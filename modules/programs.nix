@@ -54,6 +54,7 @@
     onlyoffice-desktopeditors
     libreoffice
     calibre
+    zotero
     distrobox
  ];
 
