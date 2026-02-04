@@ -18,6 +18,7 @@
     starship
     kitty
     fastfetch
+    neovim
     helix
     vscode
     zed-editor
@@ -57,6 +58,19 @@
     calibre
     zotero
     distrobox
+    (python3.withPackages (python-pkgs: with python-pkgs; [
+      pip
+      pyyaml
+      pandas
+      numpy
+      scipy
+      matplotlib
+      root
+      uproot
+      requests
+      rpy2
+      torch
+    ]))
  ];
 
   fonts.packages = with pkgs; [
