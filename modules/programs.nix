@@ -38,7 +38,10 @@
     ffmpeg
     pandoc
     mpv
+    mpd
     ncmpcpp
+    amberol
+    audacious
     gimp
     inkscape
     blender
