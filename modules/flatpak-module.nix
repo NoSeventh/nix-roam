@@ -5,9 +5,14 @@
   services.flatpak.enable = true;
 
   # 2. GNOME Software 配置（备用）
-  # environment.systemPackages = with pkgs; [
-  #   gnome-software
-  # ];
+  services.desktopManager.gnome.enable = true;
+  environment.systemPackages = with pkgs; [
+    gnome-software
+    gnome-tweaks
+    gnomeExtensions.blur-my-shell
+    gnomeExtensions.just-perfection
+    gnomeExtensions.arc-menu
+  ];
 
   # 3. 国内 Flatpak 镜像源配置
   systemd.services.configure-flatpak-repo = {

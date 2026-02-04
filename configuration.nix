@@ -48,9 +48,9 @@
   security.rtkit.enable = true;
 
   # --- 6. 用户与安全 ---
-  users.users.jadmin = {
+  users.users.xuqihao = {
     isNormalUser = true;
-    description = "jadmin";
+    description = "xuqihao";
     extraGroups = [ "networkmanager" "wheel" "libvirtd" "qemu" "kvm" "docker" ]; 
   };
 
