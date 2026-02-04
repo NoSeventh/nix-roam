@@ -27,6 +27,7 @@
     cmatrix
     obsidian
     yazi
+    tmux
     bat
     lsd
     eza
