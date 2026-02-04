@@ -42,6 +42,7 @@
     thunderbird
     wireguard-tools
     syncthing
+    clashtui
     clash-verge-rev
     wechat-uos
     qq
