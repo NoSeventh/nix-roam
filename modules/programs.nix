@@ -35,6 +35,7 @@
    # obs-studio
     ffmpeg
     mpv
+    thunderbird
     wireguard-tools
     syncthing
     clash-verge-rev
