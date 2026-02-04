@@ -53,6 +53,7 @@
     wpsoffice-cn
     onlyoffice-desktopeditors
     libreoffice
+    calibre
     distrobox
  ];
 
