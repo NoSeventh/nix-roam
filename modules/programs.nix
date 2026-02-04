@@ -32,9 +32,13 @@
     eza
     nnn
     yazi
-   # obs-studio
+    obs-studio
     ffmpeg
+    pandoc
     mpv
+    gimp
+    inkscape
+    blender
     thunderbird
     wireguard-tools
     syncthing
