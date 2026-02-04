@@ -38,6 +38,7 @@
     ffmpeg
     pandoc
     mpv
+    ncmpcpp
     gimp
     inkscape
     blender
