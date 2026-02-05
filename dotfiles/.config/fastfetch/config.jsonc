@@ -89,6 +89,11 @@
             "type": "memory"
         },
         {
+            "key": "Disk         ",
+            "keyColor": "green",
+            "type": "disk"
+        },
+        {
             "key": "Local IP     ",
             "keyColor": "red",
             "type": "localip",
