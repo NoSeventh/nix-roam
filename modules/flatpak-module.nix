@@ -18,6 +18,8 @@
     gnomeExtensions.coverflow-alt-tab
     gnomeExtensions.dash-to-dock
     gnomeExtensions.dash-to-panel
+    gnomeExtensions.mihomo-tray
+    gnomeExtensions.paperwm
   ];
 
   # 3. 国内 Flatpak 镜像源配置
