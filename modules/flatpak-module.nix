@@ -12,6 +12,7 @@
     gnomeExtensions.blur-my-shell
     gnomeExtensions.just-perfection
     gnomeExtensions.arc-menu
+    gnomeExtensions.vitals
   ];
 
   # 3. 国内 Flatpak 镜像源配置
