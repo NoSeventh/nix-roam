@@ -12,7 +12,10 @@
     gnomeExtensions.blur-my-shell
     gnomeExtensions.just-perfection
     gnomeExtensions.arc-menu
-    gnomeExtensions.vitals
+    gnomeExtensions.vitals # 监控设备信息
+    gnomeExtensions.kimpanel
+    gnomeExtensions.applications-menu
+    gnomeExtensions.coverflow-alt-tab
   ];
 
   # 3. 国内 Flatpak 镜像源配置
