@@ -46,6 +46,7 @@
     gimp
     inkscape
     blender
+    dialect
     thunderbird
     wireguard-tools
     syncthing

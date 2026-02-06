@@ -13,9 +13,11 @@
     gnomeExtensions.just-perfection
     gnomeExtensions.arc-menu
     gnomeExtensions.vitals # 监控设备信息
-    gnomeExtensions.kimpanel
+    gnomeExtensions.kimpanel # 使fcitx5能在gnome中正常使用
     gnomeExtensions.applications-menu
     gnomeExtensions.coverflow-alt-tab
+    gnomeExtensions.dash-to-dock
+    gnomeExtensions.dash-to-panel
   ];
 
   # 3. 国内 Flatpak 镜像源配置
