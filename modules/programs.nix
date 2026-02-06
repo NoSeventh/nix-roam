@@ -28,6 +28,7 @@
     cmatrix
     obsidian
     yazi
+    fish
     tmux
     bat
     lsd
@@ -62,6 +63,8 @@
     calibre
     zotero
     distrobox
+    opencode
+
     (python3.withPackages (python-pkgs: with python-pkgs; [
       pip
       pyyaml
