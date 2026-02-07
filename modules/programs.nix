@@ -56,6 +56,7 @@
     clashtui
     clash-verge-rev
     eudic
+    goldendict-ng
     cherry-studio
     wechat-uos
     qq
