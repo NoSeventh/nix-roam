@@ -42,6 +42,7 @@
     pandoc
     mpv
     mpd
+    vlc
     ncmpcpp
     amberol
     audacious
