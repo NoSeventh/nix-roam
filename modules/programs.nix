@@ -14,7 +14,7 @@
   services.rustdesk-server = {
     enable = true;
     openFirewall = true;
-    #signal.relayHosts = ["example.com"];
+    signal.relayHosts = ["example.com"];
   };
 
   environment.systemPackages = with pkgs; [
@@ -78,6 +78,7 @@
     mattermost-desktop
     google-chrome
     rustdesk-flutter
+    anydesk
     #todesk
     wpsoffice-cn
     onlyoffice-desktopeditors
