@@ -55,6 +55,7 @@
     syncthing
     clashtui
     clash-verge-rev
+    eudic
     cherry-studio
     wechat-uos
     qq
