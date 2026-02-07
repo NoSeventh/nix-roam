@@ -23,10 +23,10 @@
     vscode
     zed-editor
     siyuan
+    obsidian
     root
     btop
     cmatrix
-    obsidian
     yazi
     fish
     tmux
