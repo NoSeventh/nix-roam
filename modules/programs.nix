@@ -57,6 +57,8 @@
     #clashtui
     clash-verge-rev
     clash-nyanpasu
+    sing-box
+    v2rayn
     eudic
     goldendict-ng
     cherry-studio
