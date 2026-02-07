@@ -79,6 +79,7 @@
 
     (python3.withPackages (python-pkgs: with python-pkgs; [
       pip
+      jupyter
       pyyaml
       pandas
       numpy
