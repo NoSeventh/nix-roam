@@ -84,6 +84,7 @@
       pandas
       numpy
       scipy
+      sympy
       matplotlib
       root
       uproot
