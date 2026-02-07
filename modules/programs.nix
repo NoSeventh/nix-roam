@@ -56,6 +56,7 @@
     qq
     wemeet
     psst # a spotify client written in rust
+    cider # a apple music client
     zoom-us
     mattermost
     mattermost-desktop
