@@ -54,8 +54,9 @@
     thunderbird
     wireguard-tools
     syncthing
-    clashtui
+    #clashtui
     clash-verge-rev
+    clash-nyanpasu
     eudic
     goldendict-ng
     cherry-studio
