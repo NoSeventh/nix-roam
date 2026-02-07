@@ -57,6 +57,7 @@
     wemeet
     zoom-us
     mattermost
+    mattermost-desktop
     google-chrome
     #rustdesk
     wpsoffice-cn
