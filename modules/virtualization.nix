@@ -6,7 +6,7 @@
       enable = true;
     };
 
-    podman.enable = false;
+    podman.enable = true;
 
     libvirtd = {
       enable = true;
@@ -16,6 +16,8 @@
         runAsRoot = false;
         # ovmf submodule REMOVED: All OVMF images are now available by default in nixpkgs-unstable
         swtpm.enable = true; # TPM emulation
+        vhostUserPackages = with pkgs; [ virtiofsd ];
+
         verbatimConfig = ''
           user = "qemu-libvirtd"
           group = "kvm"
@@ -52,6 +54,7 @@
     spice-protocol # SPICE protocol headers
     virglrenderer # Virtual GPU support
     mesa # OpenGL support for VMs
+    wineWowPackages.stable # a wine that support both 32- and 64-bit applications
   ];
 
   # Enable necessary kernel modules for VM performance

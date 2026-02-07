@@ -4,11 +4,18 @@
 # Install firefox.
   programs.firefox.enable = true;
 
-# 安装  flatpak
-  services.flatpak.enable = true;
-  
-# 启用 virt-manager 程序
-  programs.virt-manager.enable = true;
+  programs.steam = {
+    enable = true; # Master switch, already covered in installation
+    remotePlay.openFirewall = true;  # Open ports in the firewall for Steam Remote Play
+    dedicatedServer.openFirewall = true; # Open ports for Source Dedicated Server hosting
+    # Other general flags if available can be set here.
+  };
+
+  services.rustdesk-server = {
+    enable = true;
+    openFirewall = true;
+    #signal.relayHosts = ["example.com"];
+  };
 
   environment.systemPackages = with pkgs; [
     vim
@@ -17,22 +24,86 @@
     starship
     kitty
     fastfetch
-    nerd-fonts.jetbrains-mono
+    neovim
     helix
+    vscode
+    zed-editor
+    siyuan
+    obsidian
+    root
     btop
     cmatrix
-    obsidian
     yazi
+    fish
+    tmux
     bat
     lsd
+    eza
+    nnn
+    yazi
+    qbittorrent
+    p7zip 
+    obs-studio
+    ffmpeg
+    pandoc
+    mpv
+    mpd
+    vlc
+    ncmpcpp
+    amberol
+    audacious
+    krita
+    gimp
+    inkscape
+    blender
+    dialect
+    thunderbird
     wireguard-tools
+    syncthing
+    #clashtui
+    clash-verge-rev
+    clash-nyanpasu
+    sing-box
+    v2rayn
+    eudic
+    goldendict-ng
+    cherry-studio
+    wechat-uos
+    qq
+    wemeet
+    psst # a spotify client written in rust
+    cider # a apple music client
+    zoom-us
+    mattermost
+    mattermost-desktop
+    google-chrome
+    #todesk
+    wpsoffice-cn
+    onlyoffice-desktopeditors
+    libreoffice
+    calibre
+    zotero
+    distrobox
+    opencode
+
+    (python3.withPackages (python-pkgs: with python-pkgs; [
+      pip
+      jupyter
+      pyyaml
+      pandas
+      numpy
+      scipy
+      sympy
+      matplotlib
+      root
+      uproot
+      requests
+      rpy2
+      torch
+    ]))
  ];
 
-
-# 启用 libvirt 服务
-  virtualisation.libvirtd = {
-    enable = true;
-   # 启用 virtiofsd 支持，这会自动处理 qemu 依赖
-    qemu.vhostUserPackages = with pkgs; [ virtiofsd ];
-  };
+  fonts.packages = with pkgs; [
+    nerd-fonts.jetbrains-mono
+  ];
 }
