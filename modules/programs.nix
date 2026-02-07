@@ -77,6 +77,7 @@
     mattermost
     mattermost-desktop
     google-chrome
+    rustdesk-flutter
     #todesk
     wpsoffice-cn
     onlyoffice-desktopeditors
