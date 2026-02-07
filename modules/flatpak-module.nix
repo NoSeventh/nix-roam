@@ -1,8 +1,9 @@
 { pkgs, ... }:
 
 {
-  # 1. 开启 Flatpak 核心服务
+  # 1. 开启 Flatpak 和 Linyaps核心服务
   services.flatpak.enable = true;
+  services.linyaps.enable = true;
 
   # 2. GNOME Software 配置（备用）
   services.desktopManager.gnome.enable = true;
