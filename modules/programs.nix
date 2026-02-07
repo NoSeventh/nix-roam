@@ -35,6 +35,8 @@
     eza
     nnn
     yazi
+    qbittorrent
+    p7zip 
     obs-studio
     ffmpeg
     pandoc
@@ -43,6 +45,7 @@
     ncmpcpp
     amberol
     audacious
+    krita
     gimp
     inkscape
     blender
