@@ -55,6 +55,7 @@
     wechat-uos
     qq
     wemeet
+    psst # a spotify client written in rust
     zoom-us
     mattermost
     mattermost-desktop
