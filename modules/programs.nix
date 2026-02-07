@@ -14,7 +14,7 @@
   services.rustdesk-server = {
     enable = true;
     openFirewall = true;
-    signal.relayHosts = ["example.com"];
+    #signal.relayHosts = ["example.com"];
   };
 
   environment.systemPackages = with pkgs; [
