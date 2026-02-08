@@ -55,8 +55,12 @@
     krita
     gimp
     inkscape
+    digikam
+    darktable
     blender
     dialect
+    xnconvert
+    uget
     thunderbird
     wireguard-tools
     syncthing
@@ -77,7 +81,6 @@
     mattermost
     mattermost-desktop
     google-chrome
-    vivaldi
     rustdesk-flutter
     anydesk
     #todesk
