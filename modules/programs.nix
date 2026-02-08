@@ -77,6 +77,7 @@
     mattermost
     mattermost-desktop
     google-chrome
+    vivaldi
     rustdesk-flutter
     anydesk
     #todesk
