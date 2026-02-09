@@ -47,6 +47,10 @@
   };
   security.rtkit.enable = true;
 
+  services.logind = {
+    lidSwitch = "hibernate";
+  };
+
   # --- 6. 用户与安全 ---
   users.users.xuqihao = {
     isNormalUser = true;
