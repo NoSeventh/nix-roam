@@ -48,7 +48,9 @@
   security.rtkit.enable = true;
 
   services.logind = {
-    lidSwitch = "hibernate";
+    lidSwitch = "hibernate"; # 合盖休眠
+    lidSwitchExternalPower = "suspend"; # 外接电源时合盖挂起
+    lidSwitchDocked = "ignore"; # docked状态（如拓展坞）时忽略合盖
   };
 
   # --- 6. 用户与安全 ---
