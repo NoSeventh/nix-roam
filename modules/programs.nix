@@ -93,6 +93,7 @@
     zotero
     distrobox
     opencode
+    kdePackages.kdeconnect-kde
 
     (python3.withPackages (python-pkgs: with python-pkgs; [
       pip
