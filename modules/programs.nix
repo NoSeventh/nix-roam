@@ -52,6 +52,8 @@
     ncmpcpp
     amberol
     audacious
+    snipaste
+    flameshot
     krita
     gimp
     inkscape
