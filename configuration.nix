@@ -48,7 +48,7 @@
   security.rtkit.enable = true;
 
   services.logind = {
-    lidSwitch = "hibernate"; # 合盖休眠
+    lidSwitch = "suspend"; # 合盖挂起（本机swap分区不够大，无法休眠（hibernate））
     lidSwitchExternalPower = "suspend"; # 外接电源时合盖挂起
     lidSwitchDocked = "ignore"; # docked状态（如拓展坞）时忽略合盖
   };
