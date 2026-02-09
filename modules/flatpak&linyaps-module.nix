@@ -21,6 +21,8 @@
     gnomeExtensions.dash-to-panel
     gnomeExtensions.mihomo-tray
     gnomeExtensions.paperwm
+    gnomeExtensions.auto-move-windows
+    gnomeExtensions.smart-auto-move
   ];
   
   programs.dconf.profiles.user.databases = [
