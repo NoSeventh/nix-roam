@@ -1,8 +1,8 @@
 { config, pkgs, ... }:
 
 {
-# Install firefox.
   programs.firefox.enable = true;
+  programs.chromium.enable = true;
 
   programs.steam = {
     enable = true; # Master switch, already covered in installation
