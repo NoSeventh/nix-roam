@@ -97,6 +97,20 @@
     opencode
     howdy # 人脸识别软件
     rstudio
+    jetbrains-toolbox
+    jetbrains.idea-oss
+    jetbrains.idea
+    jetbrains.clion
+    jetbrains.rust-rover
+    jetbrains.goland
+    jetbrains.pycharm-oss
+    jetbrains.pycharm
+    jetbrains.ruby-mine
+    jetbrains.rider
+    jetbrains.mps
+    jetbrains.datagrip
+    jetbrains.webstorm
+    jetbrains.phpstorm
     kdePackages.kdeconnect-kde
 
     (python3.withPackages (python-pkgs: with python-pkgs; [
