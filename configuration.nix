@@ -62,6 +62,8 @@
 
   nixpkgs.config.allowUnfree = true;
   services.openssh.enable = true;
+  programs.ssh.askPassword = pkgs.lib.mkForce "${pkgs.seahorse.out}/libexec/seahorse/ssh-askpass";
+  #programs.ssh.askPassword = mkDefault "${pkgs.plasma6Packages.ksshaskpass.out}/bin/ksshaskpass";
 
   # --- 7. 系统软件包 ---
   environment.systemPackages = with pkgs; [

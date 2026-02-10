@@ -7,6 +7,7 @@
 
   # 2. GNOME Software 配置（备用）
   services.desktopManager.gnome.enable = true;
+  services.desktopManager.plasma6.enable = true;
   environment.systemPackages = with pkgs; [
     gnome-software
     gnome-tweaks
@@ -23,6 +24,8 @@
     gnomeExtensions.paperwm
     gnomeExtensions.auto-move-windows
     gnomeExtensions.smart-auto-move
+    gnomeExtensions.lunar-calendar
+    gnomeExtensions.user-themes
   ];
   
   programs.dconf.profiles.user.databases = [
