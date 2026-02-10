@@ -95,6 +95,8 @@
     zotero
     distrobox
     opencode
+    howdy # 人脸识别软件
+    rstudio
     kdePackages.kdeconnect-kde
 
     (python3.withPackages (python-pkgs: with python-pkgs; [
@@ -112,8 +114,8 @@
       rpy2
       torch
     ]))
- ];
-
+    
+  ];
   fonts.packages = with pkgs; [
     nerd-fonts.jetbrains-mono
   ];
