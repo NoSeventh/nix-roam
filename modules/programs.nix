@@ -26,6 +26,7 @@
     fastfetch
     neovim
     helix
+    emacs
     vscode
     zed-editor
     siyuan
@@ -49,6 +50,7 @@
     mpv
     mpd
     vlc
+    go-musicfox
     ncmpcpp
     amberol
     audacious
