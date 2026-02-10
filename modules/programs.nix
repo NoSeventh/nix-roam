@@ -62,6 +62,7 @@
     digikam
     darktable
     blender
+    #davinci-resolve
     dialect
     xnconvert
     uget
