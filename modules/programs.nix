@@ -24,6 +24,7 @@
     starship
     kitty
     fastfetch
+    cpu-x
     neovim
     helix
     emacs
