@@ -26,6 +26,7 @@
     fastfetch
     cpu-x
     neovim
+    neovide
     helix
     emacs
     vscode
