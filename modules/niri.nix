@@ -9,6 +9,7 @@ environment.systemPackages = with pkgs; [
    fuzzel
    alacritty
    bibata-cursors
+   xwayland-satellite
   ];
 
 environment.variables = {
