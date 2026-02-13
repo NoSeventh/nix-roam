@@ -8,6 +8,8 @@
 
     podman.enable = true;
 
+    waydroid.enable = true;
+
     libvirtd = {
       enable = true;
       onBoot = "start";
