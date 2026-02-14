@@ -99,6 +99,7 @@
     distrobox
     opencode
     howdy # 人脸识别软件
+    wego
     rstudio
     jetbrains-toolbox
     jetbrains.idea-oss
