@@ -45,7 +45,7 @@
     nnn
     yazi
     qbittorrent
-    p7zip 
+    p7zip
     obs-studio
     ffmpeg
     pandoc
@@ -81,7 +81,7 @@
     cherry-studio
     wechat-uos
     qq
-    wemeet
+    # wemeet
     psst # a spotify client written in rust
     cider # a apple music client
     zoom-us
@@ -132,7 +132,7 @@
       rpy2
       torch
     ]))
-    
+
   ];
   fonts.packages = with pkgs; [
     nerd-fonts.jetbrains-mono
