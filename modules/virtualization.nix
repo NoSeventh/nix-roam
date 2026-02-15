@@ -56,7 +56,7 @@
     spice-protocol # SPICE protocol headers
     virglrenderer # Virtual GPU support
     mesa # OpenGL support for VMs
-    wineWowPackages.stableFull # a wine that support both 32- and 64-bit applications
+    wineWow64Packages.stableFull # a wine that support both 32- and 64-bit applications
   ];
 
   # Enable necessary kernel modules for VM performance
