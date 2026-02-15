@@ -55,7 +55,6 @@
     kew # a music player in terminel
     termusic # a music player in terminel written in rust
     go-musicfox
-    kew
     ncmpcpp
     amberol
     audacious
@@ -67,7 +66,7 @@
     digikam
     darktable
     blender
-    #davinci-resolve
+    # davinci-resolve
     dialect
     xnconvert
     uget
