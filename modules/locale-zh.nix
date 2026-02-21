@@ -22,15 +22,15 @@
     enable = true;
     type = "fcitx5";
     fcitx5.addons = with pkgs; [
-      qt6Packages.fcitx5-chinese-addons 
-      qt6Packages.fcitx5-configtool     
-      
-      fcitx5-gtk                        
-      
-      fcitx5-nord                       
-      fcitx5-pinyin-zhwiki             
-      fcitx5-lua                       
-      fcitx5-rime 
+      qt6Packages.fcitx5-chinese-addons
+      qt6Packages.fcitx5-configtool
+
+      fcitx5-gtk
+
+      fcitx5-nord
+      fcitx5-pinyin-zhwiki
+      fcitx5-lua
+      fcitx5-rime
       rime-ice
     ];
     fcitx5.waylandFrontend = true;
@@ -42,13 +42,23 @@
     fontDir.enable = true; # 启用旧版字体路径兼容
     packages = with pkgs; [
       cascadia-code
-      noto-fonts 
+      noto-fonts
       noto-fonts-cjk-sans    # 思源黑体
       noto-fonts-cjk-serif   # 思源宋体
       noto-fonts-color-emoji
       source-han-sans        # 思源黑体
+      unifont
+      dejavu_fonts
+      jetbrains-mono
+      maple-mono.variable
+      hack-font
+      source-code-pro
+      sarasa-gothic
+      nerd-fonts.symbols-only
+      font-awesome
+      material-design-icons
     ];
-    
+
     fontconfig = {
       defaultFonts = {
         sansSerif = [ "Noto Sans CJK SC" "DejaVu Sans" ];
