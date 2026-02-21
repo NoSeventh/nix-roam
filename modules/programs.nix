@@ -27,6 +27,7 @@
     fastfetch
     dust
     cpu-x
+    proxypin
     neovim
     neovide
     helix
