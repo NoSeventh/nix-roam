@@ -48,6 +48,7 @@
     nnn
     yazi
     qbittorrent
+    yt-dlp
     p7zip
     obs-studio
     ffmpeg
