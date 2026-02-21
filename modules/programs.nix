@@ -21,9 +21,11 @@
     vim
     wget
     git
+    lazygit
     starship
     kitty
     fastfetch
+    dust
     cpu-x
     neovim
     neovide
@@ -33,6 +35,7 @@
     zed-editor
     siyuan
     obsidian
+    glow
     root
     btop
     cmatrix
