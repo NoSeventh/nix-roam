@@ -22,6 +22,7 @@
     wget
     git
     lazygit
+    delta
     starship
     kitty
     fastfetch
