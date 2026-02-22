@@ -43,6 +43,7 @@
     yazi
     fish
     tmux
+    zellij # a modern tmux written in rust
     bat
     lsd
     eza
