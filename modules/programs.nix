@@ -95,6 +95,7 @@
     mattermost
     mattermost-desktop
     google-chrome
+    microsoft-edge
     servo
     rustdesk-flutter
     anydesk
