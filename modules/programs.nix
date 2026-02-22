@@ -95,6 +95,7 @@
     mattermost
     mattermost-desktop
     google-chrome
+    servo
     rustdesk-flutter
     anydesk
     #todesk
