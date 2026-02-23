@@ -43,6 +43,9 @@
     cmatrix
     yazi
     fish
+    oh-my-fish
+    zsh
+    oh-my-zsh
     tmux
     zellij # a modern tmux written in rust
     bat
@@ -127,6 +130,7 @@
     jetbrains.webstorm
     jetbrains.phpstorm
     kdePackages.kdeconnect-kde
+    kdePackages.kolourpaint
 
     (python3.withPackages (python-pkgs: with python-pkgs; [
       pip
