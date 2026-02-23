@@ -44,8 +44,8 @@
     yazi
     fish
     oh-my-fish
-    zsh
-    oh-my-zsh
+    # zsh
+    # oh-my-zsh
     tmux
     zellij # a modern tmux written in rust
     bat
