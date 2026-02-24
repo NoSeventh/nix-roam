@@ -57,6 +57,10 @@
       nerd-fonts.symbols-only
       font-awesome
       material-design-icons
+      ark-pixel-font
+      arphic-ukai
+      arphic-uming
+      babelstone-han
     ];
 
     fontconfig = {
