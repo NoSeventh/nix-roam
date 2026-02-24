@@ -27,6 +27,9 @@
     kitty
     ipfetch
     fastfetch
+    honeyfetch
+    fd
+    ripgrep
     dust
     cpu-x
     proxypin
@@ -41,8 +44,15 @@
     glow
     root
     btop
+    bottom
+    zenith
+    procs
+    bandwhich
+    aria2
     cmatrix
     yazi
+    calcurse
+    chafa
     fish
     oh-my-fish
     # zsh
@@ -52,6 +62,8 @@
     bat
     lsd
     eza
+    tree
+    tre-command
     nnn
     yazi
     qbittorrent
