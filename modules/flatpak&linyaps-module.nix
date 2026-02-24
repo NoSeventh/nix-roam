@@ -5,7 +5,7 @@
   services.flatpak.enable = true;
   services.linyaps.enable = true;
 
-  # 2. GNOME Software 配置（备用）
+  # 2. GNOME && KDE Software 配置（备用）
   services.desktopManager.gnome.enable = true;
   services.desktopManager.plasma6.enable = true;
   environment.systemPackages = with pkgs; [
@@ -26,8 +26,10 @@
     gnomeExtensions.smart-auto-move
     gnomeExtensions.lunar-calendar
     gnomeExtensions.user-themes
+    kdePackages.kdeconnect-kde
+    kdePackages.kolourpaint
   ];
-  
+
   programs.dconf.profiles.user.databases = [
     {
       settings = {

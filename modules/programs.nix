@@ -25,6 +25,7 @@
     delta
     starship
     kitty
+    ipfetch
     fastfetch
     dust
     cpu-x
@@ -129,8 +130,6 @@
     jetbrains.datagrip
     jetbrains.webstorm
     jetbrains.phpstorm
-    kdePackages.kdeconnect-kde
-    kdePackages.kolourpaint
 
     (python3.withPackages (python-pkgs: with python-pkgs; [
       pip
