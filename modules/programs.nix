@@ -103,6 +103,7 @@
     sing-box
     v2rayn
     eudic
+    wordbook
     goldendict-ng
     cherry-studio
     wechat-uos
