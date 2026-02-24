@@ -28,6 +28,7 @@
     gnomeExtensions.user-themes
     kdePackages.kdeconnect-kde
     kdePackages.kolourpaint
+    kdePackages.calligra
   ];
 
   programs.dconf.profiles.user.databases = [
