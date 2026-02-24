@@ -78,6 +78,7 @@
     kew # a music player in terminel
     termusic # a music player in terminel written in rust
     go-musicfox
+    qqmusic
     ncmpcpp
     amberol
     audacious
