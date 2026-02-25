@@ -16,6 +16,7 @@
     # inputs.dms.packages.${pkgs.stdenv.hostPlatform.system}.default
     noctalia-shell
     dms-shell
+    dsearch
     # ... 可能还有其他软件包
   ];
 }
