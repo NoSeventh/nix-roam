@@ -62,6 +62,7 @@
       arphic-uming
       babelstone-han
       # vista-fonts-chs
+      vista-fonts-cht
       vista-fonts
     ];
 
