@@ -1,7 +1,7 @@
 { config, pkgs, ... }:
 
 {
-  imports = [ 
+  imports = [
     ./hardware-configuration.nix
   ];
 
@@ -21,9 +21,16 @@
   time.timeZone = "Asia/Shanghai";
 
   services.xserver.enable = true;
-  services.displayManager.gdm.enable = true;
-  services.desktopManager.gnome.enable = true;
-  
+  services.displayManager = {
+    defaultSession = "niri";
+    gdm.enable = true;
+  };
+
+  # services.xserver.displayManager.lightdm = {
+  #   enable = true;
+  #   greeters.mini.enable = true;
+  # };
+
   # 为 GNOME 视频软件使用 OpenGL 兼容层
   environment.sessionVariables.GDK_GL = "gles";
 
@@ -39,7 +46,7 @@
     extraPackages = with pkgs; [
     ];
   };
-  
+
   services.pipewire = {
     enable = true;
     alsa.enable = true;
@@ -59,7 +66,7 @@
   users.users.xuqihao = {
     isNormalUser = true;
     description = "xuqihao";
-    extraGroups = [ "networkmanager" "wheel" "libvirtd" "qemu" "kvm" "docker" ]; 
+    extraGroups = [ "networkmanager" "wheel" "libvirtd" "qemu" "kvm" "docker" ];
   };
 
   nixpkgs.config.allowUnfree = true;

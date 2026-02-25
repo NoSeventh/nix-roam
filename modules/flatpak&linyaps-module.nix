@@ -29,6 +29,7 @@
     kdePackages.kdeconnect-kde
     kdePackages.kolourpaint
     kdePackages.calligra
+    kdePackages.kdenlive
   ];
 
   programs.dconf.profiles.user.databases = [

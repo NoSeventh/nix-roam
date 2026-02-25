@@ -44,6 +44,8 @@
     glow
     root
     btop
+    impala
+    bluetui
     bottom
     zenith
     procs
@@ -84,6 +86,7 @@
     audacious
     snipaste
     flameshot
+    pinta
     krita
     gimp
     inkscape
@@ -97,6 +100,7 @@
     thunderbird
     wireguard-tools
     syncthing
+    localsend
     #clashtui
     clash-verge-rev
     clash-nyanpasu
