@@ -64,6 +64,7 @@
       # vista-fonts-chs
       vista-fonts-cht
       vista-fonts
+      # google-fonts
     ];
 
     fontconfig = {
