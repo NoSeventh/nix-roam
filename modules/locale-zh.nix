@@ -61,6 +61,8 @@
       arphic-ukai
       arphic-uming
       babelstone-han
+      # vista-fonts-chs
+      vista-fonts
     ];
 
     fontconfig = {
