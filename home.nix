@@ -175,5 +175,21 @@
     ".config/helix/config.toml" = {
       source = ./dotfiles/.config/helix/config.toml;
     };
+    # ".config/hypr" = {
+    #   source = ./dotfiles/.config/hypr;
+    #   recursive = true;
+    # };
+    # ".config/niri" = {
+    #   source = ./dotfiles/.config/niri;
+    #   recursive = true;
+    # };
+    ".config/kitty" = {
+      source = ./dotfiles/.config/kitty;
+      recursive = true;
+    };
+    ".config/fastfetch" = {
+      source = ./dotfiles/.config/fastfetch;
+      recursive = true;
+    };
   };
 }

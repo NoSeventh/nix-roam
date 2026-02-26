@@ -53,7 +53,7 @@ overview {
 }
 
 // ================ 启动时自动运行的程序 ================
-spawn-at-startup "sh" "-c" "nohup noctalia-shell >/dev/null 2>&1 &"
+//spawn-at-startup "sh" "-c" "nohup noctalia-shell >/dev/null 2>&1 &"
 
 // ================ 环境变量设置 ================
 environment {
@@ -61,11 +61,11 @@ environment {
     MOZ_ENABLE_WAYLAND "1"   // Firefox使用Wayland
     XDG_SESSION_TYPE "wayland"
     GDK_BACKEND "wayland"    // GTK应用使用Wayland
-    
+
     // 终端设置
     TERM "kitty"
     TERMINAL "kitty"
-    
+
     // 其他重要设置
     QT_QPA_PLATFORMTHEME "qt6ct" // Qt主题引擎
 }
@@ -157,8 +157,8 @@ binds {
     Mod+Comma hotkey-overlay-title="设置" { spawn "noctalia-shell" "ipc" "call" "settings" "toggle"; }
     Super+Alt+L hotkey-overlay-title="锁屏" { spawn "noctalia-shell" "ipc" "call" "lockScreen" "lock"; }
     Mod+Space hotkey-overlay-title="应用启动器" { spawn "noctalia-shell" "ipc" "call" "launcher" "toggle"; }
-    Mod+Shift+Slash hotkey-overlay-title="捷键概览" { show-hotkey-overlay; } 
-    
+    Mod+Shift+Slash hotkey-overlay-title="捷键概览" { show-hotkey-overlay; }
+
     // -------- 焦点移动（HJKL / 方向键） --------
     // 焦点（禁用重复）
     Mod+Left repeat=false { focus-column-left; }
@@ -179,7 +179,7 @@ binds {
     Mod+Ctrl+J { move-window-down; }
     Mod+Ctrl+K { move-window-up; }
     Mod+Ctrl+L { move-column-right; }
-    
+
     Mod+Home { focus-column-first; }
     Mod+End { focus-column-last; }
     Mod+Ctrl+Home { move-column-to-first; }
@@ -232,12 +232,12 @@ binds {
     Mod+Page_Up { focus-workspace-up; }
     Mod+U { focus-workspace-down; }
     Mod+I { focus-workspace-up; }
-    
+
     Mod+Ctrl+Page_Down { move-column-to-workspace-down; }
     Mod+Ctrl+Page_Up { move-column-to-workspace-up; }
     Mod+Ctrl+U { move-column-to-workspace-down; }
     Mod+Ctrl+I { move-column-to-workspace-up; }
-    
+
     Mod+Shift+Page_Down { move-workspace-down; }
     Mod+Shift+Page_Up { move-workspace-up; }
     Mod+Shift+U { move-workspace-down; }
@@ -262,7 +262,7 @@ binds {
     Mod+R hotkey-overlay-title="切换列宽预设" { switch-preset-column-width; }
     Mod+O hotkey-overlay-title="窗口预览 (Toggle Overview)" repeat=false { toggle-overview; }
     Mod+BracketLeft hotkey-overlay-title="窗口靠左侧" repeat=false { consume-or-expel-window-left; }
-    Mod+BracketRight hotkey-overlay-title="窗口靠右侧" repeat=false { consume-or-expel-window-right; }  
+    Mod+BracketRight hotkey-overlay-title="窗口靠右侧" repeat=false { consume-or-expel-window-right; }
 
     // -------- 系统操作 --------
     Mod+Shift+E hotkey-overlay-title="退出 Niri" { quit skip-confirmation=true; }  // 退出 Niri（跳过确认）
