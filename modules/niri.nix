@@ -6,13 +6,14 @@
 programs.niri.enable = true;
 
 environment.systemPackages = with pkgs; [
-   fuzzel
+   # fuzzel
    alacritty
    bibata-cursors
+   xwayland-satellite
   ];
 
 environment.variables = {
     XCURSOR_THEME = "Bibata-Modern-Ice";
-    XCURSOR_SIZE = "24";  
+    XCURSOR_SIZE = "24";
   };
 }

@@ -1,11 +1,13 @@
 { pkgs, ... }:
 
 {
-  # 1. 开启 Flatpak 核心服务
+  # 1. 开启 Flatpak 和 Linyaps核心服务
   services.flatpak.enable = true;
+  services.linyaps.enable = true;
 
-  # 2. GNOME Software 配置（备用）
+  # 2. GNOME && KDE Software 配置（备用）
   services.desktopManager.gnome.enable = true;
+  services.desktopManager.plasma6.enable = true;
   environment.systemPackages = with pkgs; [
     gnome-software
     gnome-tweaks
@@ -20,6 +22,29 @@
     gnomeExtensions.dash-to-panel
     gnomeExtensions.mihomo-tray
     gnomeExtensions.paperwm
+    gnomeExtensions.auto-move-windows
+    gnomeExtensions.smart-auto-move
+    gnomeExtensions.lunar-calendar
+    gnomeExtensions.user-themes
+    kdePackages.kdeconnect-kde
+    kdePackages.kolourpaint
+    kdePackages.calligra
+    kdePackages.kdenlive
+  ];
+
+  programs.dconf.profiles.user.databases = [
+    {
+      settings = {
+        "org/gnome/mutter" = {
+          experimental-features = [
+            "scale-monitor-framebuffer" # Enables fractional scaling (125% 150% 175%)
+            "variable-refresh-rate" # Enables Variable Refresh Rate (VRR) on compatible displays
+            "xwayland-native-scaling" # Scales Xwayland applications to look crisp on HiDPI screens
+            "autoclose-xwayland" # automatically terminates Xwayland if all relevant X11 clients are gone
+          ];
+        };
+      };
+    }
   ];
 
   # 3. 国内 Flatpak 镜像源配置
