@@ -83,5 +83,5 @@
     gst_all_1.gst-plugins-ugly
   ];
 
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }

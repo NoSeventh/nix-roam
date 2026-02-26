@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    
+
     quickshell = {
       url = "git+https://git.outfoxxed.me/quickshell/quickshell";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -18,15 +18,20 @@
       url = "github:noctalia-dev/noctalia-shell";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    home-manager = {
+          url = "github:nix-community/home-manager/master";
+          inputs.nixpkgs.follows = "nixpkgs";
+        };
   };
 
-  outputs = { self, nixpkgs, ... }@inputs: 
+  outputs = { self, nixpkgs, home-manager, ... }@inputs:
   let
     system = "x86_64-linux";
     # 自动扫描 modules 目录下的所有 .nix 文件
     configDir = ./modules;
-    generatedModules = builtins.map (file: configDir + "/${file}") 
-      (builtins.filter (file: nixpkgs.lib.hasSuffix ".nix" file) 
+    generatedModules = builtins.map (file: configDir + "/${file}")
+      (builtins.filter (file: nixpkgs.lib.hasSuffix ".nix" file)
         (builtins.attrNames (builtins.readDir configDir)));
   in
   {
@@ -35,7 +40,17 @@
       specialArgs = { inherit inputs; };
       modules = [
         ./configuration.nix
-      ] ++ generatedModules; 
+        home-manager.nixosModules.home-manager
+                  {
+                    home-manager.useGlobalPkgs = true;
+                    home-manager.useUserPackages = true;
+                    home-manager.users.xuqihao = import ./home.nix;
+
+                    # 使用 home-manager.extraSpecialArgs 自定义传递给 ./home.nix 的参数
+                    # 取消注释下面这一行，就可以在 home.nix 中使用 flake 的所有 inputs 参数了
+                    home-manager.extraSpecialArgs = inputs;
+                  }
+      ] ++ generatedModules;
     };
   };
 }
