@@ -44,6 +44,8 @@
     glow
     root
     btop
+    iftop
+    iotop
     impala
     bluetui
     bottom
