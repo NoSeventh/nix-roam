@@ -167,5 +167,13 @@
       endif
     '';
   };
-  xdg.configFile."~/.config/btop/btop.conf".source = ./dotfiles/.config/btop/btop.conf;
+  home.file = {
+    ".config/btop" = {
+      source = ./dotfiles/.config/btop;
+      recursive = true;
+    };
+    ".config/helix/config.toml" = {
+      source = ./dotfiles/.config/helix/config.toml;
+    };
+  };
 }
