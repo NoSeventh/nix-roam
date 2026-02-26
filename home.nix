@@ -167,6 +167,16 @@
       endif
     '';
   };
+  programs.ssh = {
+    enable = true;
+    matchBlocks = {
+      "juno" = {
+        hostname = "lxlogin.ihep.ac.cn";
+        user = "xuqihao";
+        port = 22;
+      };
+    };
+  };
   home.file = {
     ".config/btop" = {
       source = ./dotfiles/.config/btop;
