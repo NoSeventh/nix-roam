@@ -2,27 +2,49 @@
 {
   environment.systemPackages = with pkgs; [
     git
+    lazygit
     wget
+    vim
+    neovim
+    neovide
+    helix
+    fd
     ipfetch
     fastfetch
     honeyfetch
-    fd
-    dust
-    glow
+    btop
     iftop
     iotop
+    zenith
+    impala
+    bluetui
+    dust
     bandwhich
+    wego
+    procs
+    glow
     chafa
     bat
     lsd
     eza
     tree
     tre-command
+    cmatrix
+    yazi
+    calcurse
+    tmux
+    zellij # a modern tmux written in rust
+    nnn
+    yazi
     yt-dlp
     ffmpeg
+    kew # a music player in terminel
+    termusic # a music player in terminel written in rust
+    go-musicfox
+    ncmpcpp
     pandoc
     distrobox
-    wego
+    opencode
     # c/c++工具链
     gcc
     gnumake
