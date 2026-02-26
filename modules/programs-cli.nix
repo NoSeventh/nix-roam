@@ -23,5 +23,23 @@
     pandoc
     distrobox
     wego
+    # c/c++工具链
+    gcc
+    gnumake
+    clang
+    clang-tools
+    cmake
+    ninja
+    gdb
+    valgrind
+    pkg-config
+    # rust工具链
+    rustc
+    cargo
+    # go工具链
+    go
+    go-tools
+    gopls
+    delve
   ];
 }

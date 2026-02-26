@@ -1,9 +1,12 @@
 { config, pkgs, ... }:
 
 {
-  programs.firefox.enable = true;
-  programs.chromium.enable = true;
-
+  programs.firefox = {
+    enable = true;
+  };
+  programs.chromium = {
+    enable = true;
+  };
   programs.steam = {
     enable = true; # Master switch, already covered in installation
     remotePlay.openFirewall = true;  # Open ports in the firewall for Steam Remote Play
@@ -78,12 +81,14 @@
     zoom-us
     mattermost
     mattermost-desktop
+    electron
+    nil
     google-chrome
     # microsoft-edge
     servo
     rustdesk-flutter
     anydesk
-    #todesk
+    # todesk
     wpsoffice-cn
     onlyoffice-desktopeditors
     libreoffice
@@ -122,8 +127,5 @@
       torch
     ]))
 
-  ];
-  fonts.packages = with pkgs; [
-    nerd-fonts.jetbrains-mono
   ];
 }
