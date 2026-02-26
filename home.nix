@@ -24,6 +24,7 @@
       lt = "eza -lT --icons";
       la = "eza -la --icons";
       nrs = "sudo nixos-rebuild switch";
+      nrrs = "sudo nix-channel --update && sudo nixos-rebuild switch";
       shh = "ssh xuqihao@lxlogin.ihep.ac.cn";
       shhfs = "sshfs xuqihao@lxlogin.ihep.ac.cn:/ ~/remote/";
       afs = "cd ~/remote/afs/ihep.ac.cn/users/x/xuqihao";
@@ -35,12 +36,35 @@
       fedorabox = "distrobox enter fedorabox";
       kalibox = "distrobox enter kalibox";
       vi = "hx";
+      nv = "neovide";
 
 
 
     #   k = "kubectl";
     #   urldecode = "python3 -c 'import sys, urllib.parse as ul; print(ul.unquote_plus(sys.stdin.read()))'";
     #   urlencode = "python3 -c 'import sys, urllib.parse as ul; print(ul.quote_plus(sys.stdin.read()))'";
+    };
+  };
+  programs.starship = {
+    #一个漂亮的shell提示符
+    enable = true;
+    settings = {
+      add_newline = false;
+      aws.disabled = true;
+      gcloud.disabled = true;
+      line_break.disabled = true;
+    };
+  };
+  programs.alacritty = {
+    enable = true;
+    settings = {
+      env.TERM = "xterm-256color";
+      font = {
+        size = 12;
+        color = "#ffffff";
+      };
+      scrolling.multiplier = 5;
+      selection.save_to_clipboard = true;
     };
   };
 }

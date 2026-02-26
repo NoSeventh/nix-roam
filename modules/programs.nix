@@ -18,72 +18,30 @@
   };
 
   environment.systemPackages = with pkgs; [
-    vim
-    wget
-    git
-    lazygit
-    delta
     starship
     kitty
-    ipfetch
-    fastfetch
-    honeyfetch
-    fd
     ripgrep
-    dust
     cpu-x
     proxypin
-    neovim
-    neovide
-    helix
     emacs
     vscode
     zed-editor
     siyuan
     obsidian
-    glow
     root
-    btop
-    iftop
-    iotop
-    impala
-    bluetui
     bottom
-    zenith
-    procs
-    bandwhich
     aria2
-    cmatrix
-    yazi
-    calcurse
-    chafa
     fish
     oh-my-fish
     # zsh
     # oh-my-zsh
-    tmux
-    zellij # a modern tmux written in rust
-    bat
-    lsd
-    eza
-    tree
-    tre-command
-    nnn
-    yazi
     qbittorrent
-    yt-dlp
     p7zip
     obs-studio
-    ffmpeg
-    pandoc
     mpv
     mpd
     vlc
-    kew # a music player in terminel
-    termusic # a music player in terminel written in rust
-    go-musicfox
     qqmusic
-    ncmpcpp
     amberol
     audacious
     snipaste
@@ -131,10 +89,7 @@
     libreoffice
     calibre
     zotero
-    distrobox
-    opencode
     howdy # 人脸识别软件
-    wego
     rstudio
     jetbrains-toolbox
     jetbrains.idea-oss
