@@ -1,18 +1,41 @@
-{ config, pkgs, ... }:
-
+{
+  config,
+  pkgs,
+  inputs,
+  lib,
+  ...
+}:
 {
 
-# niri设置
-programs.niri.enable = true;
+  imports = [
+    inputs.dms.nixosModules.default
+  ];
+  # niri设置
+  programs.niri.enable = true;
+  programs.hyprland.enable = true;
+  programs.dms-shell = {
+    enable = true;
+    quickshell.package = inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.quickshell;
+    systemd.enable = true;
+    enableSystemMonitoring = true;
+    enableDynamicTheming = true;
+    enableAudioWavelength = true;
+    enableVPN = true;
+  };
 
-environment.systemPackages = with pkgs; [
-   # fuzzel
-   alacritty
-   bibata-cursors
-   xwayland-satellite
+  environment.systemPackages = with pkgs; [
+    # fuzzel
+    alacritty
+    bibata-cursors
+    xwayland-satellite
+    noctalia-shell
+    dms-shell
+    dsearch
+    # inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default
+    # inputs.dms.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
 
-environment.variables = {
+  environment.variables = {
     XCURSOR_THEME = "Bibata-Modern-Ice";
     XCURSOR_SIZE = "24";
   };

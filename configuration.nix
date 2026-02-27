@@ -15,7 +15,10 @@
   networking.networkmanager.enable = true;
 
   # --- 3. Nix 特性设置 (仅保留必要项) ---
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
 
   # --- 4. 区域与桌面 ---
   time.timeZone = "Asia/Shanghai";
@@ -33,9 +36,6 @@
 
   # 为 GNOME 视频软件使用 OpenGL 兼容层
   environment.sessionVariables.GDK_GL = "gles";
-
-  # 启用 Hyprland
-  programs.hyprland.enable = true;
 
   # --- 5. 硬件与多媒体 ---
   services.printing.enable = true;
@@ -68,7 +68,14 @@
   users.users.xuqihao = {
     isNormalUser = true;
     description = "xuqihao";
-    extraGroups = [ "networkmanager" "wheel" "libvirtd" "qemu" "kvm" "docker" ];
+    extraGroups = [
+      "networkmanager"
+      "wheel"
+      "libvirtd"
+      "qemu"
+      "kvm"
+      "docker"
+    ];
   };
 
   nixpkgs.config.allowUnfree = true;

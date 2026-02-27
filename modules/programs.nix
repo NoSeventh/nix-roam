@@ -1,4 +1,9 @@
-{ config, pkgs, ... }:
+{
+  config,
+  pkgs,
+  inputs,
+  ...
+}:
 
 {
   programs.firefox = {
@@ -9,7 +14,7 @@
   };
   programs.steam = {
     enable = true; # Master switch, already covered in installation
-    remotePlay.openFirewall = true;  # Open ports in the firewall for Steam Remote Play
+    remotePlay.openFirewall = true; # Open ports in the firewall for Steam Remote Play
     dedicatedServer.openFirewall = true; # Open ports for Source Dedicated Server hosting
     # Other general flags if available can be set here.
   };
@@ -17,8 +22,12 @@
   services.rustdesk-server = {
     enable = true;
     openFirewall = true;
-    signal.relayHosts = ["example.com"];
+    signal.relayHosts = [ "example.com" ];
   };
+
+  # environment.systemPackages = [
+  #   inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default
+  # ];
 
   environment.systemPackages = with pkgs; [
     starship
@@ -111,21 +120,23 @@
     jetbrains.webstorm
     jetbrains.phpstorm
 
-    (python3.withPackages (python-pkgs: with python-pkgs; [
-      pip
-      jupyter
-      pyyaml
-      pandas
-      numpy
-      scipy
-      sympy
-      matplotlib
-      root
-      uproot
-      requests
-      rpy2
-      torch
-    ]))
+    (python3.withPackages (
+      python-pkgs: with python-pkgs; [
+        pip
+        jupyter
+        pyyaml
+        pandas
+        numpy
+        scipy
+        sympy
+        matplotlib
+        root
+        uproot
+        requests
+        rpy2
+        torch
+      ]
+    ))
 
   ];
 }
