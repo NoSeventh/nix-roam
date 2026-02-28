@@ -31,6 +31,11 @@
     tre-command
     cmatrix
     yazi
+    fish
+    oh-my-fish
+    # zsh
+    # oh-my-zsh
+    sshfs
     calcurse
     tmux
     zellij # a modern tmux written in rust
@@ -43,6 +48,7 @@
     go-musicfox
     ncmpcpp
     pandoc
+    root
     distrobox
     opencode
     # c/c++工具链

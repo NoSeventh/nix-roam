@@ -26,6 +26,7 @@
   environment.systemPackages = with pkgs; [
     # fuzzel
     alacritty
+    alacritty-theme
     bibata-cursors
     xwayland-satellite
     noctalia-shell

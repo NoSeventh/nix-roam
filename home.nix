@@ -51,23 +51,12 @@
       line_break.disabled = true;
     };
   };
-  programs.alacritty = {
-    enable = true;
-    settings = {
-      env.TERM = "xterm-256color";
-      font = {
-        size = 12;
-      };
-      scrolling.multiplier = 5;
-      selection.save_to_clipboard = true;
-    };
-  };
   programs.vim = {
     enable = true;
     plugins = with pkgs.vimPlugins; [
       vim-airline
       gruvbox
-      catppuccin-vim   # 对应 catppuccin/vim
+      catppuccin-vim # 对应 catppuccin/vim
       vim-commentary
     ];
     settings = {
@@ -177,14 +166,57 @@
       };
     };
   };
+  programs.alacritty = {
+    enable = true;
+    settings = {
+      font = {
+        size = 12.0;
+        bold = {
+          family = "JetBrains Mono";
+          style = "Heavy";
+        };
+        italic = {
+          family = "JetBrains Mono";
+          style = "Medium Italic";
+        };
+        bold_italic = {
+          family = "JetBrains Mono";
+          style = "Heavy Italic";
+        };
+        normal = {
+          family = "JetBrains Mono";
+          style = "Medium";
+        };
+      };
+      window = {
+        decorations = "Full";
+        dynamic_padding = false;
+        opacity = 0.9;
+      };
+      scrolling = {
+        history = 1000;
+        multiplier = 5;
+      };
+      selection = {
+        save_to_clipboard = true;
+      };
+    };
+    # theme = tokyonight;
+  };
+  programs.helix = {
+    enable = true;
+    settings = {
+      theme = "tokyonight";
+    };
+  };
   home.file = {
     ".config/btop" = {
       source = ./dotfiles/.config/btop;
       recursive = true;
     };
-    ".config/helix/config.toml" = {
-      source = ./dotfiles/.config/helix/config.toml;
-    };
+    # ".config/helix/config.toml" = {
+    #   source = ./dotfiles/.config/helix/config.toml;
+    # };
     # ".config/hypr" = {
     #   source = ./dotfiles/.config/hypr;
     #   recursive = true;
@@ -201,5 +233,9 @@
       source = ./dotfiles/.config/fastfetch;
       recursive = true;
     };
+    # ".config/alacritty" = {
+    #   source = ./dotfiles/.config/alacritty;
+    #   recursive = true;
+    # };
   };
 }

@@ -40,13 +40,8 @@
     zed-editor
     siyuan
     obsidian
-    root
     bottom
     aria2
-    fish
-    oh-my-fish
-    # zsh
-    # oh-my-zsh
     qbittorrent
     p7zip
     obs-studio
@@ -73,7 +68,7 @@
     wireguard-tools
     syncthing
     localsend
-    #clashtui
+    # clashtui
     clash-verge-rev
     clash-nyanpasu
     sing-box
