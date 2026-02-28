@@ -214,6 +214,10 @@
       source = ./dotfiles/.config/btop;
       recursive = true;
     };
+    ".config/nvim" = {
+      source = ./dotfiles/.config/nvim;
+      recursive = true;
+    };
     # ".config/helix/config.toml" = {
     #   source = ./dotfiles/.config/helix/config.toml;
     # };
