@@ -41,6 +41,43 @@
       nv = "neovide";
     };
   };
+  programs.alacritty = {
+    enable = true;
+    settings = {
+      font = {
+        size = 12.0;
+        bold = {
+          family = "JetBrains Mono";
+          style = "Heavy";
+        };
+        italic = {
+          family = "JetBrains Mono";
+          style = "Medium Italic";
+        };
+        bold_italic = {
+          family = "JetBrains Mono";
+          style = "Heavy Italic";
+        };
+        normal = {
+          family = "JetBrains Mono";
+          style = "Medium";
+        };
+      };
+      window = {
+        decorations = "Full";
+        dynamic_padding = false;
+        opacity = 0.9;
+      };
+      scrolling = {
+        history = 1000;
+        multiplier = 5;
+      };
+      selection = {
+        save_to_clipboard = true;
+      };
+    };
+    # theme = tokyonight;
+  };
   programs.starship = {
     #一个漂亮的shell提示符
     enable = true;
@@ -156,6 +193,12 @@
       endif
     '';
   };
+  programs.helix = {
+    enable = true;
+    settings = {
+      theme = "tokyonight";
+    };
+  };
   programs.ssh = {
     enable = true;
     matchBlocks = {
@@ -166,47 +209,16 @@
       };
     };
   };
-  programs.alacritty = {
+  programs.fuzzel = {
     enable = true;
     settings = {
-      font = {
-        size = 12.0;
-        bold = {
-          family = "JetBrains Mono";
-          style = "Heavy";
-        };
-        italic = {
-          family = "JetBrains Mono";
-          style = "Medium Italic";
-        };
-        bold_italic = {
-          family = "JetBrains Mono";
-          style = "Heavy Italic";
-        };
-        normal = {
-          family = "JetBrains Mono";
-          style = "Medium";
-        };
+      main = {
+        font = "JetBrains Mono 12";
       };
-      window = {
-        decorations = "Full";
-        dynamic_padding = false;
-        opacity = 0.9;
+      colors = {
+        background = "#000000cc";
+        text = "ffffffff";
       };
-      scrolling = {
-        history = 1000;
-        multiplier = 5;
-      };
-      selection = {
-        save_to_clipboard = true;
-      };
-    };
-    # theme = tokyonight;
-  };
-  programs.helix = {
-    enable = true;
-    settings = {
-      theme = "tokyonight";
     };
   };
   home.file = {
