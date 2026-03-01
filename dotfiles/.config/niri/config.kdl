@@ -142,6 +142,13 @@ output "DP-2" {
     position x=1920 y=0   // 位于主显示器右侧
 }
 */
+output "eDP-1" {
+    mode "2880x1800@90"   // 3K 90Hz显示器
+    scale 2               // 200%缩放
+    transform "normal"    // 无旋转
+    variable-refresh-rate on-demand=true  // 启用可变刷新率
+    position x=0 y=0      // 主显示器
+}
 
 // ================ 快捷键绑定 ================
 binds {

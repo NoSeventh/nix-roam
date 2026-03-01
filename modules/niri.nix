@@ -7,9 +7,9 @@
 }:
 {
 
-  imports = [
-    inputs.dms.nixosModules.default
-  ];
+  # imports = [
+  #   inputs.dms.nixosModules.default
+  # ];
   # niri设置
   programs.niri.enable = true;
   programs.hyprland.enable = true;
@@ -24,7 +24,7 @@
   };
 
   environment.systemPackages = with pkgs; [
-    # fuzzel
+    fuzzel
     alacritty
     alacritty-theme
     bibata-cursors
