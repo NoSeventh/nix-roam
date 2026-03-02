@@ -29,6 +29,7 @@
     alacritty-theme
     bibata-cursors
     xwayland-satellite
+    xsettingsd
     noctalia-shell
     dms-shell
     dsearch
