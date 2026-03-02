@@ -15,7 +15,10 @@
   networking.networkmanager.enable = true;
 
   # --- 3. Nix 特性设置 (仅保留必要项) ---
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
 
   # --- 4. 区域与桌面 ---
   time.timeZone = "Asia/Shanghai";
@@ -33,9 +36,6 @@
 
   # 为 GNOME 视频软件使用 OpenGL 兼容层
   environment.sessionVariables.GDK_GL = "gles";
-
-  # 启用 Hyprland
-  programs.hyprland.enable = true;
 
   # --- 5. 硬件与多媒体 ---
   services.printing.enable = true;
@@ -57,16 +57,25 @@
   security.rtkit.enable = true;
 
   services.logind = {
-    lidSwitch = "hibernate"; # 合盖休眠
-    lidSwitchExternalPower = "suspend"; # 外接电源时合盖挂起
-    lidSwitchDocked = "suspend"; # docked状态（如拓展坞）时合盖挂起
+    settings.Login = {
+      HandleLidSwitch = "hibernate"; # 合盖休眠
+      HandleLidSwitchExternalPower = "suspend"; # 外接电源时合盖挂起
+      HandleLidSwitchDocked = "suspend"; # docked状态（如拓展坞）时合盖挂起
+    };
   };
 
   # --- 6. 用户与安全 ---
   users.users.xuqihao = {
     isNormalUser = true;
     description = "xuqihao";
-    extraGroups = [ "networkmanager" "wheel" "libvirtd" "qemu" "kvm" "docker" ];
+    extraGroups = [
+      "networkmanager"
+      "wheel"
+      "libvirtd"
+      "qemu"
+      "kvm"
+      "docker"
+    ];
   };
 
   nixpkgs.config.allowUnfree = true;
@@ -83,5 +92,5 @@
     gst_all_1.gst-plugins-ugly
   ];
 
-  system.stateVersion = "25.05";
+  system.stateVersion = "26.05";
 }
