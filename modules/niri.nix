@@ -30,7 +30,7 @@
     bibata-cursors
     xwayland-satellite
     xsettingsd
-    # noctalia-shell
+    noctalia-shell
     dms-shell
     dsearch
     # inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default

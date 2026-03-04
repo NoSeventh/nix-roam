@@ -130,7 +130,6 @@
         requests
         rpy2
         torch
-        uv-build
       ]
     ))
 

@@ -26,7 +26,7 @@
       lt = "eza -lT --icons";
       la = "eza -la --icons";
       nrs = "sudo nixos-rebuild switch";
-      nrrs = "cd ~/nixos-niri-noctalia && nix flake update && sudo nixos-rebuild switch";
+      nrrs = "sudo nix-channel --update && sudo nixos-rebuild switch";
       shh = "ssh xuqihao@lxlogin.ihep.ac.cn";
       shhfs = "sshfs xuqihao@lxlogin.ihep.ac.cn:/ ~/remote/";
       afs = "cd ~/remote/afs/ihep.ac.cn/users/x/xuqihao";

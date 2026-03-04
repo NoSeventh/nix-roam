@@ -3,7 +3,6 @@
   environment.systemPackages = with pkgs; [
     git
     lazygit
-    gitui
     wget
     vim
     neovim
@@ -40,7 +39,6 @@
     calcurse
     tmux
     zellij # a modern tmux written in rust
-    tealdeer # a modern man written in rust
     nnn
     yazi
     yt-dlp
