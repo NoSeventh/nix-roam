@@ -97,6 +97,7 @@
     onlyoffice-desktopeditors
     libreoffice
     calibre
+    readest
     zotero
     howdy # 人脸识别软件
     rstudio
