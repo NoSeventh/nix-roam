@@ -38,6 +38,9 @@
     emacs
     vscode
     zed-editor
+    code-cursor
+    claude-code
+    codex
     siyuan
     obsidian
     bottom
@@ -52,6 +55,8 @@
     amberol
     audacious
     snipaste
+    grim
+    satty
     flameshot
     pinta
     krita
