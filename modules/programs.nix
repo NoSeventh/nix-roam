@@ -43,6 +43,7 @@
     codex
     siyuan
     obsidian
+    typst
     bottom
     aria2
     qbittorrent
