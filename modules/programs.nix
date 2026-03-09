@@ -65,6 +65,11 @@
     digikam
     darktable
     blender
+    freecad
+    librecad
+    qcad
+    openscad
+    qgis
     # davinci-resolve
     dialect
     xnconvert
