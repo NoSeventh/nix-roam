@@ -38,8 +38,13 @@
     emacs
     vscode
     zed-editor
+    code-cursor
+    claude-code
+    codex
     siyuan
     obsidian
+    typst
+    texlive.combined.scheme-full
     bottom
     aria2
     qbittorrent
@@ -52,6 +57,8 @@
     amberol
     audacious
     snipaste
+    grim
+    satty
     flameshot
     pinta
     krita
@@ -60,6 +67,11 @@
     digikam
     darktable
     blender
+    freecad
+    librecad
+    qcad
+    openscad
+    qgis
     # davinci-resolve
     dialect
     xnconvert
@@ -97,6 +109,7 @@
     onlyoffice-desktopeditors
     libreoffice
     calibre
+    readest
     zotero
     howdy # 人脸识别软件
     rstudio
