@@ -39,6 +39,7 @@
       kalibox = "distrobox enter kalibox";
       vi = "hx";
       nv = "neovide";
+      root = "root -l";
     };
   };
   programs.alacritty = {

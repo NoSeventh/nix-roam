@@ -3,6 +3,8 @@
   environment.systemPackages = with pkgs; [
     git
     lazygit
+    gitui # a modern git ui written in rust
+    sd # a modern sed written in rust
     wget
     vim
     neovim
@@ -39,6 +41,7 @@
     calcurse
     tmux
     zellij # a modern tmux written in rust
+    tealdeer # a modern man written in rust
     nnn
     yazi
     yt-dlp
@@ -69,5 +72,8 @@
     go-tools
     gopls
     delve
+    # node.js
+    nodejs
+    yarn2nix
   ];
 }
