@@ -25,6 +25,7 @@
 
   environment.systemPackages = with pkgs; [
     fuzzel
+    ghostty
     alacritty
     alacritty-theme
     bibata-cursors
