@@ -27,6 +27,7 @@
     fuzzel
     ghostty
     alacritty
+    wezterm
     alacritty-theme
     bibata-cursors
     xwayland-satellite
