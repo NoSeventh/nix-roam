@@ -91,7 +91,7 @@
     cherry-studio
     wechat-uos
     qq
-    wemeet
+    # wemeet
     psst # a spotify client written in rust
     cider # a apple music client
     zoom-us
