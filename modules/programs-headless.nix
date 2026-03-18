@@ -10,6 +10,8 @@
     neovim
     neovide
     helix
+    typst
+    tinymist
     fd
     ipfetch
     fastfetch
@@ -32,7 +34,6 @@
     tree
     tre-command
     cmatrix
-    yazi
     fish
     oh-my-fish
     # zsh

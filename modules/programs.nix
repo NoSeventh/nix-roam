@@ -43,7 +43,6 @@
     codex
     siyuan
     obsidian
-    typst
     texlive.combined.scheme-full
     bottom
     aria2

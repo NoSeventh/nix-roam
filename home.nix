@@ -197,7 +197,7 @@
   programs.helix = {
     enable = true;
     settings = {
-      theme = "tokyonight";
+      theme = "base16_transparent";
     };
   };
   programs.ssh = {
