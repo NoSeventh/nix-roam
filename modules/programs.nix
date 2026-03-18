@@ -25,6 +25,11 @@
     signal.relayHosts = [ "example.com" ];
   };
 
+  services.earlyoom = {
+    enable = true;
+    enableNotifications = true;
+  };
+
   # environment.systemPackages = [
   #   inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default
   # ];
