@@ -28,7 +28,7 @@
       nrs = "sudo nixos-rebuild switch";
       nrrs = "sudo nix-channel --update && sudo nixos-rebuild switch";
       shh = "ssh xuqihao@lxlogin.ihep.ac.cn";
-      shhfs = "sshfs xuqihao@lxlogin.ihep.ac.cn:/ ~/remote/";
+      shhfs = "sshfs -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 xuqihao@lxlogin.ihep.ac.cn:/ ~/remote/";
       afs = "cd ~/remote/afs/ihep.ac.cn/users/x/xuqihao";
       scratchfs = "cd ~/remote/scratchfs/juno/xuqihao";
       junofs = "cd ~/remote/junofs/users/xuqihao";

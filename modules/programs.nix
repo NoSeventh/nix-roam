@@ -18,7 +18,6 @@
     dedicatedServer.openFirewall = true; # Open ports for Source Dedicated Server hosting
     # Other general flags if available can be set here.
   };
-
   services.rustdesk-server = {
     enable = true;
     openFirewall = true;

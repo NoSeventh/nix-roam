@@ -39,6 +39,7 @@
     # zsh
     # oh-my-zsh
     sshfs
+    sftpman
     calcurse
     tmux
     zellij # a modern tmux written in rust
