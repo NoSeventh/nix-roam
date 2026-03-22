@@ -42,29 +42,6 @@
       root = "root -l";
     };
   };
-  programs.fish = {
-    enable = true;
-    shellAliases = {
-      ll = "eza -l --icons";
-      lt = "eza -lT --icons";
-      la = "eza -la --icons";
-      nrs = "sudo nixos-rebuild switch";
-      nrrs = "sudo nix-channel --update && sudo nixos-rebuild switch";
-      shh = "ssh xuqihao@lxlogin.ihep.ac.cn";
-      shhfs = "sshfs xuqihao@lxlogin.ihep.ac.cn:/ ~/mnt/juno/";
-      afs = "cd ~/mnt/juno/afs/ihep.ac.cn/users/x/xuqihao";
-      scratchfs = "cd ~/mnt/juno/scratchfs/juno/xuqihao";
-      junofs = "cd ~/mnt/juno/junofs/users/xuqihao";
-      workfs = "cd ~/mnt/juno/workfs2/juno/xuqihao";
-      archbox = "distrobox enter archbox";
-      susebox = "distrobox enter susebox";
-      fedorabox = "distrobox enter fedorabox";
-      kalibox = "distrobox enter kalibox";
-      vi = "hx";
-      nv = "neovide";
-      root = "root -l";
-    };
-  };
   programs.alacritty = {
     enable = true;
     settings = {
