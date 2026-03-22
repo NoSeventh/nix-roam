@@ -2,7 +2,7 @@
 
 let
   user = "xuqihao";
-  mountPoint = "/home/xuqihao/remote";
+  mountPoint = "/home/xuqihao/mnt/juno";
   remote = "xuqihao@lxlogin.ihep.ac.cn:/";
 in
 {
