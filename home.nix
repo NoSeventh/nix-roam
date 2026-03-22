@@ -81,7 +81,7 @@
   };
   programs.starship = {
     #一个漂亮的shell提示符
-    enable = false;
+    enable = true;
     settings = {
       add_newline = false;
       aws.disabled = true;
