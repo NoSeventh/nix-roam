@@ -48,6 +48,7 @@
     siyuan
     obsidian
     texlive.combined.scheme-full
+    copyq
     bottom
     aria2
     qbittorrent
