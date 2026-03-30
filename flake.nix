@@ -28,6 +28,11 @@
       url = "github:nix-community/home-manager/master";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    chaotic = {
+      url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -35,6 +40,7 @@
       self,
       nixpkgs,
       home-manager,
+      chaotic,
       ...
     }@inputs:
     let
@@ -54,6 +60,7 @@
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager
+          chaotic.nixosModules.default
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
