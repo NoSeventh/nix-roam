@@ -29,6 +29,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # --- 3. Chaotic AUR 源 ---
     chaotic = {
       url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -60,7 +61,7 @@
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager
-          chaotic.nixosModules.default
+          chaotic.nixosModules.default # 从 chaotic 源导入模块
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
