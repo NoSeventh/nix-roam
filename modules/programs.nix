@@ -45,6 +45,7 @@
     code-cursor
     claude-code
     codex
+    opencode-desktop
     siyuan
     obsidian
     texlive.combined.scheme-full
