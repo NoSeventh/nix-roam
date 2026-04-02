@@ -45,6 +45,7 @@
     code-cursor
     claude-code
     codex
+    gemini-cli
     opencode-desktop
     siyuan
     obsidian
