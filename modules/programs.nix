@@ -38,6 +38,8 @@
     kitty
     ripgrep
     cpu-x
+    traceroute
+    tcping-rs
     proxypin
     emacs
     vscode
