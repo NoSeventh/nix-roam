@@ -48,6 +48,7 @@
     claude-code
     codex
     gemini-cli
+    kilocode-cli
     opencode-desktop
     siyuan
     obsidian
