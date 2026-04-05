@@ -222,24 +222,24 @@
       };
     };
   };
-  services.xsettingsd = {
-    enable = true;
-    settings = {
-      "Gtk/CursorThemeName" = "Bibata-Modern-Blue";
-      "Gtk/CursorThemeSize" = 24;
-      "Gtk/FontName" = "JetBrains Mono 24";
-      "Gtk/WindowScalingFactor" = 2;
-      # "Qt/CursorThemeName" = "Bibata-Modern-Blue";
-      # "Qt/CursorThemeSize" = 24;
-      # "Qt/FontName" = "JetBrains Mono 24";
-      # "Qt/WindowScalingFactor" = 2;
-      "Xft/Antialias" = 1;
-      "Xft/Hinting" = 1;
-      "Xft/HintStyle" = "hintfull";
-      "Xft/RGBA" = "rgb";
-      "Xft/DPI" = 196608;
-    };
-  };
+  # services.xsettingsd = {
+  #   enable = true;
+  #   settings = {
+  #     "Gtk/CursorThemeName" = "Bibata-Modern-Blue";
+  #     "Gtk/CursorThemeSize" = 24;
+  #     "Gtk/FontName" = "JetBrains Mono 24";
+  #     "Gtk/WindowScalingFactor" = 2;
+  #     # "Qt/CursorThemeName" = "Bibata-Modern-Blue";
+  #     # "Qt/CursorThemeSize" = 24;
+  #     # "Qt/FontName" = "JetBrains Mono 24";
+  #     # "Qt/WindowScalingFactor" = 2;
+  #     "Xft/Antialias" = 1;
+  #     "Xft/Hinting" = 1;
+  #     "Xft/HintStyle" = "hintfull";
+  #     "Xft/RGBA" = "rgb";
+  #     "Xft/DPI" = 196608;
+  #   };
+  # };
   home.file = {
     ".config/btop" = {
       source = ./dotfiles/.config/btop;

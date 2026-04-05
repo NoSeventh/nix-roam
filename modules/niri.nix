@@ -13,6 +13,7 @@
   # niri设置
   programs.niri.enable = true;
   programs.hyprland.enable = true;
+  programs.sway.enable = true;
   programs.dms-shell = {
     enable = true;
     quickshell.package = inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.quickshell;
