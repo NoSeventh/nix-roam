@@ -120,6 +120,8 @@
     calibre
     readest
     zotero
+    bilibili-tui
+    piliplus
     howdy # 人脸识别软件
     rstudio
     jetbrains-toolbox
