@@ -79,6 +79,13 @@
     };
     # theme = tokyonight;
   };
+  programs.ghostty = {
+    enable = true;
+    settings = {
+      theme = "TokyoNight";
+      background-opacity = "0.9";
+    };
+  };
   programs.starship = {
     #一个漂亮的shell提示符
     enable = true;
@@ -262,6 +269,10 @@
     # };
     ".config/kitty" = {
       source = ./dotfiles/.config/kitty;
+      recursive = true;
+    };
+    ".config/wezterm" = {
+      source = ./dotfiles/.config/wezterm;
       recursive = true;
     };
     ".config/fastfetch" = {

@@ -50,6 +50,7 @@
       unifont
       dejavu_fonts
       jetbrains-mono
+      nerd-fonts.jetbrains-mono
       maple-mono.variable
       hack-font
       source-code-pro
@@ -65,6 +66,7 @@
       vista-fonts-cht
       vista-fonts
       # google-fonts
+      fira-code
     ];
 
     fontconfig = {
