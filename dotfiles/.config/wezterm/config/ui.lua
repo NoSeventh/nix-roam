@@ -15,12 +15,12 @@ return {
 	colors = colors, -- 主题配色
 	hide_tab_bar_if_only_one_tab = false,
 	-- scrollbar
-	enable_scroll_bar = false, -- 是否显示滚动条
+	enable_scroll_bar = true, -- 是否显示滚动条
 	-- tab bar
-	enable_tab_bar = false, -- 是否显示标签
+	enable_tab_bar = true, -- 是否显示标签
 	use_fancy_tab_bar = true,
 	tab_max_width = 25,
-	show_tab_index_in_tab_bar = false, -- 是否显示tab标签数
+	show_tab_index_in_tab_bar = true, -- 是否显示tab标签数
 	switch_to_last_active_tab_when_closing_tab = true,
 	background = {
 		{

@@ -53,6 +53,7 @@
     siyuan
     obsidian
     texlive.combined.scheme-full
+    texlivePackages.biber
     copyq
     bottom
     aria2
