@@ -8,11 +8,11 @@
   # 2. GNOME && KDE Software 配置（备用）
   services.desktopManager.gnome.enable = true;
   services.desktopManager.plasma6.enable = true;
-  services.xserver.desktopManager.xfce.enable = true;
-  services.xserver.desktopManager.mate.enable = true;
-  services.xserver.desktopManager.lxqt.enable = true;
-  services.xserver.windowManager.i3.enable = true;
-  services.xserver.windowManager.openbox.enable = true;
+  # services.xserver.desktopManager.xfce.enable = true;
+  # services.xserver.desktopManager.mate.enable = true;
+  # services.xserver.desktopManager.lxqt.enable = true;
+  # services.xserver.windowManager.i3.enable = true;
+  # services.xserver.windowManager.openbox.enable = true;
   environment.systemPackages = with pkgs; [
     gnome-software
     gnome-tweaks
