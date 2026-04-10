@@ -106,7 +106,6 @@
     zoom-us
     mattermost
     mattermost-desktop
-    electron
     nil
     google-chrome
     # microsoft-edge
