@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, pkgs-stable, ... }:
 
 {
   # -------------------------
@@ -33,7 +33,7 @@
       User = "root";                    # 以 root 运行，可以清理所有用户的环境
       ExecStart = let
         # 遍历所有有 home 目录的用户，执行 nix-env 清理
-        cleanCmd = pkgs.writeShellScript "clean-user-generations" ''
+        cleanCmd = pkgs-stable.writeShellScript "clean-user-generations" ''
           for user_home in /home/*; do
             user=$(basename "$user_home")
             # 跳过没有 .nix-profile 的用户

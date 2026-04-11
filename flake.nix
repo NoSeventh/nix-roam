@@ -42,12 +42,21 @@
     {
       self,
       nixpkgs,
+      nixpkgs-stable,
       home-manager,
       chaotic,
       ...
     }@inputs:
     let
       system = "x86_64-linux";
+      # 定义 stable 包的快捷方式，并开启 allowUnfree 和 permittedInsecurePackages
+      pkgs-stable = import nixpkgs-stable {
+        inherit system;
+        config.allowUnfree = true;
+        config.permittedInsecurePackages = [
+          "electron-38.8.4"
+        ];
+      };
       # 自动扫描 modules 目录下的所有 .nix 文件
       configDir = ./modules;
       generatedModules = builtins.map (file: configDir + "/${file}") (
@@ -59,7 +68,7 @@
     {
       nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
         inherit system;
-        specialArgs = { inherit inputs; };
+        specialArgs = { inherit inputs pkgs-stable; };
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager

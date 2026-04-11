@@ -1,6 +1,7 @@
 {
   config,
   pkgs,
+  pkgs-stable,
   inputs,
   lib,
   ...
@@ -25,14 +26,18 @@
   };
 
   environment.systemPackages = with pkgs; [
-    fuzzel
-    ghostty
-    alacritty
-    wezterm
-    alacritty-theme
-    bibata-cursors
-    xwayland-satellite
-    xsettingsd
+    # ==================== Stable packages (不需要追新) ====================
+    pkgs-stable.fuzzel
+    pkgs-stable.ghostty
+    pkgs-stable.alacritty
+    pkgs-stable.wezterm
+    pkgs-stable.alacritty-theme
+    pkgs-stable.bibata-cursors
+    pkgs-stable.xwayland-satellite
+    pkgs-stable.xsettingsd
+
+    # ==================== Unstable packages (需要追新) ====================
+    # 自定义 shell（需要最新版本）
     noctalia-shell
     dms-shell
     dsearch

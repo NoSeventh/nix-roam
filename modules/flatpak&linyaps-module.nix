@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, pkgs-stable, ... }:
 
 {
   # 1. 开启 Flatpak 和 Linyaps核心服务
@@ -13,9 +13,12 @@
   # services.xserver.desktopManager.lxqt.enable = true;
   # services.xserver.windowManager.i3.enable = true;
   # services.xserver.windowManager.openbox.enable = true;
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = with pkgs-stable; [
+    # GNOME 软件
     gnome-software
     gnome-tweaks
+
+    # GNOME 扩展
     gnomeExtensions.blur-my-shell
     gnomeExtensions.just-perfection
     gnomeExtensions.arc-menu
@@ -31,6 +34,8 @@
     gnomeExtensions.smart-auto-move
     gnomeExtensions.lunar-calendar
     gnomeExtensions.user-themes
+
+    # KDE 应用
     kdePackages.kdeconnect-kde
     kdePackages.kolourpaint
     kdePackages.calligra
@@ -58,7 +63,7 @@
     wantedBy = [ "multi-user.target" ];
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
-    path = [ pkgs.flatpak ];
+    path = [ pkgs-stable.flatpak ];
     script = ''
       # === 选项 A: 上海交通大学 (SJTU) - 推荐 ===
       flatpak remote-add --if-not-exists flathub https://mirror.sjtu.edu.cn/flathub/flathub.flatpakrepo

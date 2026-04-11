@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, pkgs-stable, ... }:
 
 let
   user = "xuqihao";
@@ -7,7 +7,7 @@ let
 in
 {
   # 1. 确保 sshfs 可用
-  environment.systemPackages = [ pkgs.sshfs ];
+  environment.systemPackages = [ pkgs-stable.sshfs ];
 
   # 2. 创建挂载点目录（如果不存在）
   systemd.tmpfiles.rules = [
@@ -26,11 +26,11 @@ in
     serviceConfig = {
       Type = "simple";
       # 挂载命令（使用你的 SSH 密钥，无需额外指定 IdentityFile）
-      ExecStart = "${pkgs.sshfs}/bin/sshfs ${remote} ${mountPoint} -o reconnect,ServerAliveInterval=15,idmap=user";
-      ExecStop = "${pkgs.fuse}/bin/fusermount -u ${mountPoint}";
+      ExecStart = "${pkgs-stable.sshfs}/bin/sshfs ${remote} ${mountPoint} -o reconnect,ServerAliveInterval=15,idmap=user";
+      ExecStop = "${pkgs-stable.fuse}/bin/fusermount -u ${mountPoint}";
       RemainAfterExit = true;
       # 确保目录存在（如果 tmpfiles 没来得及创建）
-      ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${mountPoint}";
+      ExecStartPre = "${pkgs-stable.coreutils}/bin/mkdir -p ${mountPoint}";
     };
   };
 }

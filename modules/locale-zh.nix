@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }: {
+{ config, pkgs, pkgs-stable, lib, ... }: {
   # 设置系统的中文环境
   i18n = {
     defaultLocale = "zh_CN.UTF-8";
@@ -21,7 +21,7 @@
   i18n.inputMethod = {
     enable = true;
     type = "fcitx5";
-    fcitx5.addons = with pkgs; [
+    fcitx5.addons = with pkgs-stable; [
       qt6Packages.fcitx5-chinese-addons
       qt6Packages.fcitx5-configtool
 
@@ -40,7 +40,7 @@
   # 中文字体优化
   fonts = {
     fontDir.enable = true; # 启用旧版字体路径兼容
-    packages = with pkgs; [
+    packages = with pkgs-stable; [
       cascadia-code
       noto-fonts
       noto-fonts-cjk-sans    # 思源黑体
