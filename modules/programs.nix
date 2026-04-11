@@ -235,7 +235,7 @@
     distrobox
 
     # --- 13. 笔记/知识管理 ---
-    obsidian
+    # obsidian
     siyuan
 
     # --- 14. 开发工具（AI相关或需要最新特性）---
