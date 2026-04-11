@@ -22,45 +22,34 @@ Verify changes by rebuilding and checking system behavior after modifications.
 ## Dual-Channel Package Management
 
 This configuration uses **three nixpkgs channels**:
-- `nixpkgs` (unstable) - For packages that need to stay updated (browsers, AI tools, editors)
-- `nixpkgs-stable` (25.11) - For stable packages that don't need frequent updates
+- `nixpkgs` (unstable)
+- `nixpkgs-stable` (25.11)
 - `nixpkgs-master` - Available but not actively used
 
 ### Using pkgs-stable
 
-When adding packages to modules, decide which channel to use:
+When adding packages, use `pkgs-stable.` prefix for packages from the stable channel:
 
-**Use `pkgs` (unstable) for:**
-- AI-related tools: claude-code, codex, gemini-cli, opencode-desktop, cherry-studio
-- Browsers: firefox, chromium, google-chrome
-- Modern editors: vscode, zed-editor, code-cursor, neovim
-- Proxy tools: clash-verge-rev, sing-box, v2rayn (need latest rules)
-- Chinese software: qq, wechat-uos, obsidian
-- Custom shells: noctalia-shell, dms-shell
-
-**Use `pkgs-stable` for:**
-- Large desktop apps: libreoffice, thunderbird, calibre
-- Media players: vlc, mpv, gimp, blender
-- Development toolchains: gcc, clang, rustc, go
-- System tools: git, tmux, btop, fd, bat
-- Fonts and input methods
-- JetBrains IDEs
-
-**Example:**
 ```nix
 { config, pkgs, pkgs-stable, ... }:
 
 {
   environment.systemPackages = with pkgs; [
-    # Unstable packages (need latest)
+    # Browsers
     firefox
-    vscode
-    claude-code
+    pkgs-stable.chromium
 
-    # Stable packages (use pkgs-stable prefix)
+    # Editors
+    vscode
+    pkgs-stable.neovim
+
+    # Office
     pkgs-stable.libreoffice
+    pkgs-stable.thunderbird
+
+    # Media
     pkgs-stable.vlc
-    pkgs-stable.git
+    pkgs-stable.mpv
   ];
 }
 ```
@@ -87,8 +76,8 @@ When adding packages to modules, decide which channel to use:
 **Package lists:** Use `with pkgs; [ ... ]` pattern, prefix stable packages with `pkgs-stable.`:
 ```nix
 environment.systemPackages = with pkgs; [
-  firefox                    # unstable
-  pkgs-stable.libreoffice    # stable
+  firefox
+  pkgs-stable.libreoffice
 ];
 ```
 
@@ -223,5 +212,5 @@ Access flake packages in modules using `inputs`:
 - **Chinese locale**: System configured for zh_CN.UTF-8 with Fcitx5 input method
 - **Niri WM**: Primary Wayland compositor (with Hyprland and Sway as fallbacks)
 - **Virtualization**: Both Docker and Podman enabled - do not enable both for the same containers
-- **Dual-channel**: Remember to use `pkgs-stable.` prefix for packages that should use the stable channel
 - **Module auto-loading**: All `.nix` files in `modules/` are automatically loaded - no manual imports needed
+- **Dual-channel**: Use `pkgs-stable.` prefix for packages from the stable channel - this distinction is important for package stability

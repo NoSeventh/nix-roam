@@ -26,22 +26,27 @@
   };
 
   environment.systemPackages = with pkgs; [
-    # ==================== Stable packages (不需要追新) ====================
-    pkgs-stable.fuzzel
+    # --- 终端仿真器 ---
     pkgs-stable.ghostty
     pkgs-stable.alacritty
     pkgs-stable.wezterm
     pkgs-stable.alacritty-theme
-    pkgs-stable.bibata-cursors
-    pkgs-stable.xwayland-satellite
-    pkgs-stable.xsettingsd
 
-    # ==================== Unstable packages (需要追新) ====================
-    # 自定义 shell（需要最新版本）
+    # --- 输入法/启动器 ---
+    pkgs-stable.fuzzel
+
+    # --- 自定义 shell（需要最新版本）---
     quickshell
     noctalia-shell
     dms-shell
     dsearch
+
+    # --- Wayland 相关 ---
+    pkgs-stable.xwayland-satellite
+    pkgs-stable.xsettingsd
+
+    # --- 主题 ---
+    pkgs-stable.bibata-cursors
     # inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default
     # inputs.dms.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
