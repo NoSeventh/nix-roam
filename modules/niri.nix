@@ -17,7 +17,7 @@
   programs.sway.enable = true;
   programs.dms-shell = {
     enable = true;
-    quickshell.package = inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.quickshell;
+    # quickshell.package = inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.quickshell;
     systemd.enable = true;
     enableSystemMonitoring = true;
     enableDynamicTheming = true;
@@ -38,6 +38,7 @@
 
     # ==================== Unstable packages (需要追新) ====================
     # 自定义 shell（需要最新版本）
+    quickshell
     noctalia-shell
     dms-shell
     dsearch
