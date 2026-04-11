@@ -31,7 +31,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # --- 3. Chaotic AUR 源 ---
+    # --- 3. NixVim (声明式Neovim配置) ---
+    nixvim = {
+      url = "github:nix-community/nixvim";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # --- 4. Chaotic AUR 源 ---
     chaotic = {
       url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -76,11 +82,11 @@
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
-            home-manager.users.xuqihao = import ./home.nix;
+            home-manager.users.xuqihao = import ./home/default.nix;
 
             # 使用 home-manager.extraSpecialArgs 自定义传递给 ./home.nix 的参数
             # 取消注释下面这一行，就可以在 home.nix 中使用 flake 的所有 inputs 参数了
-            home-manager.extraSpecialArgs = inputs;
+            home-manager.extraSpecialArgs = { inherit inputs; };
           }
         ]
         ++ generatedModules;

@@ -1,5 +1,11 @@
-{ config, pkgs, ... }:
+{ config, pkgs, inputs, ... }:
+
 {
+  # 导入 NixVim Home Manager 模块和 NixVim 配置
+  imports = [
+    inputs.nixvim.homeModules.nixvim
+    ./nixvim.nix
+  ];
   home = {
     username = "xuqihao";
     homeDirectory = "/home/xuqihao";
@@ -97,7 +103,7 @@
     };
   };
   programs.vim = {
-    enable = true;
+    enable = false;  # 禁用 vim，使用 NixVim 替代
     plugins = with pkgs.vimPlugins; [
       vim-airline
       gruvbox
@@ -249,38 +255,36 @@
   # };
   home.file = {
     ".config/btop" = {
-      source = ./dotfiles/.config/btop;
+      source = ../dotfiles/.config/btop;
       recursive = true;
     };
-    ".config/nvim" = {
-      source = ./dotfiles/.config/nvim;
-      recursive = true;
-    };
+    # NixVim 现在通过 home/nixvim.nix 管理 Neovim 配置
+    # 移除了手动链接的 .config/nvim
     # ".config/helix/config.toml" = {
-    #   source = ./dotfiles/.config/helix/config.toml;
+    #   source = ../dotfiles/.config/helix/config.toml;
     # };
     # ".config/hypr" = {
-    #   source = ./dotfiles/.config/hypr;
+    #   source = ../dotfiles/.config/hypr;
     #   recursive = true;
     # };
     # ".config/niri" = {
-    #   source = ./dotfiles/.config/niri;
+    #   source = ../dotfiles/.config/niri;
     #   recursive = true;
     # };
     ".config/kitty" = {
-      source = ./dotfiles/.config/kitty;
+      source = ../dotfiles/.config/kitty;
       recursive = true;
     };
     ".config/wezterm" = {
-      source = ./dotfiles/.config/wezterm;
+      source = ../dotfiles/.config/wezterm;
       recursive = true;
     };
     ".config/fastfetch" = {
-      source = ./dotfiles/.config/fastfetch;
+      source = ../dotfiles/.config/fastfetch;
       recursive = true;
     };
     # ".config/alacritty" = {
-    #   source = ./dotfiles/.config/alacritty;
+    #   source = ../dotfiles/.config/alacritty;
     #   recursive = true;
     # };
   };

@@ -36,6 +36,7 @@ When adding packages to modules, decide which channel to use:
 - Modern editors: vscode, zed-editor, code-cursor, neovim
 - Proxy tools: clash-verge-rev, sing-box, v2rayn (need latest rules)
 - Chinese software: qq, wechat-uos, obsidian
+- Custom shells: noctalia-shell, dms-shell
 
 **Use `pkgs-stable` for:**
 - Large desktop apps: libreoffice, thunderbird, calibre
@@ -55,7 +56,7 @@ When adding packages to modules, decide which channel to use:
     firefox
     vscode
     claude-code
-    
+
     # Stable packages (use pkgs-stable prefix)
     pkgs-stable.libreoffice
     pkgs-stable.vlc
@@ -103,7 +104,7 @@ environment.systemPackages = with pkgs; [
 
 ```
 /home/xuqihao/nixos-niri-noctalia/
-├── flake.nix                 # Entry point, defines pkgs-stable
+├── flake.nix                 # Entry point, defines pkgs-stable, inputs
 ├── configuration.nix         # System-level configuration
 ├── home.nix                 # User-level configuration (Home Manager)
 ├── hardware-configuration.nix # Hardware-specific (DO NOT commit changes)
@@ -114,8 +115,7 @@ environment.systemPackages = with pkgs; [
 │   ├── locale-zh.nix        # Chinese locale, fonts, input
 │   ├── mnt.nix              # SSHFS mounts
 │   ├── niri.nix             # Niri WM, compositor
-│   ├── programs-headless.nix # CLI tools, dev tools
-│   ├── programs.nix         # GUI applications
+│   ├── programs.nix         # GUI + CLI applications (merged)
 │   └── virtualization.nix   # Docker, Podman, libvirt
 └── dotfiles/               # User config files (terminals, themes)
 ```
@@ -140,7 +140,7 @@ imports = [
 ];
 ```
 
-**Auto-loading:** The `flake.nix` automatically loads all `.nix` files from `modules/` directory.
+**Auto-loading:** The `flake.nix` automatically loads all `.nix` files from `modules/` directory using `generatedModules` pattern.
 
 **Home Manager:** User-level configuration lives in `home.nix`. Use `home.file` for dotfile management:
 ```nix
@@ -154,9 +154,12 @@ home.file.".config/nvim" = {
 ```nix
 systemd.services.my-service = {
   description = "Clear service description";
-  after = [ "network-online.target" ];
-  wantedBy = [ "default.target" ];
-  serviceConfig = { ... };
+  startAt = "weekly";
+  serviceConfig = {
+    Type = "oneshot";
+    User = "root";
+    ExecStart = "...";
+  };
 };
 ```
 
@@ -190,6 +193,27 @@ nixpkgs.config.permittedInsecurePackages = [
 ];
 ```
 
+## Flake Inputs
+
+This repository uses several external flakes:
+
+- **home-manager**: User configuration management
+- **noctalia**: Custom shell (noctalia-shell)
+- **dms**: DankMaterialShell (dms-shell)
+- **quickshell**: Quick integration with DMS
+- **chaotic**: Chaotic AUR source for additional packages
+
+Access flake packages in modules using `inputs`:
+```nix
+{ config, pkgs, pkgs-stable, inputs, ... }:
+{
+  environment.systemPackages = with pkgs; [
+    inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default
+    inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.quickshell
+  ];
+}
+```
+
 ## Important Notes
 
 - **No linting/formatting tools configured** - maintain consistent 2-space indentation manually
@@ -200,3 +224,4 @@ nixpkgs.config.permittedInsecurePackages = [
 - **Niri WM**: Primary Wayland compositor (with Hyprland and Sway as fallbacks)
 - **Virtualization**: Both Docker and Podman enabled - do not enable both for the same containers
 - **Dual-channel**: Remember to use `pkgs-stable.` prefix for packages that should use the stable channel
+- **Module auto-loading**: All `.nix` files in `modules/` are automatically loaded - no manual imports needed
