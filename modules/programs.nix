@@ -19,16 +19,6 @@
     dedicatedServer.openFirewall = true; # Open ports for Source Dedicated Server hosting
     # Other general flags if available can be set here.
   };
-  services.rustdesk-server = {
-    enable = true;
-    openFirewall = true;
-    signal.relayHosts = [ "example.com" ];
-  };
-
-  services.earlyoom = {
-    enable = true;
-    enableNotifications = true;
-  };
 
   # environment.systemPackages = [
   #   inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default
