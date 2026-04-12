@@ -96,11 +96,12 @@
     #一个漂亮的shell提示符
     enable = true;
     settings = {
-      add_newline = false;
+      add_newline = true;
       aws.disabled = true;
       gcloud.disabled = true;
       line_break.disabled = true;
     };
+    presets = ["gruvbox-rainbow"];
   };
   programs.vim = {
     enable = false;  # 禁用 vim，使用 NixVim 替代
