@@ -183,9 +183,10 @@
     claude-code
     codex
     gemini-cli
-    opencode-desktop
-    cherry-studio
     opencode
+    opencode-desktop
+    vscode-extensions.kilocode.kilo-code
+    cherry-studio
 
     # --- 16. 开发工具链 ---
     # C/C++（稳定）

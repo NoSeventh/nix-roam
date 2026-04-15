@@ -7,7 +7,7 @@
     enable = true;
     defaultEditor = true;
     vimAlias = true;
-    viAlias = false;
+    viAlias = true;
 
     # ==================== 3. 基础编辑器选项 ====================
     opts = {

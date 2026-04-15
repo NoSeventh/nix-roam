@@ -43,8 +43,8 @@
       susebox = "distrobox enter susebox";
       fedorabox = "distrobox enter fedorabox";
       kalibox = "distrobox enter kalibox";
-      vi = "hx";
-      nv = "neovide";
+      # vi = "hx";
+      # nv = "neovide";
       root = "root -l";
     };
   };
