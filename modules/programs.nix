@@ -26,9 +26,9 @@
 
   environment.systemPackages = with pkgs; [
     # --- 1. 浏览器 ---
-    firefox
-    chromium
-    google-chrome
+    pkgs-stable.firefox
+    pkgs-stable.chromium
+    pkgs-stable.google-chrome
     servo
 
     # --- 2. 编辑器 ---
@@ -269,28 +269,28 @@
     distrobox
 
     # --- 22. 中文软件 ---
-    qq
-    wechat-uos
-    qqmusic
-    eudic
-    wordbook
-    goldendict-ng
+    pkgs-stable.qq
+    pkgs-stable.wechat-uos
+    pkgs-stable.qqmusic
+    pkgs-stable.eudic
+    pkgs-stable.wordbook
+    # pkgs-stable.goldendict-ng
 
     # --- 23. 代理工具 ---
-    clash-verge-rev
-    clash-nyanpasu
-    sing-box
-    v2rayn
-    proxypin
+    pkgs-stable.clash-verge-rev
+    pkgs-stable.clash-nyanpasu
+    pkgs-stable.sing-box
+    pkgs-stable.v2rayn
+    pkgs-stable.proxypin
 
     # --- 24. 远程工具 ---
-    rustdesk-flutter
-    anydesk
+    pkgs-stable.rustdesk-flutter
+    pkgs-stable.anydesk
 
     # --- 25. 视频会议 ---
-    zoom-us
-    mattermost
-    mattermost-desktop
+    pkgs-stable.zoom-us
+    pkgs-stable.mattermost
+    pkgs-stable.mattermost-desktop
 
     # --- 26. 影视/娱乐 ---
     bilibili-tui
@@ -298,9 +298,9 @@
     dialect
 
     # --- 27. 其他工具 ---
-    copyq
-    uget
+    pkgs-stable.copyq
+    pkgs-stable.uget
     howdy
-    readest
+    pkgs-stable.readest
   ];
 }
