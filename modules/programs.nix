@@ -36,6 +36,7 @@
     vscode
     zed-editor
     code-cursor
+    warp-terminal
     neovim
     neovide
     helix
@@ -271,6 +272,7 @@
     # --- 22. 中文软件 ---
     pkgs-stable.qq
     pkgs-stable.wechat-uos
+    pkgs-stable.wemeet
     pkgs-stable.qqmusic
     pkgs-stable.eudic
     pkgs-stable.wordbook
