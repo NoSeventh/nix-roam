@@ -1,10 +1,11 @@
 # NixVim 配置 - 提供 LazyVim 风格的体验
-{ config, pkgs, ... }:
+{ config, pkgs, pkgs-stable, ... }:
 
 {
   # ==================== NixVim 配置 ====================
   programs.nixvim = {
     enable = true;
+    nixpkgs.pkgs = pkgs-stable;
     defaultEditor = true;
     vimAlias = true;
     viAlias = true;
@@ -889,27 +890,6 @@
         };
       };
 
-      # 大纲大纲
-      outline = {
-        enable = true;
-        settings = {
-          outline_window = {
-            position = "right";
-            width = 25;
-            relative_width = true;
-          };
-          preview_window = {
-            auto_preview = true;
-            live = true;
-          };
-          symbol_folding = {
-            autofold_depth = 1;
-            auto_unfold = {
-              hovered = true;
-            };
-          };
-        };
-      };
     };
 
     # ==================== 9. 额外 Lua 配置 ====================

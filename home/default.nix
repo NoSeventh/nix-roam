@@ -1,4 +1,4 @@
-{ config, pkgs, inputs, ... }:
+{ config, pkgs, pkgs-stable, inputs, ... }:
 
 {
   # 导入 NixVim Home Manager 模块和 NixVim 配置
