@@ -37,8 +37,8 @@
     zed-editor
     code-cursor
     warp-terminal
-    neovim
-    neovide
+    pkgs-stable.neovim
+    pkgs-stable.neovide
     helix
 
     # 稳定编辑器
