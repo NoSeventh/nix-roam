@@ -347,6 +347,11 @@
         };
       };
 
+      # 文件图标
+      web-devicons = {
+        enable = true;
+      };
+
       # 文件浏览器
       neo-tree = {
         enable = true;

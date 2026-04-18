@@ -218,6 +218,7 @@
   };
   programs.ssh = {
     enable = true;
+    enableDefaultConfig = false;
     matchBlocks = {
       "juno" = {
         hostname = "lxlogin.ihep.ac.cn";
