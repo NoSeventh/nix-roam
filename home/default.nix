@@ -5,6 +5,7 @@
   imports = [
     inputs.nixvim.homeModules.nixvim
     ./nixvim.nix
+    ./fastfetch.nix
   ];
   home = {
     username = "xuqihao";
@@ -43,6 +44,7 @@
       susebox = "distrobox enter susebox";
       fedorabox = "distrobox enter fedorabox";
       kalibox = "distrobox enter kalibox";
+      debianbox = "distrobox enter debianbox";
       # vi = "hx";
       # nv = "neovide";
       root = "root -l";
@@ -280,10 +282,10 @@
       source = ../dotfiles/.config/wezterm;
       recursive = true;
     };
-    ".config/fastfetch" = {
-      source = ../dotfiles/.config/fastfetch;
-      recursive = true;
-    };
+    # ".config/fastfetch" = {
+    #   source = ../dotfiles/.config/fastfetch;
+    #   recursive = true;
+    # };
     # ".config/alacritty" = {
     #   source = ../dotfiles/.config/alacritty;
     #   recursive = true;

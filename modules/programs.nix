@@ -188,6 +188,7 @@
     opencode-desktop
     vscode-extensions.kilocode.kilo-code
     cherry-studio
+    # lmstudio
 
     # --- 16. 开发工具链 ---
     # C/C++（稳定）
