@@ -1,5 +1,5 @@
 # virtualization.nix
-{pkgs, ...}: {
+{pkgs, pkgs-stable, ...}: {
   # Only enable either docker or podman -- Not both
   virtualisation = {
     docker = {
@@ -18,7 +18,7 @@
         runAsRoot = false;
         # ovmf submodule REMOVED: All OVMF images are now available by default in nixpkgs-unstable
         swtpm.enable = true; # TPM emulation
-        vhostUserPackages = with pkgs; [ virtiofsd ];
+        vhostUserPackages = with pkgs-stable; [ virtiofsd ];
 
         verbatimConfig = ''
           user = "qemu-libvirtd"
@@ -42,7 +42,7 @@
     dconf.enable = true; # Required for virt-manager settings
   };
 
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = with pkgs-stable; [
     virt-viewer # View Virtual Machines
     lazydocker
     docker-client

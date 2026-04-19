@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, pkgs-stable, ... }:
 
 {
   imports = [
@@ -9,6 +9,7 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.supportedFilesystems = [ "ntfs" ];
+  # boot.kernelPackages = pkgs.linuxPackages_cachyos; # 使用 cachyos 内核包
 
   # --- 2. 网络配置 ---
   networking.hostName = "nixos";
@@ -79,12 +80,15 @@
   };
 
   nixpkgs.config.allowUnfree = true;
+  nixpkgs.config.permittedInsecurePackages = [
+    "electron-38.8.4"
+  ];
   services.openssh.enable = true;
-  programs.ssh.askPassword = pkgs.lib.mkForce "${pkgs.seahorse.out}/libexec/seahorse/ssh-askpass";
+  programs.ssh.askPassword = pkgs.lib.mkForce "${pkgs-stable.seahorse.out}/libexec/seahorse/ssh-askpass";
   #programs.ssh.askPassword = mkDefault "${pkgs.plasma6Packages.ksshaskpass.out}/bin/ksshaskpass";
 
   # --- 7. 系统软件包 ---
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = with pkgs-stable; [
     gnome-extension-manager
     gst_all_1.gst-plugins-base
     gst_all_1.gst-plugins-good

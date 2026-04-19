@@ -1,5 +1,12 @@
-{ config, pkgs, ... }:
+{ config, pkgs, pkgs-stable, inputs, ... }:
+
 {
+  # 导入 NixVim Home Manager 模块和 NixVim 配置
+  imports = [
+    inputs.nixvim.homeModules.nixvim
+    ./nixvim.nix
+    ./fastfetch.nix
+  ];
   home = {
     username = "xuqihao";
     homeDirectory = "/home/xuqihao";
@@ -28,17 +35,18 @@
       nrs = "sudo nixos-rebuild switch";
       nrrs = "sudo nix-channel --update && sudo nixos-rebuild switch";
       shh = "ssh xuqihao@lxlogin.ihep.ac.cn";
-      shhfs = "sshfs xuqihao@lxlogin.ihep.ac.cn:/ ~/remote/";
-      afs = "cd ~/remote/afs/ihep.ac.cn/users/x/xuqihao";
-      scratchfs = "cd ~/remote/scratchfs/juno/xuqihao";
-      junofs = "cd ~/remote/junofs/users/xuqihao";
-      workfs = "cd ~/remote/workfs2/juno/xuqihao";
+      shhfs = "sshfs -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 xuqihao@lxlogin.ihep.ac.cn:/ ~/mnt/juno/";
+      afs = "cd ~/mnt/juno/afs/ihep.ac.cn/users/x/xuqihao";
+      scratchfs = "cd ~/mnt/juno/scratchfs/juno/xuqihao";
+      junofs = "cd ~/mnt/juno/junofs/users/xuqihao";
+      workfs = "cd ~/mnt/juno/workfs2/juno/xuqihao";
       archbox = "distrobox enter archbox";
       susebox = "distrobox enter susebox";
       fedorabox = "distrobox enter fedorabox";
       kalibox = "distrobox enter kalibox";
-      vi = "hx";
-      nv = "neovide";
+      debianbox = "distrobox enter debianbox";
+      # vi = "hx";
+      # nv = "neovide";
       root = "root -l";
     };
   };
@@ -79,18 +87,26 @@
     };
     # theme = tokyonight;
   };
+  programs.ghostty = {
+    enable = true;
+    settings = {
+      theme = "TokyoNight";
+      background-opacity = "0.9";
+    };
+  };
   programs.starship = {
     #一个漂亮的shell提示符
     enable = true;
     settings = {
-      add_newline = false;
+      add_newline = true;
       aws.disabled = true;
       gcloud.disabled = true;
-      line_break.disabled = true;
+      # line_break.disabled = true;
     };
+    presets = ["gruvbox-rainbow"];
   };
   programs.vim = {
-    enable = true;
+    enable = false;  # 禁用 vim，使用 NixVim 替代
     plugins = with pkgs.vimPlugins; [
       vim-airline
       gruvbox
@@ -197,11 +213,12 @@
   programs.helix = {
     enable = true;
     settings = {
-      theme = "tokyonight";
+      theme = "base16_transparent";
     };
   };
   programs.ssh = {
     enable = true;
+    enableDefaultConfig = false;
     matchBlocks = {
       "juno" = {
         hostname = "lxlogin.ihep.ac.cn";
@@ -222,54 +239,56 @@
       };
     };
   };
-  services.xsettingsd = {
-    enable = true;
-    settings = {
-      "Gtk/CursorThemeName" = "Bibata-Modern-Blue";
-      "Gtk/CursorThemeSize" = 24;
-      "Gtk/FontName" = "JetBrains Mono 24";
-      "Gtk/WindowScalingFactor" = 2;
-      # "Qt/CursorThemeName" = "Bibata-Modern-Blue";
-      # "Qt/CursorThemeSize" = 24;
-      # "Qt/FontName" = "JetBrains Mono 24";
-      # "Qt/WindowScalingFactor" = 2;
-      "Xft/Antialias" = 1;
-      "Xft/Hinting" = 1;
-      "Xft/HintStyle" = "hintfull";
-      "Xft/RGBA" = "rgb";
-      "Xft/DPI" = 196608;
-    };
-  };
+  # services.xsettingsd = {
+  #   enable = true;
+  #   settings = {
+  #     "Gtk/CursorThemeName" = "Bibata-Modern-Blue";
+  #     "Gtk/CursorThemeSize" = 24;
+  #     "Gtk/FontName" = "JetBrains Mono 24";
+  #     "Gtk/WindowScalingFactor" = 2;
+  #     # "Qt/CursorThemeName" = "Bibata-Modern-Blue";
+  #     # "Qt/CursorThemeSize" = 24;
+  #     # "Qt/FontName" = "JetBrains Mono 24";
+  #     # "Qt/WindowScalingFactor" = 2;
+  #     "Xft/Antialias" = 1;
+  #     "Xft/Hinting" = 1;
+  #     "Xft/HintStyle" = "hintfull";
+  #     "Xft/RGBA" = "rgb";
+  #     "Xft/DPI" = 196608;
+  #   };
+  # };
   home.file = {
     ".config/btop" = {
-      source = ./dotfiles/.config/btop;
+      source = ../dotfiles/.config/btop;
       recursive = true;
     };
-    ".config/nvim" = {
-      source = ./dotfiles/.config/nvim;
-      recursive = true;
-    };
+    # NixVim 现在通过 home/nixvim.nix 管理 Neovim 配置
+    # 移除了手动链接的 .config/nvim
     # ".config/helix/config.toml" = {
-    #   source = ./dotfiles/.config/helix/config.toml;
+    #   source = ../dotfiles/.config/helix/config.toml;
     # };
     # ".config/hypr" = {
-    #   source = ./dotfiles/.config/hypr;
+    #   source = ../dotfiles/.config/hypr;
     #   recursive = true;
     # };
     # ".config/niri" = {
-    #   source = ./dotfiles/.config/niri;
+    #   source = ../dotfiles/.config/niri;
     #   recursive = true;
     # };
     ".config/kitty" = {
-      source = ./dotfiles/.config/kitty;
+      source = ../dotfiles/.config/kitty;
       recursive = true;
     };
-    ".config/fastfetch" = {
-      source = ./dotfiles/.config/fastfetch;
+    ".config/wezterm" = {
+      source = ../dotfiles/.config/wezterm;
       recursive = true;
     };
+    # ".config/fastfetch" = {
+    #   source = ../dotfiles/.config/fastfetch;
+    #   recursive = true;
+    # };
     # ".config/alacritty" = {
-    #   source = ./dotfiles/.config/alacritty;
+    #   source = ../dotfiles/.config/alacritty;
     #   recursive = true;
     # };
   };
