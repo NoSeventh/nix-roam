@@ -29,6 +29,7 @@
     pkgs-stable.firefox
     pkgs-stable.chromium
     pkgs-stable.google-chrome
+    pkgs-stable.microsoft-edge
     servo
 
     # --- 2. 编辑器 ---
@@ -219,6 +220,7 @@
     # 其他开发工具（稳定）
     pkgs-stable.rstudio
     nil
+    pkgs-stable.biome
 
     # --- 17. Python 环境 ---
     pkgs-stable.python3
