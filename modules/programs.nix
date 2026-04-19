@@ -267,6 +267,7 @@
     # --- 20. 排版工具 ---
     typst
     tinymist
+    typstyle
     pkgs-stable.texlivePackages.scheme-full
 
     # --- 21. 容器工具 ---
