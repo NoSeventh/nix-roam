@@ -275,7 +275,7 @@
 
     # --- 22. 中文软件 ---
     pkgs-stable.qq
-    pkgs-stable.wechat-uos
+    wechat-uos
     pkgs-stable.wemeet
     pkgs-stable.qqmusic
     pkgs-stable.eudic
