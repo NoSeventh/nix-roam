@@ -2,6 +2,7 @@
   config,
   pkgs,
   pkgs-stable,
+  pkgs-master,
   inputs,
   ...
 }:
@@ -185,8 +186,8 @@
     claude-code
     codex
     gemini-cli
-    opencode
-    opencode-desktop
+    pkgs-master.opencode
+    pkgs-master.opencode-desktop
     vscode-extensions.kilocode.kilo-code
     cherry-studio
     # lmstudio

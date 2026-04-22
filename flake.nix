@@ -62,6 +62,10 @@
           "electron-38.8.4"
         ];
       };
+      pkgs-master = import inputs.nixpkgs-master {
+        inherit system;
+        config.allowUnfree = true;
+      };
       # 自动扫描 modules 目录下的所有 .nix 文件
       configDir = ./modules;
       generatedModules = builtins.map (file: configDir + "/${file}") (
@@ -73,7 +77,9 @@
     {
       nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
         inherit system;
-        specialArgs = { inherit inputs pkgs-stable; };
+        specialArgs = {
+          inherit inputs pkgs-stable pkgs-master;
+        };
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager
@@ -85,7 +91,9 @@
 
             # 使用 home-manager.extraSpecialArgs 自定义传递给 ./home.nix 的参数
             # 取消注释下面这一行，就可以在 home.nix 中使用 flake 的所有 inputs 参数了
-            home-manager.extraSpecialArgs = { inherit inputs pkgs-stable; };
+            home-manager.extraSpecialArgs = {
+              inherit inputs pkgs-stable pkgs-master;
+            };
           }
         ]
         ++ generatedModules;
