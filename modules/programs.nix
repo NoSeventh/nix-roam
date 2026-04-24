@@ -184,7 +184,7 @@
 
     # --- 15. AI 相关工具 ---
     claude-code
-    codex
+    pkgs-stable.codex
     gemini-cli
     pkgs-master.opencode
     pkgs-master.opencode-desktop
