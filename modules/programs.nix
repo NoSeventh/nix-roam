@@ -193,6 +193,7 @@
     claude-code
     codex
     gemini-cli
+    # crush
     opencode
     opencode-desktop
     cherry-studio
@@ -249,6 +250,7 @@
         requests
         rpy2
         torch
+        uv
       ]
     ))
 
