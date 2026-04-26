@@ -20,6 +20,13 @@
     dedicatedServer.openFirewall = true; # Open ports for Source Dedicated Server hosting
     # Other general flags if available can be set here.
   };
+  programs.clash-verge = {
+    enable = true;
+    serviceMode = true;
+    tunMode = true;
+    autoStart = true;
+  };
+
 
   # environment.systemPackages = [
   #   inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default
@@ -184,11 +191,10 @@
 
     # --- 15. AI 相关工具 ---
     claude-code
-    pkgs-stable.codex
+    codex
     gemini-cli
-    pkgs-master.opencode
-    pkgs-master.opencode-desktop
-    vscode-extensions.kilocode.kilo-code
+    opencode
+    opencode-desktop
     cherry-studio
     # lmstudio
 
