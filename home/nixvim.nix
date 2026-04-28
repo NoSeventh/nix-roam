@@ -793,6 +793,25 @@
         };
       };
 
+      # 终端切换
+      toggleterm = {
+        enable = true;
+        settings = {
+          open_mapping = "[[<c-\\>]]";
+          direction = "float";
+          float_opts = {
+            border = "curved";
+            width = 130;
+            height = 30;
+          };
+          hide_numbers = true;
+          start_in_insert = true;
+          insert_mappings = true;
+          terminal_mappings = true;
+          close_on_exit = true;
+        };
+      };
+
       # 通知
       notify = {
         enable = true;
