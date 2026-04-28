@@ -26,6 +26,11 @@
     #   inputs.nixpkgs.follows = "nixpkgs";
     # };
 
+    hermes-agent = {
+      url = "github:NousResearch/hermes-agent";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     home-manager = {
       url = "github:nix-community/home-manager/master";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -49,6 +54,7 @@
       nixpkgs,
       nixpkgs-stable,
       home-manager,
+      hermes-agent,
       chaotic,
       ...
     }@inputs:
@@ -84,6 +90,7 @@
           ./configuration.nix
           home-manager.nixosModules.home-manager
           chaotic.nixosModules.default # 从 chaotic 源导入模块
+          inputs.hermes-agent.nixosModules.default
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
