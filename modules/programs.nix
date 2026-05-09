@@ -197,6 +197,7 @@
     opencode
     opencode-desktop
     cherry-studio
+    chatbox
     # lmstudio
 
     # --- 16. 开发工具链 ---
