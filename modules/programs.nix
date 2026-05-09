@@ -282,6 +282,7 @@
 
     # --- 21. 容器工具 ---
     distrobox
+    bubblewrap
 
     # --- 22. 中文软件 ---
     pkgs-stable.qq
