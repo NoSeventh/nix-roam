@@ -192,12 +192,13 @@
     # --- 15. AI 相关工具 ---
     claude-code
     codex
-    gemini-cli
+    antigravity
     # crush
     opencode
     opencode-desktop
     cherry-studio
     chatbox
+    sillytavern
     # lmstudio
 
     # --- 16. 开发工具链 ---
