@@ -26,7 +26,7 @@
     tunMode = true;
     autoStart = true;
   };
-
+  programs.nix-ld.enable = true;
 
   # environment.systemPackages = [
   #   inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default
@@ -192,6 +192,7 @@
     # --- 15. AI 相关工具 ---
     claude-code
     codex
+    github-copilot-cli
     antigravity
     # crush
     opencode
