@@ -160,6 +160,7 @@
     pkgs-stable.blender
     pkgs-stable.xnconvert
     pkgs-stable.p7zip
+    pkgs-stable.poppler-utils
 
     # 录屏截图工具
     obs-studio
