@@ -23,7 +23,7 @@ Verify changes by rebuilding and checking system behavior after modifications.
 
 This configuration uses **three nixpkgs channels**:
 - `nixpkgs` (unstable)
-- `nixpkgs-stable` (25.11)
+- `nixpkgs-stable` (26.05)
 - `nixpkgs-master` - Available but not actively used
 
 ### Using pkgs-stable

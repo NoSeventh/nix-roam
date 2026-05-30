@@ -142,7 +142,7 @@
     pkgs-stable.amberol
     pkgs-stable.audacious
     pkgs-stable.psst
-    pkgs-stable.cider
+    # pkgs-stable.cider  # broken in nixpkgs 26.05
 
     # 终端音乐播放器
     kew
@@ -227,7 +227,6 @@
 
     # Node.js（稳定）
     pkgs-stable.nodejs
-    pkgs-stable.yarn2nix
 
     # 其他开发工具（稳定）
     pkgs-stable.rstudio
@@ -289,10 +288,10 @@
 
     # --- 22. 中文软件 ---
     pkgs-stable.qq
-    wechat-uos
+    # pkgs-stable.wechat-uos  # download broken (403 from all mirrors)
     pkgs-stable.wemeet
     pkgs-stable.qqmusic
-    pkgs-stable.eudic
+    # pkgs-stable.eudic  # download broken (TLS error)
     pkgs-stable.wordbook
     # pkgs-stable.goldendict-ng
 

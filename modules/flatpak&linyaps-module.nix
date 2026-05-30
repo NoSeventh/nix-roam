@@ -28,7 +28,7 @@
     gnomeExtensions.coverflow-alt-tab
     gnomeExtensions.dash-to-dock
     gnomeExtensions.dash-to-panel
-    gnomeExtensions.mihomo-tray
+
     gnomeExtensions.paperwm
     gnomeExtensions.auto-move-windows
     gnomeExtensions.smart-auto-move
