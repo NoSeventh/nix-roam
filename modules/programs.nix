@@ -288,8 +288,7 @@
 
     # --- 22. 中文软件 ---
     pkgs-stable.qq
-    wechat  # fixed via nixpkgs overlay (AppImage, official Tencent URL)
-    # pkgs-stable.wechat-uos  # download broken (uniontech ACL 403)
+    pkgs-stable.wechat  # fixed via nixpkgs overlay (AppImage, official Tencent URL)
     pkgs-stable.wemeet
     pkgs-stable.qqmusic
     # pkgs-stable.eudic  # download broken (TLS error)
