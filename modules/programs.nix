@@ -288,7 +288,8 @@
 
     # --- 22. 中文软件 ---
     pkgs-stable.qq
-    # pkgs-stable.wechat-uos  # download broken (403 from all mirrors)
+    wechat  # fixed via nixpkgs overlay (AppImage, official Tencent URL)
+    # pkgs-stable.wechat-uos  # download broken (uniontech ACL 403)
     pkgs-stable.wemeet
     pkgs-stable.qqmusic
     # pkgs-stable.eudic  # download broken (TLS error)
@@ -321,5 +322,17 @@
     pkgs-stable.uget
     howdy
     pkgs-stable.readest
+  ];
+
+  # Fix wechat AppImage download: web.archive.org URL is dead, use official Tencent source
+  nixpkgs.overlays = [
+    (final: prev: {
+      wechat = prev.wechat.overrideAttrs (old: {
+        src = final.fetchurl {
+          url = "https://dldir1v6.qq.com/weixin/Universal/Linux/WeChatLinux_x86_64.AppImage";
+          hash = "sha256-XxAvFnlljqurGPDgRr+DnuCKbdVvgXBPh02DLHY3Oz8=";
+        };
+      });
+    })
   ];
 }
