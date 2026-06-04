@@ -45,6 +45,7 @@
     vscode
     zed-editor
     code-cursor
+    cursor-cli
     warp-terminal
     pkgs-stable.neovim
     pkgs-stable.neovide
@@ -194,7 +195,7 @@
     claude-code
     codex
     github-copilot-cli
-    antigravity
+    # antigravity
     # crush
     opencode
     opencode-desktop
@@ -258,20 +259,20 @@
     ))
 
     # --- 18. JetBrains IDEs ---
-    pkgs-stable.jetbrains-toolbox
-    pkgs-stable.jetbrains.idea-oss
-    pkgs-stable.jetbrains.idea
-    pkgs-stable.jetbrains.clion
-    pkgs-stable.jetbrains.rust-rover
-    pkgs-stable.jetbrains.goland
-    pkgs-stable.jetbrains.pycharm-oss
-    pkgs-stable.jetbrains.pycharm
-    pkgs-stable.jetbrains.ruby-mine
-    pkgs-stable.jetbrains.rider
-    pkgs-stable.jetbrains.mps
-    pkgs-stable.jetbrains.datagrip
-    pkgs-stable.jetbrains.webstorm
-    pkgs-stable.jetbrains.phpstorm
+    # pkgs-stable.jetbrains-toolbox
+    # pkgs-stable.jetbrains.idea-oss
+    # pkgs-stable.jetbrains.idea
+    # pkgs-stable.jetbrains.clion
+    # pkgs-stable.jetbrains.rust-rover
+    # pkgs-stable.jetbrains.goland
+    # pkgs-stable.jetbrains.pycharm-oss
+    # pkgs-stable.jetbrains.pycharm
+    # pkgs-stable.jetbrains.ruby-mine
+    # pkgs-stable.jetbrains.rider
+    # pkgs-stable.jetbrains.mps
+    # pkgs-stable.jetbrains.datagrip
+    # pkgs-stable.jetbrains.webstorm
+    # pkgs-stable.jetbrains.phpstorm
 
     # --- 19. 科学计算 ---
     pkgs-stable.root
@@ -308,7 +309,7 @@
 
     # --- 25. 视频会议 ---
     pkgs-stable.zoom-us
-    pkgs-stable.mattermost
+    # pkgs-stable.mattermost
     pkgs-stable.mattermost-desktop
 
     # --- 26. 影视/娱乐 ---
