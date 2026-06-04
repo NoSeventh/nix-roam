@@ -161,6 +161,7 @@
     pkgs-stable.blender
     pkgs-stable.xnconvert
     pkgs-stable.p7zip
+    pkgs-stable.unzip
     pkgs-stable.poppler-utils
 
     # 录屏截图工具
@@ -230,6 +231,7 @@
 
     # Node.js（稳定）
     pkgs-stable.nodejs
+    pkgs-stable.jq
 
     # 其他开发工具（稳定）
     pkgs-stable.rstudio
