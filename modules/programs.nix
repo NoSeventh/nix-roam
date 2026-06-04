@@ -192,6 +192,8 @@
     siyuan
 
     # --- 15. AI 相关工具 ---
+    cc-switch
+    agent-browser
     claude-code
     codex
     github-copilot-cli
