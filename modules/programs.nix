@@ -195,6 +195,7 @@
     # --- 15. AI 相关工具 ---
     cc-switch
     agent-browser
+    rtk
     claude-code
     codex
     github-copilot-cli

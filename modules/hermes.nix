@@ -16,6 +16,9 @@
         enabled = true;
         threshold = 0.85;
       };
+      plugins = {
+        enabled = [ "rtk-hermes" ];
+      };
     };
 
     # 声明式 MCP servers
