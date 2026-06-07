@@ -1,6 +1,10 @@
-{ lib, ... }:
+{ config, pkgs, pkgs-stable, lib, ... }:
 
 {
+  # ============================================
+  # AGENTS.NIX - AI/Agent 相关配置
+  # ============================================
+
   # --- 1. Hermes Agent ---
   services.hermes-agent = {
     enable = true;
@@ -41,4 +45,30 @@
 
   # --- 3. 允许当前用户访问 Hermes 共享状态 ---
   users.users.xuqihao.extraGroups = lib.mkAfter [ "hermes" ];
+
+  # --- 4. AI 相关工具/IDE ---
+  environment.systemPackages = with pkgs; [
+    # --- 4.1 AI 编辑器/IDE ---
+    code-cursor
+    cursor-cli
+
+    # --- 4.2 AI Agent 工具 ---
+    cc-switch
+    agent-browser
+    rtk
+    claude-code
+    codex
+    github-copilot-cli
+    # antigravity
+    # crush
+    opencode
+    opencode-desktop
+
+    # --- 4.3 AI 聊天客户端 ---
+    cherry-studio
+    chatbox
+    sillytavern
+    # lmstudio
+
+  ];
 }

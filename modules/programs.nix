@@ -44,8 +44,6 @@
     # 现代编辑器（需要追新）
     vscode
     zed-editor
-    code-cursor
-    cursor-cli
     warp-terminal
     pkgs-stable.neovim
     pkgs-stable.neovide
@@ -192,23 +190,7 @@
     # --- 14. 笔记/知识管理 ---
     siyuan
 
-    # --- 15. AI 相关工具 ---
-    cc-switch
-    agent-browser
-    rtk
-    claude-code
-    codex
-    github-copilot-cli
-    # antigravity
-    # crush
-    opencode
-    opencode-desktop
-    cherry-studio
-    chatbox
-    sillytavern
-    # lmstudio
-
-    # --- 16. 开发工具链 ---
+    # --- 15. 开发工具链 ---
     # C/C++（稳定）
     pkgs-stable.gcc
     pkgs-stable.gnumake
@@ -239,11 +221,11 @@
     nil
     pkgs-stable.biome
 
-    # --- 17. Python 环境 ---
-    pkgs-stable.python3
+    # --- 16. 搜索工具 ---
     pkgs-stable.ripgrep
 
-    # Python AI/数据科学包（需要最新版本）
+    # --- 17. Python 环境 ---
+    pkgs-stable.python3
     (python3.withPackages (
       python-pkgs: with python-pkgs; [
         pip
