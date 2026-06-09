@@ -219,7 +219,7 @@
   programs.ssh = {
     enable = true;
     enableDefaultConfig = false;
-    matchBlocks = {
+    settings = {
       "juno" = {
         hostname = "lxlogin.ihep.ac.cn";
         user = "xuqihao";

@@ -66,7 +66,7 @@
 
     # --- 4.3 AI 聊天客户端 ---
     cherry-studio
-    chatbox
+    # chatbox  # removed from nixpkgs (bundled EOL electron)
     sillytavern
     # lmstudio
 
