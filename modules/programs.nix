@@ -24,7 +24,7 @@
     enable = true;
     serviceMode = true;
     tunMode = true;
-    autoStart = true;
+    autoStart = false;
   };
   programs.nix-ld.enable = true;
 
@@ -284,6 +284,7 @@
     # pkgs-stable.goldendict-ng
 
     # --- 23. 代理工具 ---
+    pkgs-stable.mihomo
     pkgs-stable.clash-verge-rev
     pkgs-stable.clash-nyanpasu
     pkgs-stable.sing-box
