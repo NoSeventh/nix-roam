@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-25.11";
+    nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-26.05";
     nixpkgs-master.url = "github:nixos/nixpkgs/master";
 
     # zen-browser = {
@@ -26,6 +26,11 @@
     #   inputs.nixpkgs.follows = "nixpkgs";
     # };
 
+    hermes-agent = {
+      url = "github:NousResearch/hermes-agent";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     home-manager = {
       url = "github:nix-community/home-manager/master";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -33,7 +38,7 @@
 
     # --- 3. NixVim (声明式Neovim配置) ---
     nixvim = {
-      url = "github:nix-community/nixvim/nixos-25.11";
+      url = "github:nix-community/nixvim/nixos-26.05";
     };
 
     # --- 4. Chaotic AUR 源 ---
@@ -49,6 +54,7 @@
       nixpkgs,
       nixpkgs-stable,
       home-manager,
+      hermes-agent,
       chaotic,
       ...
     }@inputs:
@@ -62,6 +68,10 @@
           "electron-38.8.4"
         ];
       };
+      pkgs-master = import inputs.nixpkgs-master {
+        inherit system;
+        config.allowUnfree = true;
+      };
       # 自动扫描 modules 目录下的所有 .nix 文件
       configDir = ./modules;
       generatedModules = builtins.map (file: configDir + "/${file}") (
@@ -73,11 +83,14 @@
     {
       nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
         inherit system;
-        specialArgs = { inherit inputs pkgs-stable; };
+        specialArgs = {
+          inherit inputs pkgs-stable pkgs-master;
+        };
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager
           chaotic.nixosModules.default # 从 chaotic 源导入模块
+          inputs.hermes-agent.nixosModules.default
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
@@ -85,7 +98,9 @@
 
             # 使用 home-manager.extraSpecialArgs 自定义传递给 ./home.nix 的参数
             # 取消注释下面这一行，就可以在 home.nix 中使用 flake 的所有 inputs 参数了
-            home-manager.extraSpecialArgs = { inherit inputs pkgs-stable; };
+            home-manager.extraSpecialArgs = {
+              inherit inputs pkgs-stable pkgs-master;
+            };
           }
         ]
         ++ generatedModules;

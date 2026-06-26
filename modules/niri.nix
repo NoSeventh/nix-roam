@@ -54,5 +54,6 @@
   environment.variables = {
     XCURSOR_THEME = "Bibata-Modern-Ice";
     XCURSOR_SIZE = "24";
+    QT_AUTO_SCREEN_SCALE_FACTOR = "1";
   };
 }

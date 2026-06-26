@@ -62,6 +62,8 @@
       arphic-ukai
       arphic-uming
       babelstone-han
+      # edusong
+      # font-isas-misc
       # vista-fonts-chs
       vista-fonts-cht
       vista-fonts

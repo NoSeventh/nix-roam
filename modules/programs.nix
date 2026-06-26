@@ -2,6 +2,7 @@
   config,
   pkgs,
   pkgs-stable,
+  pkgs-master,
   inputs,
   ...
 }:
@@ -19,6 +20,13 @@
     dedicatedServer.openFirewall = true; # Open ports for Source Dedicated Server hosting
     # Other general flags if available can be set here.
   };
+  programs.clash-verge = {
+    enable = true;
+    serviceMode = true;
+    tunMode = true;
+    autoStart = false;
+  };
+  programs.nix-ld.enable = true;
 
   # environment.systemPackages = [
   #   inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default
@@ -36,7 +44,6 @@
     # 现代编辑器（需要追新）
     vscode
     zed-editor
-    code-cursor
     warp-terminal
     pkgs-stable.neovim
     pkgs-stable.neovide
@@ -134,7 +141,7 @@
     pkgs-stable.amberol
     pkgs-stable.audacious
     pkgs-stable.psst
-    pkgs-stable.cider
+    # pkgs-stable.cider  # broken in nixpkgs 26.05
 
     # 终端音乐播放器
     kew
@@ -152,6 +159,8 @@
     pkgs-stable.blender
     pkgs-stable.xnconvert
     pkgs-stable.p7zip
+    pkgs-stable.unzip
+    pkgs-stable.poppler-utils
 
     # 录屏截图工具
     obs-studio
@@ -181,17 +190,7 @@
     # --- 14. 笔记/知识管理 ---
     siyuan
 
-    # --- 15. AI 相关工具 ---
-    claude-code
-    codex
-    gemini-cli
-    opencode
-    opencode-desktop
-    vscode-extensions.kilocode.kilo-code
-    cherry-studio
-    # lmstudio
-
-    # --- 16. 开发工具链 ---
+    # --- 15. 开发工具链 ---
     # C/C++（稳定）
     pkgs-stable.gcc
     pkgs-stable.gnumake
@@ -215,18 +214,18 @@
 
     # Node.js（稳定）
     pkgs-stable.nodejs
-    pkgs-stable.yarn2nix
+    pkgs-stable.jq
 
     # 其他开发工具（稳定）
     pkgs-stable.rstudio
     nil
     pkgs-stable.biome
 
-    # --- 17. Python 环境 ---
-    pkgs-stable.python3
+    # --- 16. 搜索工具 ---
     pkgs-stable.ripgrep
 
-    # Python AI/数据科学包（需要最新版本）
+    # --- 17. Python 环境 ---
+    pkgs-stable.python3
     (python3.withPackages (
       python-pkgs: with python-pkgs; [
         pip
@@ -242,24 +241,26 @@
         requests
         rpy2
         torch
+        uv
+        pytest
       ]
     ))
 
     # --- 18. JetBrains IDEs ---
-    pkgs-stable.jetbrains-toolbox
-    pkgs-stable.jetbrains.idea-oss
-    pkgs-stable.jetbrains.idea
-    pkgs-stable.jetbrains.clion
-    pkgs-stable.jetbrains.rust-rover
-    pkgs-stable.jetbrains.goland
-    pkgs-stable.jetbrains.pycharm-oss
-    pkgs-stable.jetbrains.pycharm
-    pkgs-stable.jetbrains.ruby-mine
-    pkgs-stable.jetbrains.rider
-    pkgs-stable.jetbrains.mps
-    pkgs-stable.jetbrains.datagrip
-    pkgs-stable.jetbrains.webstorm
-    pkgs-stable.jetbrains.phpstorm
+    # pkgs-stable.jetbrains-toolbox
+    # pkgs-stable.jetbrains.idea-oss
+    # pkgs-stable.jetbrains.idea
+    # pkgs-stable.jetbrains.clion
+    # pkgs-stable.jetbrains.rust-rover
+    # pkgs-stable.jetbrains.goland
+    # pkgs-stable.jetbrains.pycharm-oss
+    # pkgs-stable.jetbrains.pycharm
+    # pkgs-stable.jetbrains.ruby-mine
+    # pkgs-stable.jetbrains.rider
+    # pkgs-stable.jetbrains.mps
+    # pkgs-stable.jetbrains.datagrip
+    # pkgs-stable.jetbrains.webstorm
+    # pkgs-stable.jetbrains.phpstorm
 
     # --- 19. 科学计算 ---
     pkgs-stable.root
@@ -272,17 +273,19 @@
 
     # --- 21. 容器工具 ---
     distrobox
+    bubblewrap
 
     # --- 22. 中文软件 ---
     pkgs-stable.qq
-    pkgs-stable.wechat-uos
+    pkgs-stable.wechat  # fixed via nixpkgs overlay (AppImage, official Tencent URL)
     pkgs-stable.wemeet
     pkgs-stable.qqmusic
-    pkgs-stable.eudic
+    # pkgs-stable.eudic  # download broken (TLS error)
     pkgs-stable.wordbook
     # pkgs-stable.goldendict-ng
 
     # --- 23. 代理工具 ---
+    pkgs-stable.mihomo
     pkgs-stable.clash-verge-rev
     pkgs-stable.clash-nyanpasu
     pkgs-stable.sing-box
@@ -295,7 +298,7 @@
 
     # --- 25. 视频会议 ---
     pkgs-stable.zoom-us
-    pkgs-stable.mattermost
+    # pkgs-stable.mattermost
     pkgs-stable.mattermost-desktop
 
     # --- 26. 影视/娱乐 ---
@@ -308,5 +311,17 @@
     pkgs-stable.uget
     howdy
     pkgs-stable.readest
+  ];
+
+  # Fix wechat AppImage download: web.archive.org URL is dead, use official Tencent source
+  nixpkgs.overlays = [
+    (final: prev: {
+      wechat = prev.wechat.overrideAttrs (old: {
+        src = final.fetchurl {
+          url = "https://dldir1v6.qq.com/weixin/Universal/Linux/WeChatLinux_x86_64.AppImage";
+          hash = "sha256-XxAvFnlljqurGPDgRr+DnuCKbdVvgXBPh02DLHY3Oz8=";
+        };
+      });
+    })
   ];
 }
