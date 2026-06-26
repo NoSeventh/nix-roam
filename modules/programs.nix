@@ -242,6 +242,7 @@
         rpy2
         torch
         uv
+        pytest
       ]
     ))
 
