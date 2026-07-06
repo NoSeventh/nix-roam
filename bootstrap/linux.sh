@@ -19,6 +19,7 @@ if ! command -v nix >/dev/null 2>&1; then
   for f in \
     /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
     "$HOME/.nix-profile/etc/profile.d/nix.sh"; do
+    # shellcheck disable=SC1090  # 动态加载已知 nix profile 路径
     [ -f "$f" ] && . "$f" && break
   done
 else
