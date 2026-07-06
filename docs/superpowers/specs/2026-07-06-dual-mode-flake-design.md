@@ -71,8 +71,7 @@ flake outputs:
 ├── configuration.nix              # 不变
 ├── hardware-configuration.nix     # 不变
 ├── modules/
-│   ├── programs.nix               # 改：剥离可移植 CLI 工具，只留桌面软件（NixOS-only）
-│   ├── dev-cli.nix                # 新：environment.systemPackages = import ../packages/cli-dev.nix
+│   ├── programs.nix               # 改：environment.systemPackages 末尾追加 ++ (import ../packages/cli-dev.nix)（不剥离现有条目）
 │   └── (其余 modules 不变)
 ├── packages/
 │   └── cli-dev.nix                # 新：共享 CLI 开发工具列表（纯函数 → 返回 [ pkgs ]）
@@ -95,10 +94,10 @@ flake outputs:
 
 GUI HM 配置**仅留在 NixOS 入口**，不进 `common.nix`、不导出 standalone。
 
-### 6.2 `packages/cli-dev.nix` 与 `modules/dev-cli.nix`
+### 6.2 `packages/cli-dev.nix` 与 `modules/programs.nix` 的接入
 
-- `packages/cli-dev.nix`：纯函数 `{ pkgs, pkgs-stable, ... }: [ ... ]`，返回 package list。**被两处导入**：NixOS 的 `modules/dev-cli.nix` 和 standalone 的 `home.packages`。
-- `modules/dev-cli.nix`：`environment.systemPackages = import ../packages/cli-dev.nix { inherit pkgs pkgs-stable; };` —— NixOS 系统级安装（sudo 可见）。
+- `packages/cli-dev.nix`：纯函数 `{ pkgs, pkgs-stable, ... }: [ ... ]`，返回 package list。**单一事实源**，被两处导入：NixOS 的 `modules/programs.nix` 和 standalone 的 `home/standalone.nix`。
+- `modules/programs.nix`：在现有 `environment.systemPackages = with pkgs; [ ... ];` 末尾追加 `++ (import ../packages/cli-dev.nix { inherit pkgs pkgs-stable; });` —— 把共享 CLI 工具加进 NixOS 系统级（sudo 可见）。**不剥离现有条目**（避免破坏正在使用的系统；重复条目由 Nix store path 自动去重，无开销）。可选：后续手动从 programs.nix 移除已迁入 cli-dev.nix 的条目。
 
 ## 7. CLI 开发环境默认清单
 
@@ -132,8 +131,7 @@ GUI HM 配置**仅留在 NixOS 入口**，不进 `common.nix`、不导出 standa
 ## 10. 迁移影响（对现有 NixOS 配置）
 
 - `flake.nix`：参数化 system；新增 `homeConfigurations`、`forAllSystems` helper；`pkgs-stable`/`pkgs-master` 改为按 system 实例化。**`nixosConfigurations.nixos` 保持等价。**
-- `modules/programs.nix`：**最大改动** —— 剥离所有可移植 CLI 工具到 `packages/cli-dev.nix`，只留桌面软件（浏览器、媒体、办公、QQ/微信/WPS、freecad/blender、游戏等）。
-- 新 `modules/dev-cli.nix`：接入 `environment.systemPackages`。
+- `modules/programs.nix`：**最小改动** —— 仅在 `environment.systemPackages` 末尾追加 `++ (import ../packages/cli-dev.nix { inherit pkgs pkgs-stable; });`。**不剥离现有条目**（避免破坏在用的系统；重复由 store 去重），后续可选手动去重。
 - `home/default.nix`：重构成 thin 入口（`imports = [ ./common.nix ];` + GUI HM + 个人 ssh 别名）。视觉效果不变。
 - 新 `home/common.nix`、`home/standalone.nix`、`packages/cli-dev.nix`、`bootstrap/linux.sh`。
 - `configuration.nix`、`hardware-configuration.nix`、其余 `modules/*.nix`、`dotfiles/`：**不动**。
@@ -148,7 +146,7 @@ GUI HM 配置**仅留在 NixOS 入口**，不进 `common.nix`、不导出 standa
 
 ## 12. 风险与备注
 
-- **programs.nix 剥离的边界判定**：哪些算"可移植 CLI"、哪些算"桌面软件"需逐项判断（如 `btop` 是 CLI 进 `common.nix`/`cli-dev.nix`；`obs-studio` 是桌面留 programs.nix）。实现时建立明确分类清单，避免遗漏或误删。
-- **双份安装冗余**：某些工具既被 HM 模块安装（如 `programs.bat`）又可能出现在 `cli-dev.nix`。Nix store path 去重，无实质开销，但实现时应避免同一工具两边都显式列出。
+- **programs.nix 不剥离的决定**：为降低破坏在用系统的风险，本次不改写 programs.nix 现有条目，只追加 `++ (import cli-dev.nix)`。代价是部分 CLI 工具在 NixOS 上同时存在于 programs.nix 与 cli-dev.nix（store path 去重，无功能/存储开销）。去重可作为后续可选清理任务。
+- **双份安装冗余**：某些工具既被 HM 模块安装（如 `programs.helix`）又出现在 `cli-dev.nix`/`programs.nix`。Nix store path 去重，无实质开销。
 - **HM 模块在不同平台的可用性**：个别 HM 模块（如 `programs.fish` 在某些受限环境）需验证；实现阶段以"common.nix 在 WSL/Linux 均可 build"为验收项。
 - **`xuqihao-darwin` 未实测**：本次不持有 Mac，预留入口未经实际 build 验证，属于已知未验证项。
