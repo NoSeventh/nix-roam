@@ -31,12 +31,14 @@ with pkgs; [
   tmux
 
   # --- 开发工具链（稳定通道） ---
+  # 注意：只保留 gcc 作为 C/C++ 工具链。不要同时放 gcc + clang ——
+  # 两者的 wrapper 都提供 bin/ld，在同一个 home-manager profile 的 buildEnv 里会
+  # 产生路径冲突导致 build 失败。需要 clang 的机器请用原生包管理器安装，或在
+  # NixOS 上经 modules/programs.nix（那里 gcc+clang 共存于 environment.systemPackages 不冲突）。
   pkgs-stable.gcc
   pkgs-stable.gnumake
   pkgs-stable.cmake
   pkgs-stable.ninja
-  pkgs-stable.clang
-  pkgs-stable.clang-tools
   pkgs-stable.gdb
   pkgs-stable.pkg-config
   pkgs-stable.rustc
