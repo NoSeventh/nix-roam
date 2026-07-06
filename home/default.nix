@@ -24,7 +24,7 @@
         size = 12.0;
         bold = { family = "JetBrains Mono"; style = "Heavy"; };
         italic = { family = "JetBrains Mono"; style = "Medium Italic"; };
-        bold_italic = { family = "JetBrains Mono"; style = "Heavy"; };
+        bold_italic = { family = "JetBrains Mono"; style = "Heavy Italic"; };
         normal = { family = "JetBrains Mono"; style = "Medium"; };
       };
       window = {
