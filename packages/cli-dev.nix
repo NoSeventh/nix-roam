@@ -52,6 +52,7 @@ with pkgs; [
   pkgs-stable.delve
   pkgs-stable.go-tools
   pkgs-stable.nodejs
+  bun
   pkgs-stable.jq
   pkgs-stable.root
 
