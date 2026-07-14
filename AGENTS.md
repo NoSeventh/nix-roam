@@ -1,216 +1,147 @@
 # AGENTS.md
 
-This repository contains a NixOS system configuration using flakes with dual-channel package management (unstable + stable). Agents working here must understand Nix package management and declarative configuration.
+A **dual-mode Nix flake** that serves two targets from one source tree:
 
-## Build System
+1. **NixOS mode** — full system config (desktop, GUI apps, services). `nixosConfigurations.nixos` (x86_64-linux).
+2. **Portable CLI mode** — user-level Home Manager only, for non-NixOS Linux / WSL / macOS. `homeConfigurations.xuqihao` / `xuqihao-darwin`.
 
-**Primary commands:**
-```bash
-# Apply system configuration
-sudo nixos-rebuild switch
+Read `docs/superpowers/specs/2026-07-06-dual-mode-flake-design.md` for the design rationale before restructuring the flake.
 
-# Or use alias (defined in home.nix)
-nrs
+## Build & activate commands
 
-# Update channels and rebuild
-nrrs
+| Target | Command |
+|---|---|
+| NixOS (this machine) | `sudo nixos-rebuild switch` (alias `nrs`) |
+| NixOS + channel update | `nrrs` (= `sudo nix-channel --update && sudo nixos-rebuild switch`) |
+| Fresh Linux/WSL (no Nix yet) | `bash bootstrap/linux.sh` (installs Nix + HM, then activates) |
+| Existing Nix+HM Linux/WSL | `home-manager switch --flake .#xuqihao` |
+| Remote (no clone) | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia#xuqihao"` |
+
+Aliases `nrs` / `nrrs` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`.
+
+**No test framework.** Verify by rebuilding and checking system behavior. To check a flake builds without switching: `nix build .#nixosConfigurations.nixos.config.system.build.toplevel` (NixOS) or `nix run .#homeConfigurations.xuqihao.activationPackage` (HM, dry).
+
+## Architecture: one shared CLI list, two install sites
+
+The core pattern. `packages/cli-dev.nix` is a **pure function** returning a package list — the single source of truth for CLI dev tools, imported in **two** places:
+
+```
+packages/cli-dev.nix  ({ pkgs, pkgs-stable }: [ ... ])
+        ├── modules/programs.nix   → environment.systemPackages  (system-level, sudo-visible)
+        └── home/standalone.nix    → home.packages               (user-level, non-NixOS)
 ```
 
-**Testing:** No automated test framework - this is system configuration, not application code.
-Verify changes by rebuilding and checking system behavior after modifications.
+- **NixOS**: CLI tools land in `environment.systemPackages` → `/run/current-system/sw/bin` → inside sudo `secure_path`, so `sudo <tool>` works. This is intentional (see design doc §9).
+- **Non-NixOS**: same list → `home.packages` → user profile.
+- When adding a CLI tool, decide: needs a dotfile/HM module → `home/common.nix`; bare CLI binary → `packages/cli-dev.nix`. Don't duplicate between the two.
 
-## Dual-Channel Package Management
+## Home Manager layout (`home/`, not root `home.nix`)
 
-This configuration uses **three nixpkgs channels**:
-- `nixpkgs` (unstable)
-- `nixpkgs-stable` (26.05)
-- `nixpkgs-master` - Available but not actively used
+| File | Role |
+|---|---|
+| `home/common.nix` | Cross-platform **CLI-only** HM core (git, bash, starship, helix, ssh, nixvim, fastfetch, btop dotfile). Imported by both modes. **Zero GUI assumptions.** |
+| `home/default.nix` | NixOS entry = `common.nix` + GUI terminals (alacritty/ghostty/fuzzel) + GUI terminal dotfiles (kitty/wezterm). |
+| `home/standalone.nix` | Non-NixOS entry = `common.nix` + `packages/cli-dev.nix`. Zero GUI. |
+| `home/nixvim.nix`, `home/fastfetch.nix` | Split sub-configs imported by `common.nix`. |
 
-### Using pkgs-stable
+GUI HM config stays in `home/default.nix` only — **never** put GUI modules in `common.nix` (breaks WSL/macOS).
 
-When adding packages, use `pkgs-stable.` prefix for packages from the stable channel:
+`flake.nix` wires it: NixOS mode sets `home-manager.users.xuqihao = import ./home/default.nix`; standalone mode uses `mkStandaloneHome` with `./home/standalone.nix`. `home.username`/`homeDirectory`/`stateVersion` are injected by the flake for standalone mode.
 
-```nix
-{ config, pkgs, pkgs-stable, ... }:
+## Directory structure
 
-{
-  environment.systemPackages = with pkgs; [
-    # Browsers
-    firefox
-    pkgs-stable.chromium
-
-    # Editors
-    vscode
-    pkgs-stable.neovim
-
-    # Office
-    pkgs-stable.libreoffice
-    pkgs-stable.thunderbird
-
-    # Media
-    pkgs-stable.vlc
-    pkgs-stable.mpv
-  ];
-}
+```
+flake.nix                  # Dual-mode outputs; forAllSystems helper; pkgs-stable/-master per-system
+configuration.nix          # NixOS system-level (boot, GDM, pipewire, user, base packages)
+hardware-configuration.nix # HARDWARE-SPECIFIC — gitignored, never commit
+modules/                   # AUTO-LOADED into nixosConfigurations.nixos (every *.nix)
+home/                      # Home Manager config (NixOS + standalone)
+packages/cli-dev.nix       # Shared CLI tool list (pure function) — see architecture above
+bootstrap/linux.sh         # One-shot installer for fresh Linux/WSL
+dotfiles/                  # Raw config files, referenced via ../dotfiles from home/ and modules/
+docs/superpowers/          # Planning/spec docs (design decisions of record)
 ```
 
-## Code Style Guidelines
+## Modules (auto-loaded, no manual imports)
 
-### Nix Language
+`flake.nix`'s `generatedModules` scans `modules/*.nix` and loads **all** of them into the NixOS config. Adding a `.nix` file to `modules/` is enough; removing/renaming one drops it from the build.
 
-**Function signatures:** Always use ellipsis (`...`) for attribute sets to handle future parameter expansion:
-```nix
-{ config, pkgs, pkgs-stable, inputs, lib, ... }:
-```
+Module function signatures vary — **only declare the params you actually use** (Nix will error on undeclared args). Examples in-tree:
+- `{ config, pkgs, pkgs-stable, pkgs-master, inputs, lib, ... }` — `programs.nix` (needs everything)
+- `{ config, pkgs, lib, ... }` — `fix-network.nix` (no packages)
 
-**Indentation:** 2 spaces (Nix standard)
+Match the channel to the param you reference: `pkgs-stable` for stable, `pkgs-master` for master, `pkgs` (unstable) for everything else.
 
-**Section organization:** Use numbered sections with dividers:
-```nix
-# --- 1. Section Name ---
-# --- 2. Another Section ---
-```
+Key modules:
+- `programs.nix` — giant GUI + CLI app list. Ends with `++ (import ../packages/cli-dev.nix {...})`. Also defines a **wechat overlay** (fixes dead archive.org URL → official Tencent AppImage).
+- `niri.nix` — Niri (primary) + Hyprland + Sway fallbacks; `dms-shell` enabled as the shell.
+- `agents.nix` — `hermes-agent` service + AI tools (cursor, claude-code, codex, opencode…). See "Secrets" below.
+- `virtualization.nix` — Docker **and** Podman both enabled; don't point both at the same containers.
 
-**Comments:** Mix of English and Chinese comments is acceptable. Comment disabled code rather than deleting it.
+## Three nixpkgs channels
 
-**Package lists:** Use `with pkgs; [ ... ]` pattern, prefix stable packages with `pkgs-stable.`:
+- `nixpkgs` (unstable) → `pkgs`
+- `nixpkgs-stable` (nixos-26.05) → `pkgs-stable`
+- `nixpkgs-master` → `pkgs-master` (wired into `specialArgs`; use sparingly)
+
+All three are instantiated per-system in `flake.nix` (`pkgsFor`) and passed via `specialArgs` / `extraSpecialArgs`. Convention: heavy/stability-sensitive packages (editors, office, toolchains) on `pkgs-stable.`; bleeding-edge stuff on `pkgs`.
+
 ```nix
 environment.systemPackages = with pkgs; [
-  firefox
+  vscode                 # unstable
   pkgs-stable.libreoffice
+  pkgs-stable.neovim
 ];
 ```
 
-**Attribute sets:** No trailing comma on last element:
+## Flake inputs (actual)
+
+Active: `home-manager` (master), `nixvim` (nixos-26.05), `chaotic` (chaotic-cx/nyx), `hermes-agent`.
+
+**The `noctalia`, `dms`, `quickshell`, `zen-browser` inputs are commented out in `flake.nix`.** But `modules/niri.nix` still references the *packages* `noctalia-shell`, `dms-shell`, `quickshell`, `dsearch` — these come from **`chaotic`** (chaotic-cx/nyx), not from the commented flake inputs. Don't "fix" the missing inputs; don't reference `inputs.noctalia`/`inputs.dms`/`inputs.quickshell` — they don't exist.
+
+Access flake packages in modules that declare `inputs`:
 ```nix
-{
-  enable = true;
-  settings = { ... };
-}
+inputs.nixvim.homeModules.nixvim   # used in home/common.nix
 ```
 
-### File Structure
+## Secrets
 
-```
-/home/xuqihao/nixos-niri-noctalia/
-├── flake.nix                 # Entry point, defines pkgs-stable, inputs
-├── configuration.nix         # System-level configuration
-├── home.nix                 # User-level configuration (Home Manager)
-├── hardware-configuration.nix # Hardware-specific (DO NOT commit changes)
-├── modules/                 # Auto-loaded NixOS modules
-│   ├── automation.nix       # Nix GC, optimization
-│   ├── fix-network.nix      # Substituters, mirrors
-│   ├── flatpak&linyaps-module.nix  # Flatpak, GNOME/KDE
-│   ├── locale-zh.nix        # Chinese locale, fonts, input
-│   ├── mnt.nix              # SSHFS mounts
-│   ├── niri.nix             # Niri WM, compositor
-│   ├── programs.nix         # GUI + CLI applications (merged)
-│   └── virtualization.nix   # Docker, Podman, libvirt
-└── dotfiles/               # User config files (terminals, themes)
-```
+`modules/agents.nix` enables `services.hermes-agent` with `environmentFiles = [ "/etc/hermes/env" ];`. That file holds API keys (DeepSeek etc.) and is **not** in the repo — it must exist on the target machine or the service won't start with valid creds. `systemd.tmpfiles.rules` creates `/etc/hermes` (0750 root:hermes); `xuqihao` is added to the `hermes` group for shared-state access.
 
-### Configuration Patterns
+## Handling EOL / insecure packages
 
-**Adding pkgs-stable to modules:**
-All modules that use packages must accept `pkgs-stable` parameter:
+Electron EOL errors (e.g. `Package 'electron-38.8.4' is EOL`) are permitted in **two** places — update **both** when adding a new one:
+- `flake.nix` — inside `pkgsFor` / `mkStandaloneHome` (`config.permittedInsecurePackages`)
+- `configuration.nix` — `nixpkgs.config.permittedInsecurePackages`
+
 ```nix
-{ config, pkgs, pkgs-stable, ... }:  # Add pkgs-stable here
-{
-  environment.systemPackages = [
-    pkgs-stable.some-package
-  ];
-}
-```
-
-**Module imports:** Use relative paths for imports in `configuration.nix`:
-```nix
-imports = [
-  ./hardware-configuration.nix
-];
-```
-
-**Auto-loading:** The `flake.nix` automatically loads all `.nix` files from `modules/` directory using `generatedModules` pattern.
-
-**Home Manager:** User-level configuration lives in `home.nix`. Use `home.file` for dotfile management:
-```nix
-home.file.".config/nvim" = {
-  source = ./dotfiles/.config/nvim;
-  recursive = true;
-};
-```
-
-**Systemd services:** Define services with clear descriptions:
-```nix
-systemd.services.my-service = {
-  description = "Clear service description";
-  startAt = "weekly";
-  serviceConfig = {
-    Type = "oneshot";
-    User = "root";
-    ExecStart = "...";
-  };
-};
-```
-
-## Handling EOL/Insecure Packages
-
-Some Electron-based applications may depend on EOL (End-of-Life) Electron versions. If you see errors like:
-```
-Package 'electron-38.8.4' is EOL
-```
-
-The configuration already permits these packages in both channels:
-- **flake.nix**: `pkgs-stable` has `permittedInsecurePackages` configured
-- **configuration.nix**: Main nixpkgs has `permittedInsecurePackages` configured
-
-To add new EOL packages, update **both** locations:
-```nix
-# In flake.nix (pkgs-stable)
-pkgs-stable = import nixpkgs-stable {
-  inherit system;
-  config.allowUnfree = true;
-  config.permittedInsecurePackages = [
-    "electron-38.8.4"
-    "electron-xx.x.x"  # Add new ones here
-  ];
-};
-
-# In configuration.nix (unstable)
-nixpkgs.config.permittedInsecurePackages = [
+config.permittedInsecurePackages = [
   "electron-38.8.4"
-  "electron-xx.x.x"  # Add new ones here
+  "electron-XX.X.X"   # add here, in BOTH files
 ];
 ```
 
-## Flake Inputs
+## buildEnv conflict gotchas (in `packages/cli-dev.nix`)
 
-This repository uses several external flakes:
+Hard-won — read the header comments there before editing that file:
+- **Never put both `gcc` and `clang` in a Home Manager `home.packages`**: both wrappers provide `bin/ld` → buildEnv conflict → build fails. On NixOS system-level (`environment.systemPackages`) they coexist fine; in user-level HM they don't. Need clang on a non-NixOS box → use the native package manager.
+- **Never put bare `python3` alongside `python3.withPackages (...)`**: buildEnv conflict. Use only the `withPackages` form.
+- Heavy/Linux-only packages (`root`, `rpy2`, `torch`) may need platform gating for the darwin target.
 
-- **home-manager**: User configuration management
-- **noctalia**: Custom shell (noctalia-shell)
-- **dms**: DankMaterialShell (dms-shell)
-- **quickshell**: Quick integration with DMS
-- **chaotic**: Chaotic AUR source for additional packages
+## Style
 
-Access flake packages in modules using `inputs`:
-```nix
-{ config, pkgs, pkgs-stable, inputs, ... }:
-{
-  environment.systemPackages = with pkgs; [
-    inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default
-    inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.quickshell
-  ];
-}
-```
+- **2-space** indentation, no formatter configured — maintain by hand.
+- Function headers use ellipsis: `{ config, pkgs, pkgs-stable, ... }:` (only list what you use).
+- Numbered section dividers: `# --- 1. Section ---`.
+- `with pkgs; [ ... ]` for package lists; prefix stable/master explicitly.
+- Mixed English/Chinese comments are normal. Prefer commenting-out over deleting.
+- No trailing comma on the last attribute.
 
-## Important Notes
+## Quick rules
 
-- **No linting/formatting tools configured** - maintain consistent 2-space indentation manually
-- **No testing framework** - verify by rebuilding and checking system behavior
-- **Hardware-specific config** (`hardware-configuration.nix`) should not be committed (see .gitignore)
-- **Flake-based**: Always work within the flake context - use `inputs` for external packages
-- **Chinese locale**: System configured for zh_CN.UTF-8 with Fcitx5 input method
-- **Niri WM**: Primary Wayland compositor (with Hyprland and Sway as fallbacks)
-- **Virtualization**: Both Docker and Podman enabled - do not enable both for the same containers
-- **Module auto-loading**: All `.nix` files in `modules/` are automatically loaded - no manual imports needed
-- **Dual-channel**: Use `pkgs-stable.` prefix for packages from the stable channel - this distinction is important for package stability
+- `hardware-configuration.nix` is **gitignored** — never stage it.
+- Adding a module file to `modules/` auto-activates it; no import wiring.
+- GUI HM modules → `home/default.nix` only; CLI → `home/common.nix` (needs config) or `packages/cli-dev.nix` (bare tool).
+- Don't uncomment the `noctalia`/`dms`/`quickshell` inputs — those packages are provided by `chaotic`.
+- Adding an EOL package → update `permittedInsecurePackages` in **both** `flake.nix` and `configuration.nix`.

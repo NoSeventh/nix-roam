@@ -58,46 +58,39 @@
 
     # --- 4. Shell 和终端工具 ---
     # Shell（需要追新）
-    zellij
+    # → zellij 已移至 packages/cli-dev.nix（共享）
 
     # 稳定 Shell
-    pkgs-stable.tmux
+    # → tmux 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.fish
     pkgs-stable.oh-my-fish
     pkgs-stable.starship
 
     # 终端工具（稳定）
-    pkgs-stable.bat
-    pkgs-stable.glow
+    # → bat / glow / tealdeer 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.chafa
-    pkgs-stable.tealdeer
 
     # --- 5. 基础工具 ---
     pkgs-stable.git
-    pkgs-stable.wget
-    pkgs-stable.sshfs
+    # → wget / sshfs 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.calcurse
     pkgs-stable.ffmpeg
     pkgs-stable.pandoc
     pkgs-stable.cmatrix
 
     # Git 工具（现代化界面）
-    lazygit
+    # → lazygit / sd 已移至 packages/cli-dev.nix（共享）
     gitui
-    sd
 
     # --- 6. 文件管理 ---
     # 现代文件管理器
     tre-command
-    yazi
+    # → yazi 已移至 packages/cli-dev.nix（共享）
 
     # 稳定文件管理器
-    pkgs-stable.fd
-    pkgs-stable.tree
+    # → fd / tree / dust / eza 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.nnn
-    pkgs-stable.dust
     pkgs-stable.lsd
-    pkgs-stable.eza
 
     # --- 7. 系统监控 ---
     # 现代监控工具
@@ -106,13 +99,12 @@
     bluetui
     bandwhich
     wego
-    bottom
+    # → bottom 已移至 packages/cli-dev.nix（共享）
 
     # 稳定监控工具
-    pkgs-stable.btop
+    # → btop / procs 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.iftop
     pkgs-stable.iotop
-    pkgs-stable.procs
     pkgs-stable.tcping-rs
     pkgs-stable.traceroute
     pkgs-stable.cpu-x
@@ -127,10 +119,10 @@
     pkgs-stable.syncthing
     pkgs-stable.localsend
     pkgs-stable.qbittorrent
-    pkgs-stable.aria2
+    # → aria2 已移至 packages/cli-dev.nix（共享）
 
     # 下载工具（需要最新规则支持）
-    yt-dlp
+    # → yt-dlp 已移至 packages/cli-dev.nix（共享）
     sftpman
 
     # --- 10. 媒体播放器 ---
@@ -192,59 +184,32 @@
 
     # --- 15. 开发工具链 ---
     # C/C++（稳定）
-    pkgs-stable.gcc
-    pkgs-stable.gnumake
+    # → gcc / gnumake / cmake / ninja / gdb / pkg-config 已移至 packages/cli-dev.nix（共享）
+    # 注意：clang / clang-tools 只保留在此（NixOS 系统级）——cli-dev.nix 因 HM buildEnv
+    #       bin/ld 冲突不能放 gcc+clang；系统级 environment.systemPackages 共存无冲突。
     pkgs-stable.clang
     pkgs-stable.clang-tools
-    pkgs-stable.cmake
-    pkgs-stable.ninja
-    pkgs-stable.gdb
-    pkgs-stable.valgrind
-    pkgs-stable.pkg-config
+    # → valgrind 已移至 packages/cli-dev.nix（共享）
 
     # Rust（稳定）
-    pkgs-stable.rustc
-    pkgs-stable.cargo
+    # → rustc / cargo 已移至 packages/cli-dev.nix（共享）
 
     # Go（稳定）
-    pkgs-stable.go
-    pkgs-stable.go-tools
-    pkgs-stable.gopls
-    pkgs-stable.delve
+    # → go / gopls / delve / go-tools 已移至 packages/cli-dev.nix（共享）
 
     # Node.js（稳定）
-    pkgs-stable.nodejs
-    pkgs-stable.jq
+    # → nodejs / jq 已移至 packages/cli-dev.nix（共享）
 
     # 其他开发工具（稳定）
     pkgs-stable.rstudio
-    nil
+    # → nil 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.biome
 
     # --- 16. 搜索工具 ---
-    pkgs-stable.ripgrep
+    # → ripgrep 已移至 packages/cli-dev.nix（共享）
 
     # --- 17. Python 环境 ---
-    pkgs-stable.python3
-    (python3.withPackages (
-      python-pkgs: with python-pkgs; [
-        pip
-        jupyter
-        pyyaml
-        pandas
-        numpy
-        scipy
-        sympy
-        matplotlib
-        root
-        uproot
-        requests
-        rpy2
-        torch
-        uv
-        pytest
-      ]
-    ))
+    # → 已移至 packages/cli-dev.nix（NixOS 与 home/standalone.nix 共享）
 
     # --- 18. JetBrains IDEs ---
     # pkgs-stable.jetbrains-toolbox
@@ -263,12 +228,10 @@
     # pkgs-stable.jetbrains.phpstorm
 
     # --- 19. 科学计算 ---
-    pkgs-stable.root
+    # → root 已移至 packages/cli-dev.nix（共享）
 
     # --- 20. 排版工具 ---
-    typst
-    tinymist
-    typstyle
+    # → typst / tinymist / typstyle 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.texlivePackages.scheme-full
 
     # --- 21. 容器工具 ---

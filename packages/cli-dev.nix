@@ -11,24 +11,27 @@
 
 with pkgs; [
   # --- 现代基础 CLI ---
-  ripgrep
-  fd
+  # 与 modules/programs.nix 共享的工具统一走 stable（全局版本一致）；
+  # 仅追新的小工具（sd / bottom / gh / lazygit）走 unstable。
+  pkgs-stable.ripgrep
+  pkgs-stable.fd
   sd
-  dust
-  procs
+  pkgs-stable.dust
+  pkgs-stable.procs
   bottom
-  btop
-  tree
-  tealdeer
-  glow
+  pkgs-stable.btop
+  pkgs-stable.tree
+  pkgs-stable.tealdeer
+  pkgs-stable.glow
+  pkgs-stable.bat
   gh
   lazygit
 
   # --- 文件 / 会话 ---
   yazi
-  eza
+  pkgs-stable.eza
   zellij
-  tmux
+  pkgs-stable.tmux
 
   # --- 开发工具链（稳定通道） ---
   # 注意：只保留 gcc 作为 C/C++ 工具链。不要同时放 gcc + clang ——
@@ -40,15 +43,40 @@ with pkgs; [
   pkgs-stable.cmake
   pkgs-stable.ninja
   pkgs-stable.gdb
+  pkgs-stable.valgrind  # Linux-only（与 root 同；darwin 目标未实测）
   pkgs-stable.pkg-config
   pkgs-stable.rustc
   pkgs-stable.cargo
   pkgs-stable.go
   pkgs-stable.gopls
   pkgs-stable.delve
+  pkgs-stable.go-tools
   pkgs-stable.nodejs
   pkgs-stable.jq
-  pkgs-stable.python3
+  pkgs-stable.root
+
+  # --- Python 环境（NixOS modules/programs.nix 与 home/standalone.nix 共享） ---
+  # 注意：bare python3 不单独放（会与 withPackages 的 python3-env 产生 buildEnv 冲突）；
+  # root / rpy2 / torch 较重，且 root 是 Linux-only；standalone 目标为 macOS 需按平台裁剪。
+  (python3.withPackages (
+    python-pkgs: with python-pkgs; [
+      pip
+      jupyter
+      pyyaml
+      pandas
+      numpy
+      scipy
+      sympy
+      matplotlib
+      root
+      uproot
+      requests
+      rpy2
+      torch
+      uv
+      pytest
+    ]
+  ))
 
   # --- Nix 工具 ---
   nil
