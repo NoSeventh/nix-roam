@@ -25,15 +25,13 @@
   programs.bash = {
     enable = true;
     enableCompletion = true;
-    bashrcExtra = ''
-      export PATH="$PATH:$HOME/bin:$HOME/.local/bin:$HOME/go/bin:$HOME/.bun/bin"
-    '';
+    bashrcExtra = "";
     shellAliases = {
       ll = "eza -l --icons";
       lt = "eza -lT --icons";
       la = "eza -la --icons";
       nrs = "sudo nixos-rebuild switch";
-      nrrs = "sudo nix-channel --update && sudo nixos-rebuild switch";
+      hms = "home-manager switch --flake .#xuqihao";
       shh = "ssh xuqihao@lxlogin.ihep.ac.cn";
       shhfs = "sshfs -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 xuqihao@lxlogin.ihep.ac.cn:/ ~/mnt/juno/";
       afs = "cd ~/mnt/juno/afs/ihep.ac.cn/users/x/xuqihao";
@@ -81,8 +79,25 @@
     };
   };
 
-  # --- 6. 便携 dotfiles（GUI 终端配置不在此） ---
+  # --- 6. npm ---
+  home.sessionVariables = {
+    NPM_CONFIG_PREFIX = "${config.home.homeDirectory}/.npm-global";
+  };
+
+  home.sessionPath = [
+    "${config.home.homeDirectory}/bin"
+    "${config.home.homeDirectory}/.local/bin"
+    "${config.home.homeDirectory}/go/bin"
+    "${config.home.homeDirectory}/.bun/bin"
+    "${config.home.homeDirectory}/.npm-global/bin"
+  ];
+
+  # --- 7. 便携 dotfiles（GUI 终端配置不在此） ---
   home.file = {
+    ".npm-global" = {
+      source = pkgs.emptyDirectory;
+      recursive = true;
+    };
     ".config/btop" = {
       source = ../dotfiles/.config/btop;
       recursive = true;
