@@ -96,6 +96,7 @@
         system,
         homeDirectory,
         username ? "xuqihao",
+        standaloneModule ? ./home/standalone-linux.nix,
       }:
       let
         pkgs = import nixpkgs {
@@ -113,7 +114,7 @@
             pkgs-master = extra.master;
           };
           modules = [
-            ./home/standalone.nix
+            standaloneModule
             {
               home = {
                 inherit username homeDirectory;
@@ -161,6 +162,7 @@
       homeConfigurations.xuqihao-darwin = mkStandaloneHome {
         system = "aarch64-darwin";
         homeDirectory = "/Users/xuqihao";
+        standaloneModule = ./home/standalone-darwin.nix;
       };
     };
 }

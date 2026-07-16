@@ -1,10 +1,12 @@
 # packages/cli-dev.nix
 #
-# 共享 CLI 开发工具列表 —— 纯函数，返回 package list。
-# 单一事实源，被两处导入：
-#   - modules/programs.nix   → NixOS 的 environment.systemPackages（系统级、sudo 可见）
-#   - home/standalone.nix    → 非 NixOS 的 home.packages（用户级）
+# 跨平台共享 CLI 开发工具列表 —— 纯函数，返回 package list。
+# 单一事实源，被三处导入：
+#   - modules/programs.nix         → NixOS 的 environment.systemPackages（系统级、sudo 可见）
+#   - home/standalone-linux.nix    → 非 NixOS Linux 的 home.packages（用户级）
+#   - home/standalone-darwin.nix   → macOS 的 home.packages（用户级）
 #
+# 平台专用工具放入对应的 cli-dev-{linux,darwin}.nix，保持对称。
 # 只放"无需 HM 托管 dotfile 的纯命令行工具"。
 # 需要 dotfile 配置的（git/bash/starship/helix/ssh/nixvim/fastfetch）见 home/common.nix。
 { pkgs, pkgs-stable, ... }:
@@ -43,7 +45,6 @@ with pkgs; [
   pkgs-stable.cmake
   pkgs-stable.ninja
   pkgs-stable.gdb
-  pkgs-stable.valgrind  # Linux-only（与 root 同；darwin 目标未实测）
   pkgs-stable.pkg-config
   pkgs-stable.rustc
   pkgs-stable.cargo
@@ -54,11 +55,10 @@ with pkgs; [
   pkgs-stable.nodejs
   bun
   pkgs-stable.jq
-  pkgs-stable.root
 
-  # --- Python 环境（NixOS modules/programs.nix 与 home/standalone.nix 共享） ---
-  # 注意：bare python3 不单独放（会与 withPackages 的 python3-env 产生 buildEnv 冲突）；
-  # root / rpy2 / torch 较重，且 root 是 Linux-only；standalone 目标为 macOS 需按平台裁剪。
+  # --- Python 环境（跨平台，三处共享） ---
+  # 注意：bare python3 不单独放（会与 withPackages 的 python3-env 产生 buildEnv 冲突）。
+  # Linux-only 科学计算包（root / uproot / rpy2 / torch）见 packages/cli-dev-linux.nix。
   (python3.withPackages (
     python-pkgs: with python-pkgs; [
       pip
@@ -69,11 +69,7 @@ with pkgs; [
       scipy
       sympy
       matplotlib
-      root
-      uproot
       requests
-      rpy2
-      torch
       uv
       pytest
     ]

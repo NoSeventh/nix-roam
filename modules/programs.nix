@@ -209,7 +209,7 @@
     # → ripgrep 已移至 packages/cli-dev.nix（共享）
 
     # --- 17. Python 环境 ---
-    # → 已移至 packages/cli-dev.nix（NixOS 与 home/standalone.nix 共享）
+    # → 已移至 packages/cli-dev.nix（NixOS 与 home/standalone-linux.nix 共享）
 
     # --- 18. JetBrains IDEs ---
     # pkgs-stable.jetbrains-toolbox
@@ -275,8 +275,9 @@
     howdy
     pkgs-stable.readest
   ]
-  # 共享 CLI 开发工具（与 home/standalone.nix 同源；系统级安装使 sudo 可见）
-  ++ (import ../packages/cli-dev.nix { inherit pkgs pkgs-stable; });
+  # 共享 CLI 开发工具（与 home/standalone-linux.nix 同源；系统级安装使 sudo 可见）
+  ++ (import ../packages/cli-dev.nix { inherit pkgs pkgs-stable; })
+  ++ (import ../packages/cli-dev-linux.nix { inherit pkgs pkgs-stable; });
 
   # Fix wechat AppImage download: web.archive.org URL is dead, use official Tencent source
   nixpkgs.overlays = [

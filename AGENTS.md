@@ -21,19 +21,23 @@ Aliases `nrs` / `nrrs` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are def
 
 **No test framework.** Verify by rebuilding and checking system behavior. To check a flake builds without switching: `nix build .#nixosConfigurations.nixos.config.system.build.toplevel` (NixOS) or `nix run .#homeConfigurations.xuqihao.activationPackage` (HM, dry).
 
-## Architecture: one shared CLI list, two install sites
+## Architecture: one shared CLI list, three install sites
 
-The core pattern. `packages/cli-dev.nix` is a **pure function** returning a package list — the single source of truth for CLI dev tools, imported in **two** places:
+The core pattern. `packages/cli-dev.nix` is a **pure function** returning a cross-platform package list, imported in **three** places. Platform-specific additions live in `cli-dev-linux.nix` / `cli-dev-darwin.nix`:
 
 ```
-packages/cli-dev.nix  ({ pkgs, pkgs-stable }: [ ... ])
-        ├── modules/programs.nix   → environment.systemPackages  (system-level, sudo-visible)
-        └── home/standalone.nix    → home.packages               (user-level, non-NixOS)
+packages/cli-dev.nix         ({ pkgs, pkgs-stable }: [ ... ])  cross-platform
+packages/cli-dev-linux.nix   ({ pkgs, pkgs-stable }: [ ... ])  Linux-only
+packages/cli-dev-darwin.nix  ({ pkgs, pkgs-stable }: [ ... ])  Darwin-only (placeholder)
+        ├── modules/programs.nix          → environment.systemPackages  (system-level, sudo-visible)
+        ├── home/standalone-linux.nix     → home.packages               (user-level, non-NixOS Linux)
+        └── home/standalone-darwin.nix    → home.packages               (user-level, macOS)
 ```
 
 - **NixOS**: CLI tools land in `environment.systemPackages` → `/run/current-system/sw/bin` → inside sudo `secure_path`, so `sudo <tool>` works. This is intentional (see design doc §9).
 - **Non-NixOS**: same list → `home.packages` → user profile.
 - When adding a CLI tool, decide: needs a dotfile/HM module → `home/common.nix`; bare CLI binary → `packages/cli-dev.nix`. Don't duplicate between the two.
+- Linux-only / Darwin-only packages go to the respective `cli-dev-{linux,darwin}.nix`.
 
 ## Home Manager layout (`home/`, not root `home.nix`)
 
@@ -41,12 +45,13 @@ packages/cli-dev.nix  ({ pkgs, pkgs-stable }: [ ... ])
 |---|---|
 | `home/common.nix` | Cross-platform **CLI-only** HM core (git, bash, starship, helix, ssh, nixvim, fastfetch, btop dotfile). Imported by both modes. **Zero GUI assumptions.** |
 | `home/default.nix` | NixOS entry = `common.nix` + GUI terminals (alacritty/ghostty/fuzzel) + GUI terminal dotfiles (kitty/wezterm). |
-| `home/standalone.nix` | Non-NixOS entry = `common.nix` + `packages/cli-dev.nix`. Zero GUI. |
+| `home/standalone-linux.nix` | Non-NixOS Linux entry = `common.nix` + `packages/cli-dev.nix` + `packages/cli-dev-linux.nix`. Zero GUI. |
+| `home/standalone-darwin.nix` | macOS entry = `common.nix` + `packages/cli-dev.nix` + `packages/cli-dev-darwin.nix`. Zero GUI. |
 | `home/nixvim.nix`, `home/fastfetch.nix` | Split sub-configs imported by `common.nix`. |
 
 GUI HM config stays in `home/default.nix` only — **never** put GUI modules in `common.nix` (breaks WSL/macOS).
 
-`flake.nix` wires it: NixOS mode sets `home-manager.users.xuqihao = import ./home/default.nix`; standalone mode uses `mkStandaloneHome` with `./home/standalone.nix`. `home.username`/`homeDirectory`/`stateVersion` are injected by the flake for standalone mode.
+`flake.nix` wires it: NixOS mode sets `home-manager.users.xuqihao = import ./home/default.nix`; standalone mode uses `mkStandaloneHome` with platform-specific `standalone-{linux,darwin}.nix`. `home.username`/`homeDirectory`/`stateVersion` are injected by the flake for standalone mode.
 
 ## Directory structure
 
@@ -57,6 +62,8 @@ hardware-configuration.nix # HARDWARE-SPECIFIC — gitignored, never commit
 modules/                   # AUTO-LOADED into nixosConfigurations.nixos (every *.nix)
 home/                      # Home Manager config (NixOS + standalone)
 packages/cli-dev.nix       # Shared CLI tool list (pure function) — see architecture above
+packages/cli-dev-linux.nix # Linux-only CLI additions
+packages/cli-dev-darwin.nix# Darwin-only CLI additions (placeholder)
 bootstrap/linux.sh         # One-shot installer for fresh Linux/WSL
 dotfiles/                  # Raw config files, referenced via ../dotfiles from home/ and modules/
 docs/superpowers/          # Planning/spec docs (design decisions of record)
@@ -73,7 +80,7 @@ Module function signatures vary — **only declare the params you actually use**
 Match the channel to the param you reference: `pkgs-stable` for stable, `pkgs-master` for master, `pkgs` (unstable) for everything else.
 
 Key modules:
-- `programs.nix` — giant GUI + CLI app list. Ends with `++ (import ../packages/cli-dev.nix {...})`. Also defines a **wechat overlay** (fixes dead archive.org URL → official Tencent AppImage).
+- `programs.nix` — giant GUI + CLI app list. Ends with `++ (import ../packages/cli-dev.nix {...}) ++ (import ../packages/cli-dev-linux.nix {...})`. Also defines a **wechat overlay** (fixes dead archive.org URL → official Tencent AppImage).
 - `niri.nix` — Niri (primary) + Hyprland + Sway fallbacks; `dms-shell` enabled as the shell.
 - `agents.nix` — `hermes-agent` service + AI tools (cursor, claude-code, codex, opencode…). See "Secrets" below.
 - `virtualization.nix` — Docker **and** Podman both enabled; don't point both at the same containers.
@@ -142,6 +149,6 @@ Hard-won — read the header comments there before editing that file:
 
 - `hardware-configuration.nix` is **gitignored** — never stage it.
 - Adding a module file to `modules/` auto-activates it; no import wiring.
-- GUI HM modules → `home/default.nix` only; CLI → `home/common.nix` (needs config) or `packages/cli-dev.nix` (bare tool).
+- GUI HM modules → `home/default.nix` only; CLI → `home/common.nix` (needs config) or `packages/cli-dev.nix` (bare tool); Linux-only/Darwin-only CLI → `packages/cli-dev-{linux,darwin}.nix`.
 - Don't uncomment the `noctalia`/`dms`/`quickshell` inputs — those packages are provided by `chaotic`.
 - Adding an EOL package → update `permittedInsecurePackages` in **both** `flake.nix` and `configuration.nix`.
