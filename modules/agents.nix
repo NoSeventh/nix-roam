@@ -55,7 +55,6 @@
     # --- 4.2 AI Agent 工具 ---
     cc-switch
     agent-browser
-    rtk
     claude-code
     codex
     github-copilot-cli
