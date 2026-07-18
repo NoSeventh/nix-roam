@@ -112,7 +112,6 @@
     # --- 8. 系统信息工具 ---
     ipfetch
     fastfetch
-    honeyfetch
 
     # --- 9. 网络工具 ---
     pkgs-stable.wireguard-tools
@@ -133,7 +132,6 @@
     pkgs-stable.amberol
     pkgs-stable.audacious
     pkgs-stable.psst
-    # pkgs-stable.cider  # broken in nixpkgs 26.05
 
     # 终端音乐播放器
     kew
