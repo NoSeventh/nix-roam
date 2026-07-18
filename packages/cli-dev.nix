@@ -6,7 +6,8 @@
 #   - home/standalone-linux.nix    → 非 NixOS Linux 的 home.packages（用户级）
 #   - home/standalone-darwin.nix   → macOS 的 home.packages（用户级）
 #
-# 平台专用工具放入对应的 cli-dev-{linux,darwin}.nix，保持对称。
+# 平台专用包用 stdenv.isLinux / stdenv.isDarwin 条件判断，不再需要单独的
+# cli-dev-{linux,darwin}.nix 文件。
 # 只放"无需 HM 托管 dotfile 的纯命令行工具"。
 # 需要 dotfile 配置的（git/bash/starship/helix/ssh/nixvim/fastfetch）见 home/common.nix。
 { pkgs, pkgs-stable, ... }:
@@ -58,7 +59,9 @@ with pkgs; [
 
   # --- Python 环境（跨平台，三处共享） ---
   # 注意：bare python3 不单独放（会与 withPackages 的 python3-env 产生 buildEnv 冲突）。
-  # Linux-only 科学计算包（root / uproot / rpy2 / torch）见 packages/cli-dev-linux.nix。
+  # 不要在其他地方再出现 python3.withPackages —— 多个 python3-env 在同一 HM home.packages
+  # buildEnv 里会碰撞 bin/idle3 等文件。所有 Python 包都汇总于此，Linux-only 包用
+  # stdenv.isLinux 条件判断。
   (python3.withPackages (
     python-pkgs: with python-pkgs; [
       pip
@@ -72,7 +75,12 @@ with pkgs; [
       requests
       uv
       pytest
-    ]
+    ] ++ lib.optionals stdenv.isLinux (with python-pkgs; [
+      root
+      uproot
+      rpy2
+      torch
+    ])
   ))
 
   # --- Nix 工具 ---
@@ -83,6 +91,17 @@ with pkgs; [
   typst
   tinymist
   typstyle
+
+  # --- Linux-only 包 ---
+  # valgrind / root 仅 Linux 可用；用 stdenv.isLinux 守卫。
+  (lib.optionals stdenv.isLinux [
+    pkgs-stable.valgrind
+    pkgs-stable.root
+  ])
+
+  # --- AI 开发辅助 CLI ---
+  codegraph
+  rtk
 
   # --- 小众 / 网络 CLI ---
   yt-dlp
