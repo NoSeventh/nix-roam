@@ -91,14 +91,11 @@ with pkgs; [
   typst
   tinymist
   typstyle
-
+] ++ lib.optionals stdenv.isLinux [
   # --- Linux-only 包 ---
-  # valgrind / root 仅 Linux 可用；用 stdenv.isLinux 守卫。
-  (lib.optionals stdenv.isLinux [
-    pkgs-stable.valgrind
-    pkgs-stable.root
-  ])
-
+  pkgs-stable.valgrind
+  pkgs-stable.root
+] ++ [
   # --- AI 开发辅助 CLI ---
   codegraph
   rtk
