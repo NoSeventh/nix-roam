@@ -56,6 +56,8 @@ with pkgs; [
   pkgs-stable.nodejs
   bun
   pkgs-stable.jq
+  opencode
+  pi-coding-agent
 
   # --- Python 环境（跨平台，三处共享） ---
   # 注意：bare python3 不单独放（会与 withPackages 的 python3-env 产生 buildEnv 冲突）。
