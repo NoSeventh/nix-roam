@@ -125,15 +125,12 @@
     sftpman
 
     # --- 10. 媒体播放器 ---
-    # 稳定播放器
     pkgs-stable.vlc
-    pkgs-stable.mpv
+    # → mpv 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.mpd
     pkgs-stable.amberol
     pkgs-stable.audacious
     pkgs-stable.psst
-
-    # 终端音乐播放器
     kew
     go-musicfox
     ncmpcpp

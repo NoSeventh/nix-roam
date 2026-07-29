@@ -35,6 +35,7 @@ with pkgs; [
   pkgs-stable.eza
   zellij
   pkgs-stable.tmux
+  pkgs-stable.mpv
 
   # --- 开发工具链（稳定通道） ---
   # 注意：只保留 gcc 作为 C/C++ 工具链。不要同时放 gcc + clang ——
