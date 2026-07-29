@@ -36,6 +36,9 @@ with pkgs; [
   zellij
   pkgs-stable.tmux
   pkgs-stable.mpv
+  pkgs-stable.ffmpeg
+  pkgs-stable.pandoc
+  pkgs-stable.cmatrix
 
   # --- 开发工具链（稳定通道） ---
   # 注意：只保留 gcc 作为 C/C++ 工具链。不要同时放 gcc + clang ——

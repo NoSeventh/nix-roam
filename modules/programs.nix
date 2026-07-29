@@ -41,15 +41,12 @@
     servo
 
     # --- 2. 编辑器 ---
-    # 现代编辑器（需要追新）
     vscode
     zed-editor
     warp-terminal
     pkgs-stable.neovim
     pkgs-stable.neovide
     helix
-
-    # 稳定编辑器
     pkgs-stable.vim
     pkgs-stable.emacs
 
@@ -72,11 +69,8 @@
 
     # --- 5. 基础工具 ---
     pkgs-stable.git
-    # → wget / sshfs 已移至 packages/cli-dev.nix（共享）
+    # → wget / sshfs / ffmpeg / pandoc / cmatrix 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.calcurse
-    pkgs-stable.ffmpeg
-    pkgs-stable.pandoc
-    pkgs-stable.cmatrix
 
     # Git 工具（现代化界面）
     # → lazygit / sd 已移至 packages/cli-dev.nix（共享）
