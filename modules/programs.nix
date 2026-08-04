@@ -229,7 +229,7 @@
 
     # --- 22. 中文软件 ---
     pkgs-stable.qq
-    pkgs-stable.wechat  # fixed via nixpkgs overlay (AppImage, official Tencent URL)
+    # pkgs-stable.wechat  # fixed via nixpkgs overlay (AppImage, official Tencent URL)
     pkgs-stable.wemeet
     pkgs-stable.qqmusic
     # pkgs-stable.eudic  # download broken (TLS error)
@@ -262,7 +262,6 @@
     pkgs-stable.copyq
     pkgs-stable.uget
     howdy
-    pkgs-stable.readest
   ]
   # 共享 CLI 开发工具（与 home/standalone-linux.nix 同源；系统级安装使 sudo 可见）
   # 平台专用包在 cli-dev.nix 内用 stdenv.isLinux 条件处理。
