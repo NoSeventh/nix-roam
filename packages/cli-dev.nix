@@ -86,6 +86,7 @@ with pkgs; [
       uproot
       rpy2
       torch
+      
     ])
   ))
 
