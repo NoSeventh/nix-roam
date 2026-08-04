@@ -16,7 +16,7 @@
         default = "deepseek-v4-flash";
       };
       toolsets = [ "all" ];
-      compression = {jjj
+      compression = {
         enabled = true;
         threshold = 0.85;
       };
