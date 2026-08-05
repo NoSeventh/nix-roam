@@ -84,7 +84,7 @@
 |---|---|---|
 | NixOS（daemon 配置） | 全生效（现状不变） | 全生效 |
 | standalone 单用户安装 | 全生效 | 全生效 |
-| standalone 多用户 daemon（非 trusted） | 仅 trusted-substituters 内生效；TUNA/USTC 需后续 sudo 配置 | 全生效 |
+| standalone 多用户 daemon（非 trusted） | 仅 trusted-substituters 内生效；TUNA/USTC 由 bootstrap 第 2 步授权后生效 | 全生效 |
 
 ## 5. 边界与错误处理
 
@@ -116,7 +116,16 @@ nix eval --json .#homeConfigurations.xuqihao-darwin.config.nix.settings
 | `home/standalone-linux.nix` | 改（imports） |
 | `home/standalone-darwin.nix` | 改（imports） |
 
-## 8. 可选后续（本次不做）
+## 8. bootstrap/linux.sh 集成：国内镜像授权（已批准实现）
 
-- `bootstrap/linux.sh` 或手动步骤：`sudo` 在 `/etc/nix/nix.conf` 增加 `trusted-substituters`（TUNA/USTC）与 daemon 级 `download-buffer-size`，让多用户 daemon 机器完整生效。
+`bootstrap/linux.sh` 在“安装 Nix”之后插入新步骤 2/6“配置国内镜像信任”：
+
+- 幂等地在 `/etc/nix/nix.custom.conf` 追加 `trusted-substituters = 清华/中科大`（Determinate 的系统 `/etc/nix/nix.conf` 自动 `!include nix.custom.conf`，用户修改应写进 `nix.custom.conf`）。
+- 若该文件已含 TUNA 镜像 URL 则跳过，重复运行不叠加；`sudo mkdir -p /etc/nix` 兜底。
+- 平台无关（Linux / macOS 的 Determinate 安装路径相同）。
+- 镜像列表仍只维护在 `home/nix-cn.nix`；bootstrap 只做“授权”，不重复写 `substituters`。
+
+## 9. 仍可选的后继
+
+- daemon 级 `download-buffer-size`：多用户 daemon 机器上用户级设置会被忽略，如需可写进 `nix.custom.conf`（非必须）。
 - 更彻底的墙内适配：flake 输入镜像化（gitee / `nix.registry`）。
