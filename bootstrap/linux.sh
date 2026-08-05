@@ -22,9 +22,9 @@ log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 # ---------------------------------------------------------------------------
-# 1/5 安装 Nix（Determinate Systems 安装器，默认开启 flakes）
+# 1/6 安装 Nix（Determinate Systems 安装器，默认开启 flakes）
 # ---------------------------------------------------------------------------
-log "1/5 安装 Nix"
+log "1/6 安装 Nix"
 if have nix; then
   echo "    nix 已安装，跳过"
 else
@@ -40,9 +40,24 @@ fi
 have nix || { echo "错误：nix 仍不可用。请打开新 shell 让 nix 进 PATH 后重试。" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
-# 2/5 永久开启 flakes（写入用户 nix.conf，以后直接敲 nix 命令无需额外 flag）
+# 2/6 配置国内镜像信任（多用户 daemon 下让用户级 substituters 生效）
+#     幂等：nix.custom.conf 已含 TUNA 镜像则跳过，不重复叠加。
 # ---------------------------------------------------------------------------
-log "2/5 永久开启 flakes"
+log "2/6 配置国内镜像信任"
+NIX_CUSTOM_CONF="/etc/nix/nix.custom.conf"
+TRUSTED_SUBSTITUTERS="https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store https://mirrors.ustc.edu.cn/nix-channels/store"
+if [ -f "$NIX_CUSTOM_CONF" ] && sudo grep -q "mirrors.tuna.tsinghua.edu.cn/nix-channels/store" "$NIX_CUSTOM_CONF"; then
+  echo "    已配置国内镜像信任，跳过"
+else
+  sudo mkdir -p /etc/nix
+  printf 'trusted-substituters = %s\n' "$TRUSTED_SUBSTITUTERS" | sudo tee -a "$NIX_CUSTOM_CONF" > /dev/null
+  echo "    已写入 $NIX_CUSTOM_CONF"
+fi
+
+# ---------------------------------------------------------------------------
+# 3/6 永久开启 flakes（写入用户 nix.conf，以后直接敲 nix 命令无需额外 flag）
+# ---------------------------------------------------------------------------
+log "3/6 永久开启 flakes"
 mkdir -p "$(dirname "$NIX_CONF")"
 if [ -f "$NIX_CONF" ] && grep -q '^experimental-features' "$NIX_CONF"; then
   echo "    已开启：$(grep '^experimental-features' "$NIX_CONF")"
@@ -52,10 +67,10 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3/5 备份将被 home-manager 接管的家目录文件
+# 4/6 备份将被 home-manager 接管的家目录文件
 #     仅备份「真实文件」；若已是 symlink（说明 HM 已托管），跳过 —— 保证幂等。
 # ---------------------------------------------------------------------------
-log "3/5 备份将被接管的文件"
+log "4/6 备份将被接管的文件"
 for f in "$HOME/.bashrc" "$HOME/.gitconfig" "$HOME/.ssh/config" "$HOME/.profile"; do
   if [ -e "$f" ] && [ ! -L "$f" ]; then
     mkdir -p "$(dirname "$f")"
@@ -66,9 +81,9 @@ for f in "$HOME/.bashrc" "$HOME/.gitconfig" "$HOME/.ssh/config" "$HOME/.profile"
 done
 
 # ---------------------------------------------------------------------------
-# 4/5 永久安装 home-manager（nix profile install，命令常驻 ~/.nix-profile/bin）
+# 5/6 永久安装 home-manager（nix profile install，命令常驻 ~/.nix-profile/bin）
 # ---------------------------------------------------------------------------
-log "4/5 安装 home-manager（永久）"
+log "5/6 安装 home-manager（永久）"
 export PATH="$HOME/.nix-profile/bin:$PATH"
 if have home-manager; then
   echo "    home-manager 已安装，跳过"
@@ -78,10 +93,10 @@ fi
 have home-manager || { echo "错误：home-manager 安装失败。" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
-# 5/5 激活便携 CLI 环境
+# 6/6 激活便携 CLI 环境
 #     -b backup：任何残留冲突文件自动加 .backup 后缀（兜底，避免激活中途失败）
 # ---------------------------------------------------------------------------
-log "5/5 激活 flake target: ${FLAKE_TARGET}"
+log "6/6 激活 flake target: ${FLAKE_TARGET}"
 home-manager switch -b backup --flake ".#${FLAKE_TARGET}"
 
 cat <<EOF
