@@ -8,6 +8,13 @@
   nix.package = pkgs.nix;
 
   nix.settings = {
+    # bootstrap/linux.sh 曾把这一行写进用户级 nix.conf；HM 接管后需要保留。
+    # NixOS 上 configuration.nix 也设置同值，mkForce 避免列表合并产生重复项。
+    experimental-features = lib.mkForce [
+      "nix-command"
+      "flakes"
+    ];
+
     # 优先使用国内镜像站
     substituters = lib.mkForce [
       "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
