@@ -8,6 +8,7 @@
 {
   imports = [
     ./common.nix
+    ./nix-cn.nix
   ];
 
   # 共享 CLI 开发工具（用户级安装；与 NixOS 的 programs.nix 同源）
