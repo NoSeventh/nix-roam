@@ -50,9 +50,9 @@
 { lib, ... }:
 
 {
-  nix.settings = lib.mkForce {
+  nix.settings = {
     # 优先使用国内镜像站
-    substituters = [
+    substituters = lib.mkForce [
       "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
       "https://mirrors.ustc.edu.cn/nix-channels/store"
       "https://cache.nixos.org/"
@@ -85,7 +85,7 @@
 
 ## 5. 边界与错误处理
 
-- `lib.mkForce` 语义与现状一致：用户若在入口文件里另行设置 `nix.settings`，共享模块强制覆盖。
+- `lib.mkForce` 只作用于 `substituters` 单个键（与 `fix-network.nix` 原语义一致），避免整块 `nix.settings` 强制覆盖掉 NixOS 侧 daemon 级设置（`auto-optimise-store`、`download-buffer-size`）；其余键按 Nix 模块系统正常合并。
 - 不引入新的权限变更、不触碰 `/etc/nix`。
 - macOS 目标（`xuqihao-darwin`）仅做结构生效，不做实机构建验证（跨架构限制）。
 

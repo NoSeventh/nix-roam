@@ -43,9 +43,9 @@
 { lib, ... }:
 
 {
-  nix.settings = lib.mkForce {
+  nix.settings = {
     # 优先使用国内镜像站
-    substituters = [
+    substituters = lib.mkForce [
       "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
       "https://mirrors.ustc.edu.cn/nix-channels/store"
       "https://cache.nixos.org/"
