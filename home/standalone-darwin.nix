@@ -8,6 +8,7 @@
 {
   imports = [
     ./common.nix
+    ./nix-cn.nix
   ];
 
   # 跨平台 CLI 开发工具（用户级安装）
