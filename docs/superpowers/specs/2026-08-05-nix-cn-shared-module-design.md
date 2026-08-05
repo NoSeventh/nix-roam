@@ -41,15 +41,18 @@
 
 ### 4.1 新增 `home/nix-cn.nix`
 
-约 12 行的 NixOS / HM 双兼容模块（只声明 `nix.settings`）：
+约 14 行的 NixOS / HM 双兼容模块（只声明 `nix.package` 与 `nix.settings`）：
 
 ```nix
 # 中国大陆网络适配（Nix 侧共享配置，单一事实源）
 # 被 modules/fix-network.nix（NixOS daemon）与 home/standalone-{linux,darwin}.nix（用户级）共同 import。
 # 只放三端都安全生效的设置；daemon 级设置（download-buffer-size / auto-optimise-store）留在 fix-network.nix。
-{ lib, ... }:
+{ lib, pkgs, ... }:
 
 {
+  # HM 断言：生成 nix.conf 时必须指定 nix.package
+  nix.package = pkgs.nix;
+
   nix.settings = {
     # 优先使用国内镜像站
     substituters = lib.mkForce [
@@ -86,6 +89,7 @@
 ## 5. 边界与错误处理
 
 - `lib.mkForce` 只作用于 `substituters` 单个键（与 `fix-network.nix` 原语义一致），避免整块 `nix.settings` 强制覆盖掉 NixOS 侧 daemon 级设置（`auto-optimise-store`、`download-buffer-size`）；其余键按 Nix 模块系统正常合并。
+- HM 的 `nix.settings` 带断言：生成 `nix.conf` 时必须同时指定 `nix.package`。共享模块一并提供 `nix.package = pkgs.nix;`；NixOS 侧 `nix.package` 默认即 `pkgs.nix`，无行为变化。
 - 不引入新的权限变更、不触碰 `/etc/nix`。
 - macOS 目标（`xuqihao-darwin`）仅做结构生效，不做实机构建验证（跨架构限制）。
 
