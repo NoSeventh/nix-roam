@@ -24,6 +24,7 @@ with pkgs; [
   bottom
   pkgs-stable.btop
   pkgs-stable.tree
+  pkgs-stable.tre-command
   pkgs-stable.tealdeer
   pkgs-stable.glow
   pkgs-stable.bat
@@ -31,7 +32,8 @@ with pkgs; [
   lazygit
 
   # --- 文件 / 会话 ---
-  yazi
+  pkgs-stable.nnn
+  pkgs-stable.yazi
   pkgs-stable.eza
   zellij
   pkgs-stable.tmux

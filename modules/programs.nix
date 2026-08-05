@@ -77,13 +77,9 @@
     gitui
 
     # --- 6. 文件管理 ---
-    # 现代文件管理器
-    tre-command
-    # → yazi 已移至 packages/cli-dev.nix（共享）
+    # → tre-command / yazi 已移至 packages/cli-dev.nix（共享）
 
-    # 稳定文件管理器
-    # → fd / tree / dust / eza 已移至 packages/cli-dev.nix（共享）
-    pkgs-stable.nnn
+    # → fd / tree / nnn / dust / eza 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.lsd
 
     # --- 7. 系统监控 ---
@@ -245,8 +241,8 @@
     pkgs-stable.proxypin
 
     # --- 24. 远程工具 ---
-    pkgs-stable.rustdesk-flutter
-    pkgs-stable.anydesk
+    # pkgs-stable.rustdesk-flutter
+    # pkgs-stable.anydesk
 
     # --- 25. 视频会议 ---
     pkgs-stable.zoom-us
