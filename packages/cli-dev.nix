@@ -10,7 +10,7 @@
 # cli-dev-{linux,darwin}.nix 文件。
 # 只放"无需 HM 托管 dotfile 的纯命令行工具"。
 # 需要 dotfile 配置的（git/bash/starship/helix/ssh/nixvim/fastfetch）见 home/common.nix。
-{ pkgs, pkgs-stable, ... }:
+{ pkgs, pkgs-stable, pkgs-master, ... }:
 
 with pkgs; [
   # --- 现代基础 CLI ---
@@ -60,7 +60,7 @@ with pkgs; [
   pkgs-stable.delve
   pkgs-stable.go-tools
   pkgs-stable.nodejs
-  bun
+  # pkgs-master.bun
   pkgs-stable.jq
   opencode
   pi-coding-agent

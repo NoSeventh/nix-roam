@@ -2,7 +2,7 @@
 #
 # NixOS 模式下的 Home Manager 入口（作为 home-manager.users.<user> 导入）。
 # = common（便携 CLI 核心）+ GUI HM 模块（仅 NixOS 桌面）+ GUI 终端 dotfiles + 用户信息。
-{ config, pkgs, pkgs-stable, inputs, ... }:
+{ config, pkgs, pkgs-stable, pkgs-master, inputs, ... }:
 
 {
   imports = [
