@@ -15,10 +15,13 @@
       "flakes"
     ];
 
-    # 优先使用国内镜像站
+    # 优先使用国内镜像站（均收录于 CERNET 联合镜像站 help.mirrors.cernet.edu.cn）
+    # 2026-08 实测延迟：NJU ~106ms < TUNA ~153ms < USTC ~155ms < SJTU ~435ms
     substituters = lib.mkForce [
+      "https://mirror.nju.edu.cn/nix-channels/store"
       "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
       "https://mirrors.ustc.edu.cn/nix-channels/store"
+      "https://mirror.sjtu.edu.cn/nix-channels/store"
       "https://cache.nixos.org/"
     ];
 
