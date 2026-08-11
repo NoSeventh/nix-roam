@@ -108,6 +108,16 @@ Access flake packages in modules that declare `inputs`:
 inputs.nixvim.homeModules.nixvim   # used in home/common.nix
 ```
 
+## China mirrors (CERNET / MirrorZ)
+
+`help.mirrors.cernet.edu.cn` (note the `s` — `help.mirror.cernet.edu.cn` does not resolve) is the CERNET 校园网联合镜像站 (MirrorZ). It is an **index/help aggregator, not a mirror itself**: it doesn't host packages, it points you at member mirrors (TUNA / USTC / NJU / SJTU / ...) and their per-project help pages. Never configure Nix to use `help.mirrors.cernet.edu.cn` or `mirrors.cernet.edu.cn` as a source.
+
+- **Single source of truth** for Nix binary-cache substituters is `home/nix-cn.nix`, imported by `modules/fix-network.nix` (NixOS daemon) and both `home/standalone-*.nix` entries. Current list: NJU → TUNA → USTC → SJTU → `cache.nixos.org` fallback (ordered by 2026-08 measured latency).
+- **Keep `bootstrap/linux.sh` in sync**: on non-NixOS multi-user installs the same list must be written to `/etc/nix/nix.custom.conf` as `trusted-substituters`, or Nix will ignore the user-level substituters with a warning.
+- Binary caches only cover store paths. Flake inputs (`github:nixos/nixpkgs/...`, `home-manager`, `chaotic`, ...) still fetch source from GitHub; the nixpkgs **git** mirrors at USTC/SJTU are dead (404 as of 2026-08) — don't point flake inputs at them.
+- SJTU is the only listed mirror providing nix-darwin binary cache (needed for `standalone-darwin`); TUNA/USTC/BFSU don't.
+- BFSU's `/nix-channels/store` is a 302 redirect to TUNA, not an independent source — don't add it.
+
 ## Secrets
 
 `modules/agents.nix` enables `services.hermes-agent` with `environmentFiles = [ "/etc/hermes/env" ];`. That file holds API keys (DeepSeek etc.) and is **not** in the repo — it must exist on the target machine or the service won't start with valid creds. `systemd.tmpfiles.rules` creates `/etc/hermes` (0750 root:hermes); `xuqihao` is added to the `hermes` group for shared-state access.
