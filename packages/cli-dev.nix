@@ -76,6 +76,7 @@ with pkgs; [
       jupyter
       pyyaml
       pandas
+      polars
       numpy
       scipy
       sympy
