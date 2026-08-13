@@ -32,6 +32,8 @@
       la = "eza -la --icons";
       nrs = "sudo nixos-rebuild switch";
       hms = "home-manager switch --flake .#xuqihao";
+      # npm 兜底源（npmmirror 不可用时）：npmr install <pkg>
+      npmr = "npm --registry=https://repo.nju.edu.cn/repository/npm/";
       shh = "ssh xuqihao@lxlogin.ihep.ac.cn";
       shhfs = "sshfs -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 xuqihao@lxlogin.ihep.ac.cn:/ ~/mnt/juno/";
       afs = "cd ~/mnt/juno/afs/ihep.ac.cn/users/x/xuqihao";
