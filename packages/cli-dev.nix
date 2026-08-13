@@ -10,7 +10,7 @@
 # cli-dev-{linux,darwin}.nix 文件。
 # 只放"无需 HM 托管 dotfile 的纯命令行工具"。
 # 需要 dotfile 配置的（git/bash/starship/helix/ssh/nixvim/fastfetch）见 home/common.nix。
-{ pkgs, pkgs-stable, ... }:
+{ pkgs, pkgs-stable, pkgs-master, ... }:
 
 with pkgs; [
   # --- 现代基础 CLI ---
@@ -24,6 +24,7 @@ with pkgs; [
   bottom
   pkgs-stable.btop
   pkgs-stable.tree
+  pkgs-stable.tre-command
   pkgs-stable.tealdeer
   pkgs-stable.glow
   pkgs-stable.bat
@@ -31,10 +32,15 @@ with pkgs; [
   lazygit
 
   # --- 文件 / 会话 ---
-  yazi
+  pkgs-stable.nnn
+  pkgs-stable.yazi
   pkgs-stable.eza
   zellij
   pkgs-stable.tmux
+  pkgs-stable.mpv
+  pkgs-stable.ffmpeg
+  pkgs-stable.pandoc
+  pkgs-stable.cmatrix
 
   # --- 开发工具链（稳定通道） ---
   # 注意：只保留 gcc 作为 C/C++ 工具链。不要同时放 gcc + clang ——
@@ -54,8 +60,10 @@ with pkgs; [
   pkgs-stable.delve
   pkgs-stable.go-tools
   pkgs-stable.nodejs
-  bun
+  # pkgs-master.bun
   pkgs-stable.jq
+  opencode
+  pi-coding-agent
 
   # --- Python 环境（跨平台，三处共享） ---
   # 注意：bare python3 不单独放（会与 withPackages 的 python3-env 产生 buildEnv 冲突）。
@@ -68,6 +76,7 @@ with pkgs; [
       jupyter
       pyyaml
       pandas
+      polars
       numpy
       scipy
       sympy
@@ -80,6 +89,7 @@ with pkgs; [
       uproot
       rpy2
       torch
+      
     ])
   ))
 
@@ -91,14 +101,11 @@ with pkgs; [
   typst
   tinymist
   typstyle
-
+] ++ lib.optionals stdenv.isLinux [
   # --- Linux-only 包 ---
-  # valgrind / root 仅 Linux 可用；用 stdenv.isLinux 守卫。
-  (lib.optionals stdenv.isLinux [
-    pkgs-stable.valgrind
-    pkgs-stable.root
-  ])
-
+  pkgs-stable.valgrind
+  pkgs-stable.root
+] ++ [
   # --- AI 开发辅助 CLI ---
   codegraph
   rtk

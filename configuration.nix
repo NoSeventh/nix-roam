@@ -81,7 +81,8 @@
 
   nixpkgs.config.allowUnfree = true;
   nixpkgs.config.permittedInsecurePackages = [
-    "electron-38.8.4"
+    "electron-40.10.5"
+    "pnpm-10.29.2"
   ];
   services.openssh.enable = true;
   programs.ssh.askPassword = pkgs.lib.mkForce "${pkgs-stable.seahorse.out}/libexec/seahorse/ssh-askpass";

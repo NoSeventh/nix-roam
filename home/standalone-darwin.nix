@@ -8,11 +8,12 @@
 {
   imports = [
     ./common.nix
+    ./nix-cn.nix
   ];
 
   # 跨平台 CLI 开发工具（用户级安装）
   # 平台专用包在 cli-dev.nix 内用 stdenv.isDarwin 条件处理。
   home.packages = import ../packages/cli-dev.nix {
-    inherit pkgs pkgs-stable;
+    inherit pkgs pkgs-stable pkgs-master;
   };
 }

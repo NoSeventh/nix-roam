@@ -60,7 +60,7 @@
     github-copilot-cli
     # antigravity
     # crush
-    opencode
+    # opencode 已移至 packages/cli-dev.nix （共享） 
     opencode-desktop
 
     # --- 4.3 AI 聊天客户端 ---

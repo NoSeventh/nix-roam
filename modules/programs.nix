@@ -41,15 +41,12 @@
     servo
 
     # --- 2. 编辑器 ---
-    # 现代编辑器（需要追新）
     vscode
     zed-editor
     warp-terminal
     pkgs-stable.neovim
     pkgs-stable.neovide
     helix
-
-    # 稳定编辑器
     pkgs-stable.vim
     pkgs-stable.emacs
 
@@ -72,24 +69,17 @@
 
     # --- 5. 基础工具 ---
     pkgs-stable.git
-    # → wget / sshfs 已移至 packages/cli-dev.nix（共享）
+    # → wget / sshfs / ffmpeg / pandoc / cmatrix 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.calcurse
-    pkgs-stable.ffmpeg
-    pkgs-stable.pandoc
-    pkgs-stable.cmatrix
 
     # Git 工具（现代化界面）
     # → lazygit / sd 已移至 packages/cli-dev.nix（共享）
     gitui
 
     # --- 6. 文件管理 ---
-    # 现代文件管理器
-    tre-command
-    # → yazi 已移至 packages/cli-dev.nix（共享）
+    # → tre-command / yazi 已移至 packages/cli-dev.nix（共享）
 
-    # 稳定文件管理器
-    # → fd / tree / dust / eza 已移至 packages/cli-dev.nix（共享）
-    pkgs-stable.nnn
+    # → fd / tree / nnn / dust / eza 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.lsd
 
     # --- 7. 系统监控 ---
@@ -125,15 +115,12 @@
     sftpman
 
     # --- 10. 媒体播放器 ---
-    # 稳定播放器
     pkgs-stable.vlc
-    pkgs-stable.mpv
+    # → mpv 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.mpd
     pkgs-stable.amberol
     pkgs-stable.audacious
     pkgs-stable.psst
-
-    # 终端音乐播放器
     kew
     go-musicfox
     ncmpcpp
@@ -238,7 +225,7 @@
 
     # --- 22. 中文软件 ---
     pkgs-stable.qq
-    pkgs-stable.wechat  # fixed via nixpkgs overlay (AppImage, official Tencent URL)
+    # pkgs-stable.wechat  # fixed via nixpkgs overlay (AppImage, official Tencent URL)
     pkgs-stable.wemeet
     pkgs-stable.qqmusic
     # pkgs-stable.eudic  # download broken (TLS error)
@@ -254,8 +241,8 @@
     pkgs-stable.proxypin
 
     # --- 24. 远程工具 ---
-    pkgs-stable.rustdesk-flutter
-    pkgs-stable.anydesk
+    # pkgs-stable.rustdesk-flutter
+    # pkgs-stable.anydesk
 
     # --- 25. 视频会议 ---
     pkgs-stable.zoom-us
@@ -271,11 +258,10 @@
     pkgs-stable.copyq
     pkgs-stable.uget
     howdy
-    pkgs-stable.readest
   ]
   # 共享 CLI 开发工具（与 home/standalone-linux.nix 同源；系统级安装使 sudo 可见）
   # 平台专用包在 cli-dev.nix 内用 stdenv.isLinux 条件处理。
-  ++ (import ../packages/cli-dev.nix { inherit pkgs pkgs-stable; });
+  ++ (import ../packages/cli-dev.nix { inherit pkgs pkgs-stable pkgs-master; });
 
   # Fix wechat AppImage download: web.archive.org URL is dead, use official Tencent source
   nixpkgs.overlays = [
