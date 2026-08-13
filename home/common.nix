@@ -82,6 +82,10 @@
   # --- 6. npm ---
   home.sessionVariables = {
     NPM_CONFIG_PREFIX = "${config.home.homeDirectory}/.npm-global";
+    # 中国大陆加速：默认走 npmmirror（npm / npx 通用）。
+    # 环境变量优先级高于项目级 .npmrc；个别项目要用自己的 registry 时：
+    #   npm i --registry=<url>   或   unset NPM_CONFIG_REGISTRY
+    NPM_CONFIG_REGISTRY = "https://registry.npmmirror.com";
   };
 
   home.sessionPath = [
