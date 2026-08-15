@@ -59,7 +59,7 @@ with pkgs; [
   pkgs-stable.gopls
   pkgs-stable.delve
   pkgs-stable.go-tools
-  pkgs-stable.nodejs
+  pkgs-stable.nodejs_26
   # pkgs-master.bun
   pkgs-stable.jq
   opencode
