@@ -59,7 +59,8 @@ with pkgs; [
   pkgs-stable.gopls
   pkgs-stable.delve
   pkgs-stable.go-tools
-  pkgs-stable.nodejs_26
+  # pkgs-stable.nodejs_26
+  pkgs-stable.pnpm
   # pkgs-master.bun
   pkgs-stable.jq
   opencode
