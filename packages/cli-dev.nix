@@ -6,7 +6,7 @@
 #   - home/standalone-linux.nix    → 非 NixOS Linux 的 home.packages（用户级）
 #   - home/standalone-darwin.nix   → macOS 的 home.packages（用户级）
 #
-# 平台专用包用 stdenv.isLinux / stdenv.isDarwin 条件判断，不再需要单独的
+# 平台专用包用 stdenv.hostPlatform.isLinux / stdenv.hostPlatform.isDarwin 条件判断，不再需要单独的
 # cli-dev-{linux,darwin}.nix 文件。
 # 只放"无需 HM 托管 dotfile 的纯命令行工具"。
 # 需要 dotfile 配置的（git/bash/starship/helix/ssh/nixvim/fastfetch）见 home/common.nix。
@@ -70,7 +70,7 @@ with pkgs; [
   # 注意：bare python3 不单独放（会与 withPackages 的 python3-env 产生 buildEnv 冲突）。
   # 不要在其他地方再出现 python3.withPackages —— 多个 python3-env 在同一 HM home.packages
   # buildEnv 里会碰撞 bin/idle3 等文件。所有 Python 包都汇总于此，Linux-only 包用
-  # stdenv.isLinux 条件判断。
+  # stdenv.hostPlatform.isLinux 条件判断。
   (python3.withPackages (
     python-pkgs: with python-pkgs; [
       pip
@@ -85,7 +85,7 @@ with pkgs; [
       requests
       uv
       pytest
-    ] ++ lib.optionals stdenv.isLinux (with python-pkgs; [
+    ] ++ lib.optionals stdenv.hostPlatform.isLinux (with python-pkgs; [
       root
       uproot
       rpy2
@@ -102,7 +102,7 @@ with pkgs; [
   typst
   tinymist
   typstyle
-] ++ lib.optionals stdenv.isLinux [
+] ++ lib.optionals stdenv.hostPlatform.isLinux [
   # --- Linux-only 包 ---
   pkgs-stable.valgrind
   pkgs-stable.root
