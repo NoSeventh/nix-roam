@@ -15,7 +15,7 @@ Read `docs/superpowers/specs/2026-07-06-dual-mode-flake-design.md` for the desig
 | NixOS + channel update | `nrrs` (= `sudo nix-channel --update && sudo nixos-rebuild switch`) |
 | Fresh Linux/WSL (no Nix yet) | `bash bootstrap/linux.sh` (installs Nix + HM, then activates) |
 | Existing Nix+HM Linux/WSL | `home-manager switch --flake .#xuqihao` |
-| Remote (no clone) | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia#xuqihao"` |
+| Remote (no clone) | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nix-roam#xuqihao"` |
 
 Aliases `nrs` / `nrrs` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`.
 
