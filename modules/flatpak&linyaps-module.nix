@@ -8,6 +8,10 @@
   # 2. GNOME && KDE Software 配置（备用）
   services.desktopManager.gnome.enable = true;
   services.desktopManager.plasma6.enable = true;
+  services.desktopManager.cosmic = {
+    enable = true;
+    xwayland.enable = true;
+  };
   # services.xserver.desktopManager.xfce.enable = true;
   # services.xserver.desktopManager.mate.enable = true;
   # services.xserver.desktopManager.lxqt.enable = true;

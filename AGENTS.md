@@ -7,15 +7,24 @@ A **dual-mode Nix flake** that serves two targets from one source tree:
 
 Read `docs/superpowers/specs/2026-07-06-dual-mode-flake-design.md` for the design rationale before restructuring the flake.
 
+## Detect the current host before acting
+
+This repository defines both NixOS and standalone Home Manager targets; **the target present in the repo does not identify the environment where an agent is currently running**. Before diagnosing, rebuilding, activating, or editing environment-specific settings, inspect the actual host (at minimum `/etc/os-release`, `uname -a`, and whether `/etc/NIXOS` exists).
+
+- `/etc/NIXOS` exists → current host is NixOS; system fixes belong under `configuration.nix` / `modules/`, and activation uses `nixos-rebuild`.
+- `/etc/NIXOS` absent → current host is standalone Nix on Linux/WSL (or macOS); fixes belong under `home/standalone-*`, `home/common.nix`, or `bootstrap/` as appropriate, and activation uses Home Manager.
+- WSL must be treated as standalone Linux even though this repo also exports `nixosConfigurations.nixos`.
+- Never infer the current host from the working directory, hostname, flake outputs, `/run/current-system` alone, or wording such as “this machine” in older documentation. State the detected environment before choosing a mode-specific fix.
+
 ## Build & activate commands
 
 | Target | Command |
 |---|---|
-| NixOS (this machine) | `sudo nixos-rebuild switch` (alias `nrs`) |
+| NixOS host | `sudo nixos-rebuild switch` (alias `nrs`) |
 | NixOS + channel update | `nrrs` (= `sudo nix-channel --update && sudo nixos-rebuild switch`) |
 | Fresh Linux/WSL (no Nix yet) | `bash bootstrap/linux.sh` (installs Nix + HM, then activates) |
 | Existing Nix+HM Linux/WSL | `home-manager switch --flake .#xuqihao` |
-| Remote (no clone) | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia#xuqihao"` |
+| Remote (no clone) | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nix-roam#xuqihao"` |
 
 Aliases `nrs` / `nrrs` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`.
 
@@ -23,7 +32,7 @@ Aliases `nrs` / `nrrs` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are def
 
 ## Architecture: one shared CLI list, three install sites
 
-The core pattern. `packages/cli-dev.nix` is a **pure function** returning a cross-platform package list, imported in **three** places. Platform-specific packages use `lib.optionals stdenv.isLinux` / `stdenv.isDarwin` guards inside `cli-dev.nix`:
+The core pattern. `packages/cli-dev.nix` is a **pure function** returning a cross-platform package list, imported in **three** places. Platform-specific packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` guards inside `cli-dev.nix`:
 
 ```
 packages/cli-dev.nix         ({ pkgs, pkgs-stable }: [ ... ])  cross-platform (platform-conditional inside)
@@ -35,7 +44,7 @@ packages/cli-dev.nix         ({ pkgs, pkgs-stable }: [ ... ])  cross-platform (p
 - **NixOS**: CLI tools land in `environment.systemPackages` → `/run/current-system/sw/bin` → inside sudo `secure_path`, so `sudo <tool>` works. This is intentional (see design doc §9).
 - **Non-NixOS**: same list → `home.packages` → user profile.
 - When adding a CLI tool, decide: needs a dotfile/HM module → `home/common.nix`; bare CLI binary → `packages/cli-dev.nix`. Don't duplicate between the two.
-- Linux-only / Darwin-only packages use `lib.optionals stdenv.isLinux` / `stdenv.isDarwin` inside the main list.
+- Linux-only / Darwin-only packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` inside the main list.
 
 ## Home Manager layout (`home/`, not root `home.nix`)
 
@@ -43,8 +52,8 @@ packages/cli-dev.nix         ({ pkgs, pkgs-stable }: [ ... ])  cross-platform (p
 |---|---|
 | `home/common.nix` | Cross-platform **CLI-only** HM core (git, bash, starship, helix, ssh, nixvim, fastfetch, btop dotfile). Imported by both modes. **Zero GUI assumptions.** |
 | `home/default.nix` | NixOS entry = `common.nix` + GUI terminals (alacritty/ghostty/fuzzel) + GUI terminal dotfiles (kitty/wezterm). |
-| `home/standalone-linux.nix` | Non-NixOS Linux entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.isLinux`. Zero GUI. |
-| `home/standalone-darwin.nix` | macOS entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.isDarwin`. Zero GUI. |
+| `home/standalone-linux.nix` | Non-NixOS Linux entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isLinux`. Zero GUI. |
+| `home/standalone-darwin.nix` | macOS entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isDarwin`. Zero GUI. |
 | `home/nixvim.nix`, `home/fastfetch.nix` | Split sub-configs imported by `common.nix`. |
 
 GUI HM config stays in `home/default.nix` only — **never** put GUI modules in `common.nix` (breaks WSL/macOS).
@@ -76,7 +85,7 @@ Module function signatures vary — **only declare the params you actually use**
 Match the channel to the param you reference: `pkgs-stable` for stable, `pkgs-master` for master, `pkgs` (unstable) for everything else.
 
 Key modules:
-- `programs.nix` — giant GUI + CLI app list. Ends with `++ (import ../packages/cli-dev.nix {...})`. Platform-conditional packages use `stdenv.isLinux` guards. Also defines a **wechat overlay**.
+- `programs.nix` — giant GUI + CLI app list. Ends with `++ (import ../packages/cli-dev.nix {...})`. Platform-conditional packages use `stdenv.hostPlatform.isLinux` guards. Also defines a **wechat overlay**.
 - `niri.nix` — Niri (primary) + Hyprland + Sway fallbacks; `dms-shell` enabled as the shell.
 - `agents.nix` — `hermes-agent` service + AI tools (cursor, claude-code, codex, opencode…). See "Secrets" below.
 - `virtualization.nix` — Docker **and** Podman both enabled; don't point both at the same containers.
@@ -114,7 +123,7 @@ inputs.nixvim.homeModules.nixvim   # used in home/common.nix
 
 - **Single source of truth** for Nix binary-cache substituters is `home/nix-cn.nix`, imported by `modules/fix-network.nix` (NixOS daemon) and both `home/standalone-*.nix` entries. Current list: NJU → TUNA → USTC → SJTU → `cache.nixos.org` fallback (ordered by 2026-08 measured latency).
 - npm/npx 的 registry 统一在 `home/common.nix` 配置：默认 `NPM_CONFIG_REGISTRY=https://registry.npmmirror.com`（npmmirror）；A 不可用时用 bash 别名 `npmr` 切到 NJU 南大源（`https://repo.nju.edu.cn/repository/npm/`）。USTC 的 npm 反向代理已于 2026-06-12 停服（请求 302 → npmmirror），不要添加。
-- **Keep `bootstrap/linux.sh` in sync**: on non-NixOS multi-user installs the same list must be written to `/etc/nix/nix.custom.conf` as `trusted-substituters`, or Nix will ignore the user-level substituters with a warning.
+- **Keep `bootstrap/linux.sh` in sync**: on non-NixOS multi-user installs the same list must be written to `/etc/nix/nix.custom.conf` as `trusted-substituters`, and `/etc/nix/nix.conf` must include that file. Otherwise Nix ignores the user-level substituters with a warning.
 - Binary caches only cover store paths. Flake inputs (`github:nixos/nixpkgs/...`, `home-manager`, `chaotic`, ...) still fetch source from GitHub; the nixpkgs **git** mirrors at USTC/SJTU are dead (404 as of 2026-08) — don't point flake inputs at them.
 - SJTU is the only listed mirror providing nix-darwin binary cache (needed for `standalone-darwin`); TUNA/USTC/BFSU don't.
 - BFSU's `/nix-channels/store` is a 302 redirect to TUNA, not an independent source — don't add it.
@@ -141,7 +150,7 @@ config.permittedInsecurePackages = [
 Hard-won — read the header comments there before editing that file:
 - **Never put both `gcc` and `clang` in a Home Manager `home.packages`**: both wrappers provide `bin/ld` → buildEnv conflict → build fails. On NixOS system-level (`environment.systemPackages`) they coexist fine; in user-level HM they don't. Need clang on a non-NixOS box → use the native package manager.
 - **Never put bare `python3` alongside `python3.withPackages (...)`**: buildEnv conflict. Use only the `withPackages` form.
-- **Never have two separate `python3.withPackages (...)` calls in the same HM `home.packages`**: both produce python3-env derivations that collide on `bin/idle3` etc. in HM's buildEnv. Merge all Python packages into a single `withPackages` call, using `stdenv.isLinux` / `stdenv.isDarwin` guards for platform-specific packages.
+- **Never have two separate `python3.withPackages (...)` calls in the same HM `home.packages`**: both produce python3-env derivations that collide on `bin/idle3` etc. in HM's buildEnv. Merge all Python packages into a single `withPackages` call, using `stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` guards for platform-specific packages.
 
 ## Style
 
@@ -156,6 +165,6 @@ Hard-won — read the header comments there before editing that file:
 
 - `hardware-configuration.nix` is **gitignored** — never stage it.
 - Adding a module file to `modules/` auto-activates it; no import wiring.
-- GUI HM modules → `home/default.nix` only; CLI → `home/common.nix` (needs config) or `packages/cli-dev.nix` (bare tool); Linux-only/Darwin-only packages use `lib.optionals stdenv.isLinux` / `stdenv.isDarwin` inside `cli-dev.nix`.
+- GUI HM modules → `home/default.nix` only; CLI → `home/common.nix` (needs config) or `packages/cli-dev.nix` (bare tool); Linux-only/Darwin-only packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` inside `cli-dev.nix`.
 - Don't uncomment the `noctalia`/`dms`/`quickshell` inputs — those packages are provided by `chaotic`.
 - Adding an EOL package → update `permittedInsecurePackages` in **both** `flake.nix` and `configuration.nix`.

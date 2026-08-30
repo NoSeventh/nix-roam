@@ -120,7 +120,7 @@ GUI HM 配置**仅留在 NixOS 入口**，不进 `common.nix`、不导出 standa
 | NixOS（不变） | `sudo nixos-rebuild switch`（或 `nrs`） |
 | Fresh Linux/WSL（未装 Nix） | `bash bootstrap/linux.sh`（自动装 Nix + HM 并 `home-manager switch --flake .#xuqihao`） |
 | 已有 Nix+HM 的 Linux/WSL | `home-manager switch --flake .#xuqihao` |
-| 远程机器（不 clone 仓库） | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia#xuqihao"` |
+| 远程机器（不 clone 仓库） | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nix-roam#xuqihao"` |
 | Mac（未来） | `home-manager switch --flake .#xuqihao-darwin` |
 
 ## 9. sudo 处理
