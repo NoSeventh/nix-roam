@@ -86,7 +86,7 @@ with pkgs; [
       uv
       pytest
     ] ++ lib.optionals stdenv.hostPlatform.isLinux (with python-pkgs; [
-      root
+      pkgs-stable.root
       uproot
       rpy2
       torch
