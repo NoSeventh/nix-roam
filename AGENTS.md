@@ -7,11 +7,20 @@ A **dual-mode Nix flake** that serves two targets from one source tree:
 
 Read `docs/superpowers/specs/2026-07-06-dual-mode-flake-design.md` for the design rationale before restructuring the flake.
 
+## Detect the current host before acting
+
+This repository defines both NixOS and standalone Home Manager targets; **the target present in the repo does not identify the environment where an agent is currently running**. Before diagnosing, rebuilding, activating, or editing environment-specific settings, inspect the actual host (at minimum `/etc/os-release`, `uname -a`, and whether `/etc/NIXOS` exists).
+
+- `/etc/NIXOS` exists → current host is NixOS; system fixes belong under `configuration.nix` / `modules/`, and activation uses `nixos-rebuild`.
+- `/etc/NIXOS` absent → current host is standalone Nix on Linux/WSL (or macOS); fixes belong under `home/standalone-*`, `home/common.nix`, or `bootstrap/` as appropriate, and activation uses Home Manager.
+- WSL must be treated as standalone Linux even though this repo also exports `nixosConfigurations.nixos`.
+- Never infer the current host from the working directory, hostname, flake outputs, `/run/current-system` alone, or wording such as “this machine” in older documentation. State the detected environment before choosing a mode-specific fix.
+
 ## Build & activate commands
 
 | Target | Command |
 |---|---|
-| NixOS (this machine) | `sudo nixos-rebuild switch` (alias `nrs`) |
+| NixOS host | `sudo nixos-rebuild switch` (alias `nrs`) |
 | NixOS + channel update | `nrrs` (= `sudo nix-channel --update && sudo nixos-rebuild switch`) |
 | Fresh Linux/WSL (no Nix yet) | `bash bootstrap/linux.sh` (installs Nix + HM, then activates) |
 | Existing Nix+HM Linux/WSL | `home-manager switch --flake .#xuqihao` |
@@ -114,7 +123,7 @@ inputs.nixvim.homeModules.nixvim   # used in home/common.nix
 
 - **Single source of truth** for Nix binary-cache substituters is `home/nix-cn.nix`, imported by `modules/fix-network.nix` (NixOS daemon) and both `home/standalone-*.nix` entries. Current list: NJU → TUNA → USTC → SJTU → `cache.nixos.org` fallback (ordered by 2026-08 measured latency).
 - npm/npx 的 registry 统一在 `home/common.nix` 配置：默认 `NPM_CONFIG_REGISTRY=https://registry.npmmirror.com`（npmmirror）；A 不可用时用 bash 别名 `npmr` 切到 NJU 南大源（`https://repo.nju.edu.cn/repository/npm/`）。USTC 的 npm 反向代理已于 2026-06-12 停服（请求 302 → npmmirror），不要添加。
-- **Keep `bootstrap/linux.sh` in sync**: on non-NixOS multi-user installs the same list must be written to `/etc/nix/nix.custom.conf` as `trusted-substituters`, or Nix will ignore the user-level substituters with a warning.
+- **Keep `bootstrap/linux.sh` in sync**: on non-NixOS multi-user installs the same list must be written to `/etc/nix/nix.custom.conf` as `trusted-substituters`, and `/etc/nix/nix.conf` must include that file. Otherwise Nix ignores the user-level substituters with a warning.
 - Binary caches only cover store paths. Flake inputs (`github:nixos/nixpkgs/...`, `home-manager`, `chaotic`, ...) still fetch source from GitHub; the nixpkgs **git** mirrors at USTC/SJTU are dead (404 as of 2026-08) — don't point flake inputs at them.
 - SJTU is the only listed mirror providing nix-darwin binary cache (needed for `standalone-darwin`); TUNA/USTC/BFSU don't.
 - BFSU's `/nix-channels/store` is a 302 redirect to TUNA, not an independent source — don't add it.

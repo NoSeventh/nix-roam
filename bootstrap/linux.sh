@@ -41,10 +41,11 @@ have nix || { echo "错误：nix 仍不可用。请打开新 shell 让 nix 进 P
 
 # ---------------------------------------------------------------------------
 # 2/6 配置国内镜像信任（多用户 daemon 下让用户级 substituters 生效）
-#     幂等：nix.custom.conf 已含 NJU 镜像则跳过；旧列表（TUNA/USTC）整行替换为新列表。
+#     幂等：维护 nix.custom.conf 的镜像列表，并确保 nix.conf 实际 include 它。
 # ---------------------------------------------------------------------------
 log "2/6 配置国内镜像信任"
 NIX_CUSTOM_CONF="/etc/nix/nix.custom.conf"
+NIX_SYSTEM_CONF="/etc/nix/nix.conf"
 TRUSTED_SUBSTITUTERS="https://mirror.nju.edu.cn/nix-channels/store https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store https://mirrors.ustc.edu.cn/nix-channels/store https://mirror.sjtu.edu.cn/nix-channels/store"
 if [ -f "$NIX_CUSTOM_CONF" ] && sudo grep -q "mirror.nju.edu.cn/nix-channels/store" "$NIX_CUSTOM_CONF"; then
   echo "    已配置国内镜像信任，跳过"
@@ -56,6 +57,10 @@ else
     printf 'trusted-substituters = %s\n' "$TRUSTED_SUBSTITUTERS" | sudo tee -a "$NIX_CUSTOM_CONF" > /dev/null
   fi
   echo "    已写入 $NIX_CUSTOM_CONF"
+fi
+if [ ! -f "$NIX_SYSTEM_CONF" ] || ! sudo grep -Eq '^!include[[:space:]]+(nix\.custom\.conf|/etc/nix/nix\.custom\.conf)$' "$NIX_SYSTEM_CONF"; then
+  printf '\n!include nix.custom.conf\n' | sudo tee -a "$NIX_SYSTEM_CONF" > /dev/null
+  echo "    已让 $NIX_SYSTEM_CONF 加载 nix.custom.conf"
 fi
 
 # ---------------------------------------------------------------------------
