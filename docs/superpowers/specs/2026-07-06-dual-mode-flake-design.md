@@ -150,3 +150,19 @@ GUI HM 配置**仅留在 NixOS 入口**，不进 `common.nix`、不导出 standa
 - **双份安装冗余**：某些工具既被 HM 模块安装（如 `programs.helix`）又出现在 `cli-dev.nix`/`programs.nix`。Nix store path 去重，无实质开销。
 - **HM 模块在不同平台的可用性**：个别 HM 模块（如 `programs.fish` 在某些受限环境）需验证；实现阶段以"common.nix 在 WSL/Linux 均可 build"为验收项。
 - **`xuqihao-darwin` 未实测**：本次不持有 Mac，预留入口未经实际 build 验证，属于已知未验证项。
+
+## 13. 实施后调整：按主机组织硬件配置
+
+为兼顾多机器可迁移性与 Git Flake 的纯求值要求，NixOS 主机入口调整为：
+
+```text
+hosts/nixos/
+├── default.nix
+└── hardware-configuration.nix
+```
+
+- `hosts/nixos/default.nix` 组合共享的 `configuration.nix` 与当前机器生成的硬件配置。
+- `hosts/<hostname>/hardware-configuration.nix` 必须纳入 Git；Git Flake 不会复制真正被忽略的文件。
+- 根目录 `/hardware-configuration.nix` 继续被忽略，只用于防止在错误位置重新生成。
+- 新增机器时创建独立的 `hosts/<hostname>/`，并在 `flake.nix` 增加对应的 `nixosConfigurations.<hostname>`，不覆盖现有主机文件。
+- Linux/WSL/macOS 的 standalone Home Manager 输出不依赖任何 NixOS 主机目录，因此可移植模式保持不变。

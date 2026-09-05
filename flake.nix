@@ -134,7 +134,7 @@
           pkgs-master = nixosPkgs.master;
         };
         modules = [
-          ./configuration.nix
+          ./hosts/nixos
           home-manager.nixosModules.home-manager
           chaotic.nixosModules.default
           inputs.hermes-agent.nixosModules.default

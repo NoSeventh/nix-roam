@@ -1,10 +1,6 @@
 { config, pkgs, pkgs-stable, ... }:
 
 {
-  imports = [
-    ./hardware-configuration.nix
-  ];
-
   # --- 1. 引导与系统内核 ---
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;

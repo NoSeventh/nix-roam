@@ -64,8 +64,8 @@ GUI HM config stays in `home/default.nix` only — **never** put GUI modules in 
 
 ```
 flake.nix                  # Dual-mode outputs; forAllSystems helper; pkgs-stable/-master per-system
-configuration.nix          # NixOS system-level (boot, GDM, pipewire, user, base packages)
-hardware-configuration.nix # HARDWARE-SPECIFIC — gitignored, never commit
+configuration.nix          # Shared NixOS system config (boot, GDM, pipewire, user, base packages)
+hosts/nixos/               # Current host entry + tracked hardware-configuration.nix
 modules/                   # AUTO-LOADED into nixosConfigurations.nixos (every *.nix)
 home/                      # Home Manager config (NixOS + standalone)
 packages/cli-dev.nix       # Shared CLI tool list (pure function) — see architecture above
@@ -73,6 +73,10 @@ bootstrap/linux.sh         # One-shot installer for fresh Linux/WSL
 dotfiles/                  # Raw config files, referenced via ../dotfiles from home/ and modules/
 docs/superpowers/          # Planning/spec docs (design decisions of record)
 ```
+
+## Host layout
+
+`hosts/nixos/default.nix` is the current machine entry and imports both the shared `configuration.nix` and its tracked `hardware-configuration.nix`. Keep generated hardware files under `hosts/<hostname>/` and track them so Git Flake evaluation remains pure and reproducible. Add a sibling host directory and a matching `nixosConfigurations.<hostname>` output for each additional machine; the root `/hardware-configuration.nix` path is ignored only to prevent accidental regeneration in the wrong location.
 
 ## Modules (auto-loaded, no manual imports)
 
@@ -163,7 +167,7 @@ Hard-won — read the header comments there before editing that file:
 
 ## Quick rules
 
-- `hardware-configuration.nix` is **gitignored** — never stage it.
+- Track `hosts/<hostname>/hardware-configuration.nix` for reproducible Git Flake builds; only the accidental root path `/hardware-configuration.nix` is ignored.
 - Adding a module file to `modules/` auto-activates it; no import wiring.
 - GUI HM modules → `home/default.nix` only; CLI → `home/common.nix` (needs config) or `packages/cli-dev.nix` (bare tool); Linux-only/Darwin-only packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` inside `cli-dev.nix`.
 - Don't uncomment the `noctalia`/`dms`/`quickshell` inputs — those packages are provided by `chaotic`.

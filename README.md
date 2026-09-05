@@ -55,7 +55,7 @@ bash bootstrap/linux.sh
 
 ### NixOS
 
-NixOS 模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。该文件包含硬件信息且不纳入版本控制，不建议在其他机器上直接切换。
+NixOS 模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。当前机器的配置位于 `hosts/nixos/` 并纳入版本控制，以保证 Git Flake 可以纯求值和重复构建；其他机器应建立独立的 `hosts/<hostname>/`，不要直接复用现有硬件配置。
 
 在已准备好硬件配置的目标机器上：
 
@@ -89,7 +89,9 @@ nix build --no-link .#nixosConfigurations.nixos.config.system.build.toplevel
 ```text
 .
 ├── flake.nix                   # 双模式 flake 输出与三套 nixpkgs 通道
-├── configuration.nix           # NixOS 基础系统配置
+├── configuration.nix           # 共享的 NixOS 基础系统配置
+├── hosts/
+│   └── nixos/                  # 当前 NixOS 主机入口与硬件配置
 ├── modules/                    # 自动加载的 NixOS 模块
 ├── home/
 │   ├── common.nix              # 两种模式共享的纯 CLI Home Manager 配置
@@ -117,11 +119,11 @@ CLI 工具只维护一份列表：`packages/cli-dev.nix`。它会被安装到以
 
 ## 注意事项
 
-- `hardware-configuration.nix` 是机器专用文件，已被忽略，不应提交。
+- `hosts/<hostname>/hardware-configuration.nix` 是机器专用文件，应与对应主机入口一起提交；只有仓库根目录下误生成的 `/hardware-configuration.nix` 被忽略。
 - NixOS 中的 Hermes Agent 需要目标机器自行提供 `/etc/hermes/env`。
 - 多用户 Nix 安装需要让 daemon 信任自定义 substituter；`bootstrap/linux.sh` 会处理新机器的这项配置。
 - macOS 输出目前尚未完成真实设备构建验证。
 
 ## License
 
-当前仓库尚未声明开源许可证。配置可供参考，但在添加许可证前不代表已授予复制、修改或再分发权限。
+见 [`LICENSE`](LICENSE)。
