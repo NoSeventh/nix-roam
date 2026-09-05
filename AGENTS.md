@@ -1,19 +1,19 @@
 # AGENTS.md
 
-A **dual-mode Nix flake** that serves two targets from one source tree:
+A **dual-mode Nix flake** that supports two management modes from one source tree:
 
-1. **NixOS mode** — full system config (desktop, GUI apps, services). `nixosConfigurations.nixos` (x86_64-linux).
+1. **NixOS mode** — desktop: `nixosConfigurations.nixos`; CLI-only WSL: `nixosConfigurations.wsl` (both x86_64-linux).
 2. **Portable CLI mode** — user-level Home Manager only, for non-NixOS Linux / WSL / macOS. `homeConfigurations.xuqihao` / `xuqihao-darwin`.
 
-Read `docs/superpowers/specs/2026-07-06-dual-mode-flake-design.md` for the design rationale before restructuring the flake.
+Read `docs/superpowers/specs/2026-07-06-dual-mode-flake-design.md` and `docs/superpowers/specs/2026-09-05-nixos-wsl-design.md` for the design rationale before restructuring the flake.
 
 ## Detect the current host before acting
 
 This repository defines both NixOS and standalone Home Manager targets; **the target present in the repo does not identify the environment where an agent is currently running**. Before diagnosing, rebuilding, activating, or editing environment-specific settings, inspect the actual host (at minimum `/etc/os-release`, `uname -a`, and whether `/etc/NIXOS` exists).
 
-- `/etc/NIXOS` exists → current host is NixOS; system fixes belong under `configuration.nix` / `modules/`, and activation uses `nixos-rebuild`.
+- `/etc/NIXOS` exists → current host is NixOS; system fixes belong under `hosts/`, `profiles/`, or desktop `configuration.nix` / `modules/`, and activation uses `nixos-rebuild`.
 - `/etc/NIXOS` absent → current host is standalone Nix on Linux/WSL (or macOS); fixes belong under `home/standalone-*`, `home/common.nix`, or `bootstrap/` as appropriate, and activation uses Home Manager.
-- WSL must be treated as standalone Linux even though this repo also exports `nixosConfigurations.nixos`.
+- WSL with `/etc/NIXOS` is NixOS-WSL and uses `.#wsl`; other WSL distributions use standalone Home Manager.
 - Never infer the current host from the working directory, hostname, flake outputs, `/run/current-system` alone, or wording such as “this machine” in older documentation. State the detected environment before choosing a mode-specific fix.
 
 ## Build & activate commands
@@ -21,6 +21,7 @@ This repository defines both NixOS and standalone Home Manager targets; **the ta
 | Target | Command |
 |---|---|
 | NixOS host | `sudo nixos-rebuild switch` (alias `nrs`) |
+| NixOS-WSL | `sudo nixos-rebuild switch --flake .#wsl` |
 | NixOS + channel update | `nrrs` (= `sudo nix-channel --update && sudo nixos-rebuild switch`) |
 | Fresh Linux/WSL (no Nix yet) | `bash bootstrap/linux.sh` (installs Nix + HM, then activates) |
 | Existing Nix+HM Linux/WSL | `home-manager switch --flake .#xuqihao` |
@@ -28,14 +29,21 @@ This repository defines both NixOS and standalone Home Manager targets; **the ta
 
 Aliases `nrs` / `nrrs` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`.
 
-**No test framework.** Verify by rebuilding and checking system behavior. To check a flake builds without switching: `nix build .#nixosConfigurations.nixos.config.system.build.toplevel` (NixOS) or `nix run .#homeConfigurations.xuqihao.activationPackage` (HM, dry).
+**No test framework.** Build without activation using `nix build --no-link` with the appropriate target:
 
-## Architecture: one shared CLI list, three install sites
+- Desktop: `.#nixosConfigurations.nixos.config.system.build.toplevel`
+- NixOS-WSL: `.#nixosConfigurations.wsl.config.system.build.toplevel`
+- Standalone Linux: `.#homeConfigurations.xuqihao.activationPackage`
 
-The core pattern. `packages/cli-dev.nix` is a **pure function** returning a cross-platform package list, imported in **three** places. Platform-specific packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` guards inside `cli-dev.nix`:
+`nix run` on an activation package is not a dry build. A successful WSL build on another Linux distribution does not verify WSL boot or login.
+
+## Architecture: one shared CLI list, four install sites
+
+The core pattern. `packages/cli-dev.nix` is a **pure function** returning a cross-platform package list, imported in **four** places. Platform-specific packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` guards inside `cli-dev.nix`:
 
 ```
 packages/cli-dev.nix         ({ pkgs, pkgs-stable }: [ ... ])  cross-platform (platform-conditional inside)
+        ├── profiles/cli.nix              → environment.systemPackages  (NixOS-WSL)
         ├── modules/programs.nix          → environment.systemPackages  (system-level, sudo-visible)
         ├── home/standalone-linux.nix     → home.packages               (user-level, non-NixOS Linux)
         └── home/standalone-darwin.nix    → home.packages               (user-level, macOS)
@@ -51,6 +59,7 @@ packages/cli-dev.nix         ({ pkgs, pkgs-stable }: [ ... ])  cross-platform (p
 | File | Role |
 |---|---|
 | `home/common.nix` | Cross-platform **CLI-only** HM core (git, bash, starship, helix, ssh, nixvim, fastfetch, btop dotfile). Imported by both modes. **Zero GUI assumptions.** |
+| `home/nixos-cli.nix` | NixOS-WSL HM entry = `common.nix` + user identity. CLI packages installed system-wide by `profiles/cli.nix`. |
 | `home/default.nix` | NixOS entry = `common.nix` + GUI terminals (alacritty/ghostty/fuzzel) + GUI terminal dotfiles (kitty/wezterm). |
 | `home/standalone-linux.nix` | Non-NixOS Linux entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isLinux`. Zero GUI. |
 | `home/standalone-darwin.nix` | macOS entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isDarwin`. Zero GUI. |
@@ -58,13 +67,15 @@ packages/cli-dev.nix         ({ pkgs, pkgs-stable }: [ ... ])  cross-platform (p
 
 GUI HM config stays in `home/default.nix` only — **never** put GUI modules in `common.nix` (breaks WSL/macOS).
 
-`flake.nix` wires it: NixOS mode sets `home-manager.users.xuqihao = import ./home/default.nix`; standalone mode uses `mkStandaloneHome` with platform-specific `standalone-{linux,darwin}.nix`. `home.username`/`homeDirectory`/`stateVersion` are injected by the flake for standalone mode.
+`flake.nix` wires it: `nixosHome` selects `home/default.nix` for the desktop and `home/nixos-cli.nix` for WSL; standalone mode uses `mkStandaloneHome` with platform-specific `standalone-{linux,darwin}.nix`. `home.username`/`homeDirectory`/`stateVersion` are injected by the flake for standalone mode.
 
 ## Directory structure
 
 ```
 flake.nix                  # Dual-mode outputs; forAllSystems helper; pkgs-stable/-master per-system
-configuration.nix          # Shared NixOS system config (boot, GDM, pipewire, user, base packages)
+configuration.nix          # Desktop NixOS config; imports profiles/nixos-base.nix
+profiles/                  # Explicit shared NixOS base, locale and CLI modules
+hosts/wsl/                 # NixOS-WSL entry, no physical hardware config
 hosts/nixos/               # Current host entry + tracked hardware-configuration.nix
 modules/                   # AUTO-LOADED into nixosConfigurations.nixos (every *.nix)
 home/                      # Home Manager config (NixOS + standalone)
@@ -76,11 +87,11 @@ docs/superpowers/          # Planning/spec docs (design decisions of record)
 
 ## Host layout
 
-`hosts/nixos/default.nix` is the current machine entry and imports both the shared `configuration.nix` and its tracked `hardware-configuration.nix`. Keep generated hardware files under `hosts/<hostname>/` and track them so Git Flake evaluation remains pure and reproducible. Add a sibling host directory and a matching `nixosConfigurations.<hostname>` output for each additional machine; the root `/hardware-configuration.nix` path is ignored only to prevent accidental regeneration in the wrong location.
+`hosts/nixos/default.nix` is the current machine entry and imports both the desktop `configuration.nix` and its tracked `hardware-configuration.nix`. Keep generated hardware files under `hosts/<hostname>/` and track them so Git Flake evaluation remains pure and reproducible. Add a sibling host directory and a matching `nixosConfigurations.<hostname>` output for each additional machine; the root `/hardware-configuration.nix` path is ignored only to prevent accidental regeneration in the wrong location.
 
-## Modules (auto-loaded, no manual imports)
+## Desktop modules (auto-loaded); WSL profiles (explicit imports)
 
-`flake.nix`'s `generatedModules` scans `modules/*.nix` and loads **all** of them into the NixOS config. Adding a `.nix` file to `modules/` is enough; removing/renaming one drops it from the build.
+`flake.nix`'s `generatedModules` scans `modules/*.nix` and loads **all** of them into the desktop NixOS config. WSL uses an explicit module list; never append generatedModules to it. Adding a `.nix` file to `modules/` is enough; removing/renaming one drops it from the build.
 
 Module function signatures vary — **only declare the params you actually use** (Nix will error on undeclared args). Examples in-tree:
 - `{ config, pkgs, pkgs-stable, pkgs-master, inputs, lib, ... }` — `programs.nix` (needs everything)
@@ -112,7 +123,7 @@ environment.systemPackages = with pkgs; [
 
 ## Flake inputs (actual)
 
-Active: `home-manager` (master), `nixvim` (nixos-26.05), `chaotic` (chaotic-cx/nyx), `hermes-agent`.
+Active: `nixos-wsl`, `home-manager` (master), `nixvim` (nixos-26.05), `chaotic` (chaotic-cx/nyx), `hermes-agent`.
 
 **The `noctalia`, `dms`, `quickshell`, `zen-browser` inputs are commented out in `flake.nix`.** But `modules/niri.nix` still references the *packages* `noctalia-shell`, `dms-shell`, `quickshell`, `dsearch` — these come from **`chaotic`** (chaotic-cx/nyx), not from the commented flake inputs. Don't "fix" the missing inputs; don't reference `inputs.noctalia`/`inputs.dms`/`inputs.quickshell` — they don't exist.
 
@@ -140,7 +151,7 @@ inputs.nixvim.homeModules.nixvim   # used in home/common.nix
 
 Electron EOL errors (e.g. `Package 'electron-38.8.4' is EOL`) are permitted in **two** places — update **both** when adding a new one:
 - `flake.nix` — inside `pkgsFor` / `mkStandaloneHome` (`config.permittedInsecurePackages`)
-- `configuration.nix` — `nixpkgs.config.permittedInsecurePackages`
+- `profiles/nixos-base.nix` — `nixpkgs.config.permittedInsecurePackages`
 
 ```nix
 config.permittedInsecurePackages = [
@@ -168,7 +179,15 @@ Hard-won — read the header comments there before editing that file:
 ## Quick rules
 
 - Track `hosts/<hostname>/hardware-configuration.nix` for reproducible Git Flake builds; only the accidental root path `/hardware-configuration.nix` is ignored.
-- Adding a module file to `modules/` auto-activates it; no import wiring.
+- Adding a module file to `modules/` auto-activates it only for the desktop; WSL imports modules explicitly.
 - GUI HM modules → `home/default.nix` only; CLI → `home/common.nix` (needs config) or `packages/cli-dev.nix` (bare tool); Linux-only/Darwin-only packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` inside `cli-dev.nix`.
 - Don't uncomment the `noctalia`/`dms`/`quickshell` inputs — those packages are provided by `chaotic`.
-- Adding an EOL package → update `permittedInsecurePackages` in **both** `flake.nix` and `configuration.nix`.
+- Adding an EOL package → update `permittedInsecurePackages` in **both** `flake.nix` and `profiles/nixos-base.nix`.
+
+## NixOS-WSL
+
+`hosts/wsl/default.nix` imports `profiles/nixos-base.nix` and `profiles/cli.nix`; the flake supplies NixOS-WSL and integrated Home Manager with `home/nixos-cli.nix`. Software tracks standalone Linux via the same list and common HM configuration. Do not import `home/standalone-linux.nix` into NixOS. Shared system settings belong in `profiles/`; desktop services stay in the desktop module set. NixOS-WSL does not require a generated physical hardware configuration.
+
+“CLI-only” means software alignment with standalone Linux, including tools such as mpv; do not remove packages merely because they can use graphics. Keep one shared CLI list and `home/common.nix`. WSL uses system-level installation for bare tools and integrated Home Manager for user configuration; do not separately activate standalone Home Manager there.
+
+Default WSL host/user are `wsl` / `xuqihao`. Activate explicitly with `sudo nixos-rebuild switch --flake .#wsl`. Shared defaults include `system.stateVersion = "26.05"`; preserve an existing target's original stateVersion when adopting this configuration. Desktop sessions, databases, container services, Hermes and remote mounts are not enabled by this entry; add services only when requested. WSLg integration follows NixOS-WSL defaults.

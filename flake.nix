@@ -31,6 +31,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    nixos-wsl = {
+      url = "github:nix-community/NixOS-WSL/main";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     home-manager = {
       url = "github:nix-community/home-manager/master";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -91,6 +96,18 @@
         )
       );
 
+      # Shared NixOS Home Manager integration; each host selects its user profile.
+      nixosHome = homeModule: {
+        home-manager.useGlobalPkgs = true;
+        home-manager.useUserPackages = true;
+        home-manager.users.xuqihao = import homeModule;
+        home-manager.extraSpecialArgs = {
+          inherit inputs;
+          pkgs-stable = nixosPkgs.stable;
+          pkgs-master = nixosPkgs.master;
+        };
+      };
+
       # 构造 standalone home-manager 配置（非 NixOS）
       mkStandaloneHome = {
         system,
@@ -138,18 +155,24 @@
           home-manager.nixosModules.home-manager
           chaotic.nixosModules.default
           inputs.hermes-agent.nixosModules.default
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.users.xuqihao = import ./home/default.nix;
-
-            home-manager.extraSpecialArgs = {
-              inherit inputs;
-              pkgs-stable = nixosPkgs.stable;
-              pkgs-master = nixosPkgs.master;
-            };
-          }
+          (nixosHome ./home/default.nix)
         ] ++ generatedModules;
+      };
+
+      # NixOS-WSL: explicit modules, with the standalone CLI software environment.
+      nixosConfigurations.wsl = nixpkgs.lib.nixosSystem {
+        system = nixosSystem;
+        specialArgs = {
+          inherit inputs;
+          pkgs-stable = nixosPkgs.stable;
+          pkgs-master = nixosPkgs.master;
+        };
+        modules = [
+          inputs.nixos-wsl.nixosModules.default
+          ./hosts/wsl
+          home-manager.nixosModules.home-manager
+          (nixosHome ./home/nixos-cli.nix)
+        ];
       };
 
       # --- 2. 非 NixOS 便携 CLI 环境（Home Manager standalone, x86_64-linux） ---

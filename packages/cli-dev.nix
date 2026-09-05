@@ -1,7 +1,8 @@
 # packages/cli-dev.nix
 #
 # 跨平台共享 CLI 开发工具列表 —— 纯函数，返回 package list。
-# 单一事实源，被三处导入：
+# 单一事实源，被四处导入：
+#   - profiles/cli.nix             → NixOS-WSL 的 environment.systemPackages
 #   - modules/programs.nix         → NixOS 的 environment.systemPackages（系统级、sudo 可见）
 #   - home/standalone-linux.nix    → 非 NixOS Linux 的 home.packages（用户级）
 #   - home/standalone-darwin.nix   → macOS 的 home.packages（用户级）

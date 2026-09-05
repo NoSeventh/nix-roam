@@ -9,6 +9,7 @@
 | 模式 | Flake 输出 | 状态 | 用途 |
 |---|---|---|---|
 | Linux / WSL | `homeConfigurations.xuqihao` | 当前使用、已验证 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
+| NixOS-WSL | `nixosConfigurations.wsl` | 构建通过、待目标机实测 | NixOS 系统管理，软件环境与 standalone Linux 对齐 |
 | NixOS | `nixosConfigurations.nixos` | 保留 | x86_64-linux 完整系统、桌面与服务配置 |
 | macOS | `homeConfigurations.xuqihao-darwin` | 结构就绪、未实测 | aarch64-darwin 纯 CLI 环境 |
 
@@ -53,15 +54,29 @@ bash bootstrap/linux.sh
 
 脚本会依次安装 Nix、配置 flakes 与国内缓存、备份可能冲突的用户文件、安装 Home Manager，并激活 `xuqihao` 配置。它设计为可重复运行。
 
-### NixOS
+### NixOS 桌面
 
-NixOS 模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。当前机器的配置位于 `hosts/nixos/` 并纳入版本控制，以保证 Git Flake 可以纯求值和重复构建；其他机器应建立独立的 `hosts/<hostname>/`，不要直接复用现有硬件配置。
+NixOS 桌面模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。当前机器的配置位于 `hosts/nixos/` 并纳入版本控制，以保证 Git Flake 可以纯求值和重复构建；其他机器应建立独立的 `hosts/<hostname>/`，不要直接复用现有硬件配置。
 
 在已准备好硬件配置的目标机器上：
 
 ```bash
 sudo nixos-rebuild switch --flake .#nixos
 ```
+
+### NixOS-WSL
+
+先按 [NixOS-WSL 官方安装说明](https://nix-community.github.io/NixOS-WSL/install.html) 安装 NixOS 发行版，再在其中克隆本仓库并执行：
+
+```bash
+sudo nixos-rebuild switch --flake .#wsl
+```
+
+默认用户为 `xuqihao`，主机名为 `wsl`。系统和 Home Manager 一起激活，无需另外运行 `home-manager switch` 或 `bootstrap/linux.sh`。首次接入已有系统时保留该系统原有的 `system.stateVersion`，必要时在主机入口用 `lib.mkForce` 覆盖共享值。
+
+该入口复用 `packages/cli-dev.nix` 和 `home/common.nix`：裸 CLI 工具系统级安装，用户配置由集成的 Home Manager 管理。这里“CLI”指与 standalone 的软件环境对齐，保留清单中的 mpv 等工具。WSL 适配使用 NixOS-WSL 模块，不导入实体机硬件配置，也不自动加载桌面模块、数据库、容器服务、Hermes 服务或远程挂载。
+
+普通 Ubuntu/AlmaLinux 等 WSL 发行版仍使用上面的 standalone 入口；只有 NixOS 发行版使用 `.#wsl`。
 
 ## 更新与验证
 
@@ -82,6 +97,7 @@ nix build --no-link .#homeConfigurations.xuqihao.activationPackage
 
 ```bash
 nix build --no-link .#nixosConfigurations.nixos.config.system.build.toplevel
+nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 ```
 
 ## 目录结构
@@ -89,17 +105,20 @@ nix build --no-link .#nixosConfigurations.nixos.config.system.build.toplevel
 ```text
 .
 ├── flake.nix                   # 双模式 flake 输出与三套 nixpkgs 通道
-├── configuration.nix           # 共享的 NixOS 基础系统配置
+├── configuration.nix           # NixOS 桌面系统配置（导入共享基础）
 ├── hosts/
-│   └── nixos/                  # 当前 NixOS 主机入口与硬件配置
-├── modules/                    # 自动加载的 NixOS 模块
+│   ├── nixos/                  # 当前 NixOS 主机入口与硬件配置
+│   └── wsl/                    # NixOS-WSL 主机入口
+├── profiles/                   # 显式导入的共享 NixOS 基础、locale、CLI
+├── modules/                    # 仅桌面入口自动加载的 NixOS 模块
 ├── home/
 │   ├── common.nix              # 两种模式共享的纯 CLI Home Manager 配置
 │   ├── default.nix             # NixOS Home Manager 入口，包含 GUI 配置
+│   ├── nixos-cli.nix           # NixOS CLI 用户配置入口
 │   ├── standalone-linux.nix    # 普通 Linux / WSL 入口
 │   ├── standalone-darwin.nix   # macOS 入口
 │   └── nix-cn.nix              # Nix binary cache 单一配置源
-├── packages/cli-dev.nix        # 三个安装位置共享的 CLI 软件列表
+├── packages/cli-dev.nix        # 各入口共享的 CLI 软件列表
 ├── bootstrap/linux.sh          # 全新 Linux / WSL 引导脚本
 ├── dotfiles/                   # Home Manager 引用的原始配置文件
 └── docs/superpowers/           # 设计说明与实施记录
@@ -109,7 +128,7 @@ nix build --no-link .#nixosConfigurations.nixos.config.system.build.toplevel
 
 CLI 工具只维护一份列表：`packages/cli-dev.nix`。它会被安装到以下位置：
 
-- NixOS：`environment.systemPackages`，因此 `sudo` 环境也能找到相关命令
+- NixOS 桌面 / NixOS-WSL：`environment.systemPackages`，因此 `sudo` 环境也能找到相关命令
 - 普通 Linux / WSL：Home Manager 的 `home.packages`
 - macOS：Home Manager 的 `home.packages`
 
@@ -120,7 +139,7 @@ CLI 工具只维护一份列表：`packages/cli-dev.nix`。它会被安装到以
 ## 注意事项
 
 - `hosts/<hostname>/hardware-configuration.nix` 是机器专用文件，应与对应主机入口一起提交；只有仓库根目录下误生成的 `/hardware-configuration.nix` 被忽略。
-- NixOS 中的 Hermes Agent 需要目标机器自行提供 `/etc/hermes/env`。
+- NixOS 桌面配置中的 Hermes Agent 需要目标机器自行提供 `/etc/hermes/env`。
 - 多用户 Nix 安装需要让 daemon 信任自定义 substituter；`bootstrap/linux.sh` 会处理新机器的这项配置。
 - macOS 输出目前尚未完成真实设备构建验证。
 

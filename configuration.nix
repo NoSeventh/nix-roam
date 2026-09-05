@@ -1,6 +1,8 @@
-{ config, pkgs, pkgs-stable, ... }:
+{ pkgs, pkgs-stable, ... }:
 
 {
+  imports = [ ./profiles/nixos-base.nix ];
+
   # --- 1. 引导与系统内核 ---
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -11,15 +13,7 @@
   networking.hostName = "nixos";
   networking.networkmanager.enable = true;
 
-  # --- 3. Nix 特性设置 (仅保留必要项) ---
-  nix.settings.experimental-features = [
-    "nix-command"
-    "flakes"
-  ];
-
   # --- 4. 区域与桌面 ---
-  time.timeZone = "Asia/Shanghai";
-
   services.xserver.enable = true;
   services.displayManager = {
     defaultSession = "niri";
@@ -63,11 +57,8 @@
 
   # --- 6. 用户与安全 ---
   users.users.xuqihao = {
-    isNormalUser = true;
-    description = "xuqihao";
     extraGroups = [
       "networkmanager"
-      "wheel"
       "libvirtd"
       "qemu"
       "kvm"
@@ -75,11 +66,6 @@
     ];
   };
 
-  nixpkgs.config.allowUnfree = true;
-  nixpkgs.config.permittedInsecurePackages = [
-    "electron-40.10.5"
-    "pnpm-10.29.2"
-  ];
   services.openssh.enable = true;
   programs.ssh.askPassword = pkgs.lib.mkForce "${pkgs-stable.seahorse.out}/libexec/seahorse/ssh-askpass";
   #programs.ssh.askPassword = mkDefault "${pkgs.plasma6Packages.ksshaskpass.out}/bin/ksshaskpass";
@@ -92,6 +78,4 @@
     gst_all_1.gst-plugins-bad
     gst_all_1.gst-plugins-ugly
   ];
-
-  system.stateVersion = "26.05";
 }
