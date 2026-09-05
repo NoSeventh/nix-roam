@@ -80,6 +80,17 @@ sudo nixos-rebuild switch --flake .#wsl
 
 ## 更新与验证
 
+手动垃圾回收（自动识别 NixOS、普通 Linux / WSL 和 macOS）：
+
+```bash
+bash bootstrap/gc.sh --dry-run        # 仅预览命令，不执行清理
+bash bootstrap/gc.sh                  # 清理超过 14 天的旧世代及无引用的包
+bash bootstrap/gc.sh --older-than 30d # 改为保留最近 30 天
+bash bootstrap/gc.sh --all            # 清理全部非当前世代，失去这些世代的回滚能力
+```
+
+以普通用户运行即可：NixOS 会先清理用户环境，再通过 sudo 清理系统旧世代；普通 Linux / WSL 和 macOS 默认只清理用户环境，需要清理系统/root 世代（例如 nix-darwin）时加 `--system`。当前环境及其他 GC 根引用的包不会被删除；脚本不刷新引导菜单。
+
 更新当前 Linux / WSL 用户环境：
 
 ```bash
