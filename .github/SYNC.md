@@ -3,6 +3,7 @@
 Gitee 是主仓库，GitHub Actions 在每小时第 17、47 分钟拉取所有分支和标签，
 再推送到 `NoSeventh/nix-roam`。日常只需推送 Gitee；可在 GitHub Actions 的
 `Sync from Gitee` 页面点击 `Run workflow` 手动同步。定时运行可能延迟。
+拉取使用 Git 协议 v1，并在失败后间隔重试，最多尝试四次。
 
 Gitee 仓库必须保持公开。工作流使用 GitHub 自动提供的 `GITHUB_TOKEN`，
 无需设置个人令牌或 SSH 密钥。同步只更新 Git 分支和标签，不包含 Issues、
