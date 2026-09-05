@@ -1,0 +1,45 @@
+name: Sync from Gitee
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/sync-from-gitee.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-from-gitee
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'NoSeventh/nix-roam'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fetch public Gitee branches and tags
+        shell: bash
+        env:
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          git init --bare mirror.git
+          git -C mirror.git fetch --no-tags \
+            https://gitee.com/qihaoxu/nixos-niri-noctalia.git \
+            'refs/heads/*:refs/heads/*' 'refs/tags/*:refs/tags/*'
+
+      - name: Push branches and tags to GitHub
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          gh auth setup-git
+          # Stop on divergent history; keep branches/tags deleted on Gitee as backups.
+          git -C mirror.git push --atomic \
+            https://github.com/NoSeventh/nix-roam.git \
+            'refs/heads/*:refs/heads/*' 'refs/tags/*:refs/tags/*'
