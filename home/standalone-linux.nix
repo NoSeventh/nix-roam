@@ -11,6 +11,11 @@
     ./nix-cn.nix
   ];
 
+  # Token 由 bootstrap/linux.sh 交互写入仓库外的私有文件，避免进入 Git 或 Nix store。
+  nix.extraOptions = ''
+    !include ${config.home.homeDirectory}/.config/nix/github-access-tokens.conf
+  '';
+
   # 共享 CLI 开发工具（用户级安装；与 NixOS 的 programs.nix 同源）
   # 平台专用包在 cli-dev.nix 内用 stdenv.hostPlatform.isLinux 条件处理。
   home.packages = import ../packages/cli-dev.nix {

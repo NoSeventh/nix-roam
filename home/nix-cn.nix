@@ -1,6 +1,6 @@
 # 中国大陆网络适配（Nix 侧共享配置，单一事实源）
 # 被 modules/fix-network.nix（NixOS daemon）与 home/standalone-{linux,darwin}.nix（用户级）共同 import。
-# 只放三端都安全生效的设置；daemon 级设置（download-buffer-size / auto-optimise-store）留在 fix-network.nix。
+# 只放各入口都安全生效的设置；daemon 级设置（download-buffer-size / auto-optimise-store）留在 fix-network.nix。
 { lib, pkgs, ... }:
 
 {
@@ -9,7 +9,7 @@
 
   nix.settings = {
     # bootstrap/linux.sh 曾把这一行写进用户级 nix.conf；HM 接管后需要保留。
-    # NixOS 上 configuration.nix 也设置同值，mkForce 避免列表合并产生重复项。
+    # NixOS 上 profiles/nixos-base.nix 也设置同值，mkForce 避免列表合并产生重复项。
     experimental-features = lib.mkForce [
       "nix-command"
       "flakes"

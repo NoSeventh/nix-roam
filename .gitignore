@@ -1,4 +1,7 @@
-hardware-configuration.nix
+# Prevent accidentally regenerating hardware config at the repository root.
+# Canonical tracked host configs live under hosts/<hostname>/.
+/hardware-configuration.nix
+
 .codegraph/
 .cursor/
 .omc/
