@@ -2,18 +2,20 @@
 
 一套跟着我在不同机器间漫游的 Nix 环境。
 
-`nix-roam` 用同一个 flake 同时维护便携的命令行开发环境和完整的 NixOS 桌面配置。当前主要使用场景是普通 Linux / WSL 上的 standalone Home Manager；原有 NixOS 配置继续保留，并共享同一套 CLI 工具与用户配置。
+`nix-roam` 用同一个 flake 同时维护便携的命令行开发环境和完整的 NixOS 桌面配置。普通 Linux / WSL 使用 standalone Home Manager；NixOS 桌面与 NixOS-WSL 使用系统配置，并共享同一套 CLI 工具与用户配置。
 
 ## 支持模式
 
 | 模式 | Flake 输出 | 状态 | 用途 |
 |---|---|---|---|
-| Linux / WSL | `homeConfigurations.xuqihao` | 当前使用、已验证 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
-| NixOS-WSL | `nixosConfigurations.wsl` | 构建通过、待目标机实测 | NixOS 系统管理，软件环境与 standalone Linux 对齐 |
+| Linux / WSL | `homeConfigurations.xuqihao` | 已有使用记录，变更后需重新验证 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
+| NixOS-WSL | `nixosConfigurations.wsl` | 有构建通过记录、待目标机实测 | NixOS 系统管理，软件环境与 standalone Linux 对齐 |
 | NixOS | `nixosConfigurations.nixos` | 保留 | x86_64-linux 完整系统、桌面与服务配置 |
 | macOS | `homeConfigurations.xuqihao-darwin` | 结构就绪、未实测 | aarch64-darwin 纯 CLI 环境 |
 
 > 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。直接复用前，请先搜索 `xuqihao` 并按自己的环境调整。
+
+表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；macOS 仅支持 Apple Silicon（aarch64-darwin），Linux 输出为 x86_64-linux。
 
 ## 主要内容
 
@@ -31,13 +33,13 @@
 无需克隆即可激活 Linux / WSL 配置：
 
 ```bash
-home-manager switch --flake "git+https://gitee.com/qihaoxu/nix-roam#xuqihao"
+home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia.git#xuqihao"
 ```
 
 从本地仓库激活：
 
 ```bash
-git clone https://gitee.com/qihaoxu/nix-roam.git
+git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git nix-roam
 cd nix-roam
 home-manager switch --flake .#xuqihao
 ```
@@ -47,12 +49,14 @@ home-manager switch --flake .#xuqihao
 安装 Git 并克隆仓库后，运行引导脚本：
 
 ```bash
-git clone https://gitee.com/qihaoxu/nix-roam.git
+git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git nix-roam
 cd nix-roam
 bash bootstrap/linux.sh
 ```
 
-脚本会依次安装 Nix、配置 flakes 与国内缓存、备份可能冲突的用户文件、安装 Home Manager，并激活 `xuqihao` 配置。它设计为可重复运行。
+脚本会依次安装 Nix、配置国内缓存信任、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活 `xuqihao` 配置。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
+
+脚本会跳过部分已完成步骤；Home Manager 已接管配置后，日常更新直接使用 `home-manager switch`。激活后打开新登录 shell；原 SSH 配置中需要保留的主机请合并到 `home/common.nix`。
 
 ### NixOS 桌面
 
@@ -78,6 +82,16 @@ sudo nixos-rebuild switch --flake .#wsl
 
 普通 Ubuntu/AlmaLinux 等 WSL 发行版仍使用上面的 standalone 入口；只有 NixOS 发行版使用 `.#wsl`。
 
+### macOS（未实机构建验证）
+
+安装 Nix 和 Home Manager 后，在仓库根目录运行：
+
+```bash
+home-manager switch --flake .#xuqihao-darwin
+```
+
+这个入口只管理用户 CLI 环境，不管理 macOS 系统服务和 GUI；不要运行 Linux 引导脚本。
+
 ## 更新与验证
 
 手动垃圾回收（自动识别 NixOS、普通 Linux / WSL 和 macOS）：
@@ -94,9 +108,11 @@ bash bootstrap/gc.sh --all            # 清理全部非当前世代，失去这�
 更新当前 Linux / WSL 用户环境：
 
 ```bash
-git pull
+git pull --ff-only
 home-manager switch --flake .#xuqihao
 ```
+
+上面的更新使用仓库锁定的依赖版本。需要升级依赖时，运行 `nix flake update`，检查 `flake.lock` 差异并构建验证，再提交锁文件；`nix-channel --update` 不会更新 flake 依赖。
 
 只验证构建、不激活：
 
@@ -130,9 +146,12 @@ nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 │   ├── standalone-darwin.nix   # macOS 入口
 │   └── nix-cn.nix              # Nix binary cache 单一配置源
 ├── packages/cli-dev.nix        # 各入口共享的 CLI 软件列表
-├── bootstrap/linux.sh          # 全新 Linux / WSL 引导脚本
+├── bootstrap/
+│   ├── linux.sh                # 全新普通 Linux / WSL 引导脚本
+│   └── gc.sh                   # 跨平台手动垃圾回收
 ├── dotfiles/                   # Home Manager 引用的原始配置文件
-└── docs/superpowers/           # 设计说明与实施记录
+├── .github/                    # GitHub 同步工作流与操作说明
+└── AGENTS.md                   # 架构决策与维护约定
 ```
 
 ## 配置约定
@@ -145,7 +164,31 @@ CLI 工具只维护一份列表：`packages/cli-dev.nix`。它会被安装到以
 
 需要 Home Manager 托管配置文件的 CLI 放在 `home/common.nix`；GUI Home Manager 配置只放在 `home/default.nix`，避免给 WSL 和 macOS 引入桌面依赖。
 
-更完整的架构说明见 [`docs/superpowers/specs/2026-07-06-dual-mode-flake-design.md`](docs/superpowers/specs/2026-07-06-dual-mode-flake-design.md)。
+更完整的架构说明和维护约定见 [`AGENTS.md`](AGENTS.md)。
+
+npm/npx 默认使用 npmmirror，Bash 中可用 `npmr install <pkg>` 临时改用 NJU。默认 registry 环境变量会覆盖项目 `.npmrc`；需要项目自己的源时使用 `--registry=<url>` 或取消 `NPM_CONFIG_REGISTRY`。
+
+## Gitee 与 GitHub 同步
+
+主仓库是 [Gitee](https://gitee.com/qihaoxu/nixos-niri-noctalia)，镜像是 [GitHub](https://github.com/NoSeventh/nix-roam)。项目名为 nix-roam，Gitee 路径仍为 nixos-niri-noctalia。
+
+从 Gitee 克隆后，日常提交只需推送 Gitee：
+
+```bash
+git push origin master
+```
+
+GitHub Actions 在每小时第 17、47 分钟自动拉取分支和标签，也可在 [Sync from Gitee](https://github.com/NoSeventh/nix-roam/actions/workflows/sync-from-gitee.yml) 页面点击 **Run workflow** 手动同步。定时任务可能延迟；公开仓库 60 天无活动后需重新启用。
+
+同步不会强制覆盖分叉历史或删除 GitHub 独有分支。修改工作流文件时，需要将同一提交手动推送到两边；普通代码和文档更新由 Actions 同步。详见 [同步说明](.github/SYNC.md)。
+
+远程配置只保存在本机，不随提交同步。若另一台电脑从 Gitee 克隆，需要手动推送 GitHub 时先添加：
+
+```bash
+git remote add github git@github.com:NoSeventh/nix-roam.git
+```
+
+从 GitHub 克隆时 `origin` 指向 GitHub，推送前先用 `git remote -v` 确认目标。
 
 ## 注意事项
 

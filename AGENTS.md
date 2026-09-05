@@ -5,7 +5,9 @@ A **dual-mode Nix flake** that supports two management modes from one source tre
 1. **NixOS mode** — desktop: `nixosConfigurations.nixos`; CLI-only WSL: `nixosConfigurations.wsl` (both x86_64-linux).
 2. **Portable CLI mode** — user-level Home Manager only, for non-NixOS Linux / WSL / macOS. `homeConfigurations.xuqihao` / `xuqihao-darwin`.
 
-Read `docs/superpowers/specs/2026-07-06-dual-mode-flake-design.md` and `docs/superpowers/specs/2026-09-05-nixos-wsl-design.md` for the design rationale before restructuring the flake.
+This file records the maintained architecture and operating conventions. Keep it and `README.md` aligned with implementation changes; historical plans are not required to work on this repository.
+
+Standalone mode supplements the native package manager: keep system services and GUI applications under the native OS, with no root Home Manager profile or `darwinConfigurations`. Select explicit flake outputs; do not use `--impure`, environment variables or the evaluation host to choose a target. Linux outputs are x86_64-linux; the macOS output is aarch64-darwin only.
 
 ## Detect the current host before acting
 
@@ -20,16 +22,16 @@ This repository defines both NixOS and standalone Home Manager targets; **the ta
 
 | Target | Command |
 |---|---|
-| NixOS host | `sudo nixos-rebuild switch` (alias `nrs`) |
+| NixOS desktop | `sudo nixos-rebuild switch --flake .#nixos` |
 | NixOS-WSL | `sudo nixos-rebuild switch --flake .#wsl` |
-| NixOS + channel update | `nrrs` (= `sudo nix-channel --update && sudo nixos-rebuild switch`) |
 | Fresh Linux/WSL (no Nix yet) | `bash bootstrap/linux.sh` (installs Nix + HM, then activates) |
+| Existing Nix+HM macOS | `home-manager switch --flake .#xuqihao-darwin` |
 | Existing Nix+HM Linux/WSL | `home-manager switch --flake .#xuqihao` |
-| Remote (no clone) | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nix-roam#xuqihao"` |
+| Remote (no clone) | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia.git#xuqihao"` |
 
-Aliases `nrs` / `nrrs` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`.
+Aliases `nrs` / `hms` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`. `nrs` has no explicit flake target; use the commands above for a specific host. `hms` selects standalone Linux, not NixOS-WSL or Darwin. There is no `nrrs` alias. Update flake dependencies with `nix flake update`, review and commit `flake.lock`, then build the affected targets; `nix-channel --update` does not update the lock file.
 
-**No test framework.** Build without activation using `nix build --no-link` with the appropriate target:
+**No repository test framework.** Build without activation using `nix build --no-link` with the appropriate target:
 
 - Desktop: `.#nixosConfigurations.nixos.config.system.build.toplevel`
 - NixOS-WSL: `.#nixosConfigurations.wsl.config.system.build.toplevel`
@@ -42,15 +44,15 @@ Aliases `nrs` / `nrrs` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are def
 The core pattern. `packages/cli-dev.nix` is a **pure function** returning a cross-platform package list, imported in **four** places. Platform-specific packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` guards inside `cli-dev.nix`:
 
 ```
-packages/cli-dev.nix         ({ pkgs, pkgs-stable }: [ ... ])  cross-platform (platform-conditional inside)
+packages/cli-dev.nix         ({ pkgs, pkgs-stable, pkgs-master, ... }: [ ... ])  cross-platform (platform-conditional inside)
         ├── profiles/cli.nix              → environment.systemPackages  (NixOS-WSL)
         ├── modules/programs.nix          → environment.systemPackages  (system-level, sudo-visible)
         ├── home/standalone-linux.nix     → home.packages               (user-level, non-NixOS Linux)
         └── home/standalone-darwin.nix    → home.packages               (user-level, macOS)
 ```
 
-- **NixOS**: CLI tools land in `environment.systemPackages` → `/run/current-system/sw/bin` → inside sudo `secure_path`, so `sudo <tool>` works. This is intentional (see design doc §9).
-- **Non-NixOS**: same list → `home.packages` → user profile.
+- **NixOS**: CLI tools land in `environment.systemPackages` → `/run/current-system/sw/bin` → inside sudo `secure_path`, so `sudo <tool>` works. This intentionally makes bare CLI tools available to root without a separate root profile.
+- **Non-NixOS**: same list → `home.packages` → user profile. Home Manager does not configure sudoers; do not assume `sudo -E` bypasses the native sudo `secure_path`.
 - When adding a CLI tool, decide: needs a dotfile/HM module → `home/common.nix`; bare CLI binary → `packages/cli-dev.nix`. Don't duplicate between the two.
 - Linux-only / Darwin-only packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` inside the main list.
 
@@ -72,7 +74,7 @@ GUI HM config stays in `home/default.nix` only — **never** put GUI modules in 
 ## Directory structure
 
 ```
-flake.nix                  # Dual-mode outputs; forAllSystems helper; pkgs-stable/-master per-system
+flake.nix                  # Explicit host/home outputs; pkgsFor creates stable/master per system
 configuration.nix          # Desktop NixOS config; imports profiles/nixos-base.nix
 profiles/                  # Explicit shared NixOS base, locale and CLI modules
 hosts/wsl/                 # NixOS-WSL entry, no physical hardware config
@@ -80,9 +82,12 @@ hosts/nixos/               # Current host entry + tracked hardware-configuration
 modules/                   # AUTO-LOADED into nixosConfigurations.nixos (every *.nix)
 home/                      # Home Manager config (NixOS + standalone)
 packages/cli-dev.nix       # Shared CLI tool list (pure function) — see architecture above
-bootstrap/linux.sh         # One-shot installer for fresh Linux/WSL
+bootstrap/linux.sh         # Seven-step installer for standalone Linux/WSL
+bootstrap/gc.sh            # Manual GC with host detection and dry-run
 dotfiles/                  # Raw config files, referenced via ../dotfiles from home/ and modules/
-docs/superpowers/          # Planning/spec docs (design decisions of record)
+AGENTS.md                  # Maintained architecture and operating conventions
+.github/workflows/         # Gitee → GitHub synchronization
+.github/SYNC.md            # Synchronization operation and limitations
 ```
 
 ## Host layout
@@ -93,9 +98,7 @@ docs/superpowers/          # Planning/spec docs (design decisions of record)
 
 `flake.nix`'s `generatedModules` scans `modules/*.nix` and loads **all** of them into the desktop NixOS config. WSL uses an explicit module list; never append generatedModules to it. Adding a `.nix` file to `modules/` is enough; removing/renaming one drops it from the build.
 
-Module function signatures vary — **only declare the params you actually use** (Nix will error on undeclared args). Examples in-tree:
-- `{ config, pkgs, pkgs-stable, pkgs-master, inputs, lib, ... }` — `programs.nix` (needs everything)
-- `{ config, pkgs, lib, ... }` — `fix-network.nix` (no packages)
+Module function signatures vary. For new edits, declare the parameters you use and retain `...`; some existing headers contain unused parameters. Referenced package sets must be in scope and supplied via module arguments. `modules/fix-network.nix` currently uses `{ ... }:` and only declares settings/imports.
 
 Match the channel to the param you reference: `pkgs-stable` for stable, `pkgs-master` for master, `pkgs` (unstable) for everything else.
 
@@ -111,7 +114,7 @@ Key modules:
 - `nixpkgs-stable` (nixos-26.05) → `pkgs-stable`
 - `nixpkgs-master` → `pkgs-master` (wired into `specialArgs`; use sparingly)
 
-All three are instantiated per-system in `flake.nix` (`pkgsFor`) and passed via `specialArgs` / `extraSpecialArgs`. Convention: heavy/stability-sensitive packages (editors, office, toolchains) on `pkgs-stable.`; bleeding-edge stuff on `pkgs`.
+NixOS provides its own unstable `pkgs`; `mkStandaloneHome` imports unstable for standalone. `pkgsFor` separately instantiates stable/master per system and passes them via `specialArgs` / `extraSpecialArgs`. The `supportedSystems` / `forAllSystems` helper is currently unused; editing that list alone does not add an output. Convention: heavy/stability-sensitive packages (editors, office, toolchains) on `pkgs-stable.`; bleeding-edge stuff on `pkgs`.
 
 ```nix
 environment.systemPackages = with pkgs; [
@@ -149,16 +152,18 @@ inputs.nixvim.homeModules.nixvim   # used in home/common.nix
 
 ## Handling EOL / insecure packages
 
-Electron EOL errors (e.g. `Package 'electron-38.8.4' is EOL`) are permitted in **two** places — update **both** when adding a new one:
-- `flake.nix` — inside `pkgsFor` / `mkStandaloneHome` (`config.permittedInsecurePackages`)
-- `profiles/nixos-base.nix` — `nixpkgs.config.permittedInsecurePackages`
+Inspect **both** `flake.nix` and `profiles/nixos-base.nix` when an insecure-package evaluation error occurs. Each nixpkgs instance has a separate allowlist; an exception on system unstable does not cover `pkgs-stable` or standalone unstable.
 
-```nix
-config.permittedInsecurePackages = [
-  "electron-38.8.4"
-  "electron-XX.X.X"   # add here, in BOTH files
-];
-```
+Current source values (not a claim that every target builds):
+
+| nixpkgs instance | Location | `permittedInsecurePackages` |
+|---|---|---|
+| Stable, all targets | `flake.nix` → `pkgsFor.stable` | `electron-38.8.4` |
+| Standalone unstable | `flake.nix` → `mkStandaloneHome` | `electron-38.8.4` |
+| NixOS unstable, desktop/WSL | `profiles/nixos-base.nix` | `electron-40.10.5`, `pnpm-10.29.2` |
+| Master | `flake.nix` → `pkgsFor.master` | No explicit allowlist |
+
+These lists currently differ. Add an approved exact package/version exception to every affected instance in both files as needed; do not assume one edit covers all four outputs or expand permissions just to make documentation match. Validate the affected package/target after changing exceptions.
 
 ## buildEnv conflict gotchas (in `packages/cli-dev.nix`)
 
@@ -182,7 +187,7 @@ Hard-won — read the header comments there before editing that file:
 - Adding a module file to `modules/` auto-activates it only for the desktop; WSL imports modules explicitly.
 - GUI HM modules → `home/default.nix` only; CLI → `home/common.nix` (needs config) or `packages/cli-dev.nix` (bare tool); Linux-only/Darwin-only packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` inside `cli-dev.nix`.
 - Don't uncomment the `noctalia`/`dms`/`quickshell` inputs — those packages are provided by `chaotic`.
-- Adding an EOL package → update `permittedInsecurePackages` in **both** `flake.nix` and `profiles/nixos-base.nix`.
+- Adding an EOL exception → inspect **both** `flake.nix` and `profiles/nixos-base.nix` and update the affected nixpkgs instances; their current lists differ.
 
 ## NixOS-WSL
 
@@ -191,3 +196,36 @@ Hard-won — read the header comments there before editing that file:
 “CLI-only” means software alignment with standalone Linux, including tools such as mpv; do not remove packages merely because they can use graphics. Keep one shared CLI list and `home/common.nix`. WSL uses system-level installation for bare tools and integrated Home Manager for user configuration; do not separately activate standalone Home Manager there.
 
 Default WSL host/user are `wsl` / `xuqihao`. Activate explicitly with `sudo nixos-rebuild switch --flake .#wsl`. Shared defaults include `system.stateVersion = "26.05"`; preserve an existing target's original stateVersion when adopting this configuration. Desktop sessions, databases, container services, Hermes and remote mounts are not enabled by this entry; add services only when requested. WSLg integration follows NixOS-WSL defaults.
+
+## Nix configuration ownership and bootstrap
+
+- Keep `home/nix-cn.nix` out of `home/common.nix`: NixOS manages daemon settings through `profiles/nixos-base.nix` → `modules/fix-network.nix`, while standalone manages user `~/.config/nix/nix.conf`. Avoid generating a second NixOS user configuration unintentionally.
+- The shared module declares `nix.package = pkgs.nix` to satisfy Home Manager's configuration assertion. It preserves `experimental-features = [ "nix-command" "flakes" ]` when Home Manager takes over the file bootstrap initially wrote.
+- Apply `lib.mkForce` only to individual settings needing replacement (currently `substituters` and `experimental-features`), never the entire `nix.settings` attribute set. Keep `connect-timeout = 5` and `fallback = true` shared; `download-buffer-size = 524288000`, `auto-optimise-store = true` and `NIXPKGS_ALLOW_UNFREE` stay on the NixOS side.
+- User substituters require daemon authorization on standalone multi-user installations. Bootstrap writes the four domestic caches as `trusted-substituters` and ensures `/etc/nix/nix.conf` includes `nix.custom.conf`; the official cache remains the shared fallback. It does not grant blanket `trusted-users` access. Its current skip check only tests for NJU, so changing the cache list also requires reviewing that check.
+- `bootstrap/linux.sh [target]` is for ordinary Linux/WSL, defaults to `xuqihao`, and runs seven steps: install Nix, configure cache trust, optionally store a GitHub token, enable flakes, back up conflicting files, install Home Manager, activate with `-b backup`. Do not use it for NixOS-WSL or describe it as a macOS installer.
+- The script backs up real `.bashrc`, `.gitconfig`, `.ssh/config`, and `.profile` files with timestamp suffixes and skips symlinks. Home Manager uses `programs.ssh.enableDefaultConfig = false`; merge any required old SSH hosts into `home/common.nix` after migration. Open a new login shell after activation.
+- Bootstrap is intended for repeat use but writes user `nix.conf` before activation. If Home Manager already owns it as a store symlink, use Home Manager for routine updates; do not assume missing includes can be appended to a read-only managed file.
+- Optional Nix GitHub tokens live in `~/.config/nix/github-access-tokens.conf` (0600), outside Git and the Nix store. `home/standalone-linux.nix` retains the optional `!include`; Darwin does not currently add it. Never inline tokens into Nix expressions. This file is separate from `gh auth login`, Git SSH keys, and Actions' ephemeral `GITHUB_TOKEN`.
+
+## npm configuration ownership
+
+Use `home.sessionVariables.NPM_CONFIG_REGISTRY` and the Bash `npmr` alias, rather than an HM-managed read-only `.npmrc`. `NPM_CONFIG_PREFIX` and `home.sessionPath` place global installs under `~/.npm-global/bin`. The registry environment variable overrides project/user `.npmrc`; use `--registry=<url>` or unset the variable for project-specific registries. The NJU alias is manual fallback, not automatic failover, and does not configure `sudo npm`. After activation, verify in a new shell with `npm config get registry` and `npmr config get registry`.
+
+## Garbage collection
+
+`bootstrap/gc.sh` defaults to deleting generations older than 14 days; `--older-than Nd` changes retention, `--all` removes all non-current generations, and `--dry-run` only prints commands. Run as the normal user: it cleans the user first and uses sudo for NixOS system generations; standalone/macOS require `--system` for root/system cleanup. Referenced store paths remain; deleted generations lose rollback availability. The script does not refresh boot menus or configure automatic GC.
+
+## Repository hosting and synchronization
+
+- Gitee is the primary repository: `https://gitee.com/qihaoxu/nixos-niri-noctalia.git`; GitHub is `https://github.com/NoSeventh/nix-roam`. The project is named nix-roam, but the Gitee path retains the older name.
+- Local remotes are `origin` (Gitee) and `github` (GitHub); `.git/config` is not shared by commits. A new clone has only its clone source as `origin`; inspect `git remote -v` before pushing.
+- `.github/workflows/sync-from-gitee.yml` runs at minutes 17 and 47 each hour, via manual dispatch, and on pushes changing that workflow on `master`. It fetches public Gitee heads/tags with Git protocol v1 and up to four attempts, then pushes atomically using `GITHUB_TOKEN` with `contents: write`.
+- Normal changes go to Gitee; Actions copies them to GitHub. No forced history updates or remote deletions; divergence and rewritten tags require intervention. This copies Git refs, not Issues, PRs, release assets or LFS objects.
+- Keep workflow changes on both remotes using local credentials; the built-in token cannot push workflow-file changes. For public repositories, scheduled runs may be delayed and are disabled after 60 days without activity. Operational details: [`.github/SYNC.md`](.github/SYNC.md).
+
+## Validation boundaries
+
+For documentation-only edits, check source consistency, local links, removed-path references and `git diff --check`; no system rebuild or activation is needed. For Nix changes, parse edited files, evaluate affected options/derivations, then build the appropriate target. Do not treat evaluation as a build, a build as activation, or a command found on the current host as proof of another target's package contents.
+
+Historical verification on 2026-09-05 used AlmaLinux 9.8 / WSL2 standalone Nix: WSL's system closure built; the desktop host-layout refactor preserved its derivation; standalone Linux/Darwin activation derivations evaluated. These records predate later edits and do not certify the current lock/package set. Real NixOS-WSL boot/login/switch and a Darwin build remain unverified. GitHub synchronization was separately verified by pushing a documentation commit only to Gitee and observing Actions update GitHub.
