@@ -84,13 +84,21 @@ sudo nixos-rebuild switch --flake .#wsl
 
 ### macOS（未实机构建验证）
 
-安装 Nix 和 Home Manager 后，在仓库根目录运行：
+全新 Apple Silicon 机器一键安装（装 Nix → 配镜像 → 配 token → 开 flakes → 备份冲突文件 → 装 HM → 激活）：
+
+```bash
+bash bootstrap/darwin.sh
+```
+
+已有 Nix + Home Manager 的机器，在仓库根目录手动激活：
 
 ```bash
 home-manager switch --flake .#xuqihao-darwin
 ```
 
-这个入口只管理用户 CLI 环境，不管理 macOS 系统服务和 GUI；不要运行 Linux 引导脚本。
+这个入口只管理用户 CLI 环境，不管理 macOS 系统服务和 GUI，也不安装 nix-darwin；不要运行 Linux 引导脚本。flake 仅提供 aarch64-darwin 输出，Intel Mac 不受支持。
+
+该配置尊重 macOS 惯用用法：不改默认 shell，也不接管 `~/.zshrc`——首次激活只会向其追加一段幂等的 Home Manager 环境加载（会话变量与 PATH，可整段删除），zsh 的提示符和其余配置保持原生；starship 提示符和 bash 别名只影响 bash 会话，其中 `hms` 在 macOS 指向 `.#xuqihao-darwin`。与 Homebrew 共存时，PATH 中 nix 提供的工具优先于同名 brew 命令。
 
 ## 更新与验证
 

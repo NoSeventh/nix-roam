@@ -25,11 +25,12 @@ This repository defines both NixOS and standalone Home Manager targets; **the ta
 | NixOS desktop | `sudo nixos-rebuild switch --flake .#nixos` |
 | NixOS-WSL | `sudo nixos-rebuild switch --flake .#wsl` |
 | Fresh Linux/WSL (no Nix yet) | `bash bootstrap/linux.sh` (installs Nix + HM, then activates) |
+| Fresh macOS (no Nix yet) | `bash bootstrap/darwin.sh` (installs Nix + HM, then activates) |
 | Existing Nix+HM macOS | `home-manager switch --flake .#xuqihao-darwin` |
 | Existing Nix+HM Linux/WSL | `home-manager switch --flake .#xuqihao` |
 | Remote (no clone) | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia.git#xuqihao"` |
 
-Aliases `nrs` / `hms` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`. `nrs` has no explicit flake target; use the commands above for a specific host. `hms` selects standalone Linux, not NixOS-WSL or Darwin. There is no `nrrs` alias. Update flake dependencies with `nix flake update`, review and commit `flake.lock`, then build the affected targets; `nix-channel --update` does not update the lock file.
+Aliases `nrs` / `hms` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`. They are platform-gated there: `hms` picks `.#xuqihao` on Linux and `.#xuqihao-darwin` on macOS (never NixOS-WSL); `nrs` and the distrobox aliases are Linux-only via `lib.optionalAttrs`. `nrs` has no explicit flake target; use the commands above for a specific host. There is no `nrrs` alias. Update flake dependencies with `nix flake update`, review and commit `flake.lock`, then build the affected targets; `nix-channel --update` does not update the lock file.
 
 **No repository test framework.** Build without activation using `nix build --no-link` with the appropriate target:
 
@@ -64,7 +65,7 @@ packages/cli-dev.nix         ({ pkgs, pkgs-stable, pkgs-master, ... }: [ ... ]) 
 | `home/nixos-cli.nix` | NixOS-WSL HM entry = `common.nix` + user identity. CLI packages installed system-wide by `profiles/cli.nix`. |
 | `home/default.nix` | NixOS entry = `common.nix` + GUI terminals (alacritty/ghostty/fuzzel) + GUI terminal dotfiles (kitty/wezterm). |
 | `home/standalone-linux.nix` | Non-NixOS Linux entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isLinux`. Zero GUI. |
-| `home/standalone-darwin.nix` | macOS entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isDarwin`. Zero GUI. |
+| `home/standalone-darwin.nix` | macOS entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isDarwin`. Zero GUI. Keeps zsh native: no `programs.zsh`, never takes over `~/.zshrc`; an idempotent activation script appends a guarded `hm-session-vars.sh` loader so session variables/PATH load in zsh. |
 | `home/nixvim.nix`, `home/fastfetch.nix` | Split sub-configs imported by `common.nix`. |
 
 GUI HM config stays in `home/default.nix` only — **never** put GUI modules in `common.nix` (breaks WSL/macOS).
@@ -82,6 +83,7 @@ modules/                   # Shared NixOS modules (fix-network); modules/desktop
 home/                      # Home Manager config (NixOS + standalone)
 packages/cli-dev.nix       # Shared CLI tool list (pure function) — see architecture above
 bootstrap/linux.sh         # Seven-step installer for standalone Linux/WSL
+bootstrap/darwin.sh        # macOS counterpart (Apple Silicon only)
 bootstrap/gc.sh            # Manual GC with host detection and dry-run
 dotfiles/                  # Raw config files, referenced via ../dotfiles from home/ and modules/
 AGENTS.md                  # Maintained architecture and operating conventions
@@ -147,7 +149,7 @@ inputs.nixvim.homeModules.nixvim   # used in home/common.nix
 
 - **Single source of truth** for Nix binary-cache substituters is `home/nix-cn.nix`, imported by `modules/fix-network.nix` (NixOS daemon) and both `home/standalone-*.nix` entries. Current list: NJU → TUNA → USTC → SJTU → `cache.nixos.org` fallback (ordered by 2026-08 measured latency).
 - npm/npx 的 registry 统一在 `home/common.nix` 配置：默认 `NPM_CONFIG_REGISTRY=https://registry.npmmirror.com`（npmmirror）；A 不可用时用 bash 别名 `npmr` 切到 NJU 南大源（`https://repo.nju.edu.cn/repository/npm/`）。USTC 的 npm 反向代理已于 2026-06-12 停服（请求 302 → npmmirror），不要添加。
-- **Keep `bootstrap/linux.sh` in sync**: on non-NixOS multi-user installs the same list must be written to `/etc/nix/nix.custom.conf` as `trusted-substituters`, and `/etc/nix/nix.conf` must include that file. Otherwise Nix ignores the user-level substituters with a warning.
+- **Keep `bootstrap/linux.sh` and `bootstrap/darwin.sh` in sync**: on non-NixOS multi-user installs (macOS included) the same list must be written to `/etc/nix/nix.custom.conf` as `trusted-substituters`, and `/etc/nix/nix.conf` must include that file. Otherwise Nix ignores the user-level substituters with a warning.
 - Binary caches only cover store paths. Flake inputs (`github:nixos/nixpkgs/...`, `home-manager`, ...) still fetch source from GitHub; the nixpkgs **git** mirrors at USTC/SJTU are dead (404 as of 2026-08) — don't point flake inputs at them.
 - SJTU is the only listed mirror providing nix-darwin binary cache (needed for `standalone-darwin`); TUNA/USTC/BFSU don't.
 - BFSU's `/nix-channels/store` is a 302 redirect to TUNA, not an independent source — don't add it.
@@ -208,11 +210,12 @@ Default WSL host/user are `wsl` / `xuqihao`. Activate explicitly with `sudo nixo
 - Keep `home/nix-cn.nix` out of `home/common.nix`: NixOS manages daemon settings through `profiles/nixos-base.nix` → `modules/fix-network.nix`, while standalone manages user `~/.config/nix/nix.conf`. Avoid generating a second NixOS user configuration unintentionally.
 - The shared module declares `nix.package = pkgs.nix` to satisfy Home Manager's configuration assertion. It preserves `experimental-features = [ "nix-command" "flakes" ]` when Home Manager takes over the file bootstrap initially wrote.
 - Apply `lib.mkForce` only to individual settings needing replacement (currently `substituters` and `experimental-features`), never the entire `nix.settings` attribute set. Keep `connect-timeout = 5` and `fallback = true` shared; `download-buffer-size = 524288000`, `auto-optimise-store = true` and `NIXPKGS_ALLOW_UNFREE` stay on the NixOS side.
-- User substituters require daemon authorization on standalone multi-user installations. Bootstrap writes the four domestic caches as `trusted-substituters` and ensures `/etc/nix/nix.conf` includes `nix.custom.conf`; the official cache remains the shared fallback. It does not grant blanket `trusted-users` access. Its current skip check only tests for NJU, so changing the cache list also requires reviewing that check.
-- `bootstrap/linux.sh [target]` is for ordinary Linux/WSL, defaults to `xuqihao`, and runs seven steps: install Nix, configure cache trust, optionally store a GitHub token, enable flakes, back up conflicting files, install Home Manager, activate with `-b backup`. Do not use it for NixOS-WSL or describe it as a macOS installer.
+- User substituters require daemon authorization on standalone multi-user installations. Bootstrap writes the four domestic caches as `trusted-substituters` and ensures `/etc/nix/nix.conf` includes `nix.custom.conf`; the official cache remains the shared fallback. It does not grant blanket `trusted-users` access. The skip checks in both bootstrap scripts only test for NJU, so changing the cache list also requires reviewing those checks.
+- `bootstrap/linux.sh [target]` is for ordinary Linux/WSL, defaults to `xuqihao`, and runs seven steps: install Nix, configure cache trust, optionally store a GitHub token, enable flakes, back up conflicting files, install Home Manager, activate with `-b backup`. Do not use it for NixOS-WSL or for macOS.
+- `bootstrap/darwin.sh [target]` is the macOS counterpart, defaults to `xuqihao-darwin`: same seven steps and Determinate Systems installer, guarded to Apple Silicon (`uname -s` = Darwin and `uname -m` = arm64; Intel Macs are rejected because the flake only outputs aarch64-darwin). macOS differences: in-place edits use BSD `sed -i ''`; user-level `nix.conf` appends (token include, `experimental-features`) are skipped when the file is already a Home Manager-owned symlink — the token include is carried by `home/standalone-darwin.nix`'s `nix.extraOptions`, flakes by `nix-cn.nix`. It installs no nix-darwin and manages no system services or GUI; it has not yet been run on a real macOS host. macOS conventions are preserved: the default shell stays zsh, `~/.zshrc` is never taken over (only the guarded hm-session-vars append described above), and Homebrew coexists with nix paths taking PATH precedence.
 - The script backs up real `.bashrc`, `.gitconfig`, `.ssh/config`, and `.profile` files with timestamp suffixes and skips symlinks. Home Manager uses `programs.ssh.enableDefaultConfig = false`; merge any required old SSH hosts into `home/common.nix` after migration. Open a new login shell after activation.
 - Bootstrap is intended for repeat use but writes user `nix.conf` before activation. If Home Manager already owns it as a store symlink, use Home Manager for routine updates; do not assume missing includes can be appended to a read-only managed file.
-- Optional Nix GitHub tokens live in `~/.config/nix/github-access-tokens.conf` (0600), outside Git and the Nix store. `home/standalone-linux.nix` retains the optional `!include`; Darwin does not currently add it. Never inline tokens into Nix expressions. This file is separate from `gh auth login`, Git SSH keys, and Actions' ephemeral `GITHUB_TOKEN`.
+- Optional Nix GitHub tokens live in `~/.config/nix/github-access-tokens.conf` (0600), outside Git and the Nix store. `home/standalone-linux.nix` and `home/standalone-darwin.nix` retain the optional `!include`. Never inline tokens into Nix expressions. This file is separate from `gh auth login`, Git SSH keys, and Actions' ephemeral `GITHUB_TOKEN`.
 
 ## npm configuration ownership
 

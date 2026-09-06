@@ -3,8 +3,11 @@
 # 跨平台、纯 CLI 的 Home Manager 核心配置。
 # 被 home/default.nix（NixOS）与 home/standalone-{linux,darwin}.nix（非 NixOS）共同导入。
 # 零 GUI 假设：NixOS / WSL / 普通 Linux / macOS 均可运行。
-{ config, pkgs, pkgs-stable, pkgs-master, inputs, ... }:
+{ config, pkgs, pkgs-stable, pkgs-master, inputs, lib, ... }:
 
+let
+  isLinux = pkgs.stdenv.hostPlatform.isLinux;
+in
 {
   imports = [
     inputs.nixvim.homeModules.nixvim
@@ -30,8 +33,8 @@
       ll = "eza -l --icons";
       lt = "eza -lT --icons";
       la = "eza -la --icons";
-      nrs = "sudo nixos-rebuild switch";
-      hms = "home-manager switch --flake .#xuqihao";
+      # flake target 按平台区分，避免在 macOS 上误激活 Linux 配置（homeDirectory 不同）
+      hms = if isLinux then "home-manager switch --flake .#xuqihao" else "home-manager switch --flake .#xuqihao-darwin";
       # npm 兜底源（npmmirror 不可用时）：npmr install <pkg>
       npmr = "npm --registry=https://repo.nju.edu.cn/repository/npm/";
       shh = "ssh xuqihao@lxlogin.ihep.ac.cn";
@@ -40,12 +43,15 @@
       scratchfs = "cd ~/mnt/juno/scratchfs/juno/xuqihao";
       junofs = "cd ~/mnt/juno/junofs/users/xuqihao";
       workfs = "cd ~/mnt/juno/workfs2/juno/xuqihao";
+      root = "root -l";
+    } // lib.optionalAttrs isLinux {
+      # Linux 专用：macOS 上无 nixos-rebuild / distrobox，不注入避免误用
+      nrs = "sudo nixos-rebuild switch";
       archbox = "distrobox enter archbox";
       susebox = "distrobox enter susebox";
       fedorabox = "distrobox enter fedorabox";
       kalibox = "distrobox enter kalibox";
       debianbox = "distrobox enter debianbox";
-      root = "root -l";
     };
   };
 
