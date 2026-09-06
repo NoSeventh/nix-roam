@@ -46,11 +46,6 @@
       url = "github:nix-community/nixvim/nixos-26.05";
     };
 
-    # --- Chaotic AUR 源 ---
-    chaotic = {
-      url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
@@ -60,7 +55,6 @@
       nixpkgs-stable,
       home-manager,
       hermes-agent,
-      chaotic,
       ...
     }@inputs:
     let
@@ -87,14 +81,6 @@
       # NixOS 仍固定 x86_64-linux
       nixosSystem = "x86_64-linux";
       nixosPkgs = pkgsFor nixosSystem;
-
-      # 自动扫描 modules 目录下的所有 .nix 文件
-      configDir = ./modules;
-      generatedModules = builtins.map (file: configDir + "/${file}") (
-        builtins.filter (file: nixpkgs.lib.hasSuffix ".nix" file) (
-          builtins.attrNames (builtins.readDir configDir)
-        )
-      );
 
       # Shared NixOS Home Manager integration; each host selects its user profile.
       nixosHome = homeModule: {
@@ -150,16 +136,17 @@
           pkgs-stable = nixosPkgs.stable;
           pkgs-master = nixosPkgs.master;
         };
+        # Host entry hosts/nixos pulls in profiles/desktop.nix, which imports
+        # the explicit desktop module list under modules/desktop/.
         modules = [
           ./hosts/nixos
           home-manager.nixosModules.home-manager
-          chaotic.nixosModules.default
           inputs.hermes-agent.nixosModules.default
           (nixosHome ./home/default.nix)
-        ] ++ generatedModules;
+        ];
       };
 
-      # NixOS-WSL: explicit modules, with the standalone CLI software environment.
+      # NixOS-WSL: host entry hosts/wsl imports shared profiles explicitly.
       nixosConfigurations.wsl = nixpkgs.lib.nixosSystem {
         system = nixosSystem;
         specialArgs = {

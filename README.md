@@ -132,12 +132,11 @@ nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 ```text
 .
 ├── flake.nix                   # 双模式 flake 输出与三套 nixpkgs 通道
-├── configuration.nix           # NixOS 桌面系统配置（导入共享基础）
 ├── hosts/
-│   ├── nixos/                  # 当前 NixOS 主机入口与硬件配置
+│   ├── nixos/                  # 当前 NixOS 主机入口（机器专属设置）与硬件配置
 │   └── wsl/                    # NixOS-WSL 主机入口
-├── profiles/                   # 显式导入的共享 NixOS 基础、locale、CLI
-├── modules/                    # 仅桌面入口自动加载的 NixOS 模块
+├── profiles/                   # 显式导入的共享 profiles：基础、桌面、locale、CLI
+├── modules/                    # 共享 NixOS 模块；modules/desktop/ 为桌面专属模块
 ├── home/
 │   ├── common.nix              # 两种模式共享的纯 CLI Home Manager 配置
 │   ├── default.nix             # NixOS Home Manager 入口，包含 GUI 配置

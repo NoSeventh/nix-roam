@@ -13,7 +13,7 @@ Standalone mode supplements the native package manager: keep system services and
 
 This repository defines both NixOS and standalone Home Manager targets; **the target present in the repo does not identify the environment where an agent is currently running**. Before diagnosing, rebuilding, activating, or editing environment-specific settings, inspect the actual host (at minimum `/etc/os-release`, `uname -a`, and whether `/etc/NIXOS` exists).
 
-- `/etc/NIXOS` exists → current host is NixOS; system fixes belong under `hosts/`, `profiles/`, or desktop `configuration.nix` / `modules/`, and activation uses `nixos-rebuild`.
+- `/etc/NIXOS` exists → current host is NixOS; system fixes belong under `hosts/`, `profiles/`, or `modules/` (desktop-only modules under `modules/desktop/`), and activation uses `nixos-rebuild`.
 - `/etc/NIXOS` absent → current host is standalone Nix on Linux/WSL (or macOS); fixes belong under `home/standalone-*`, `home/common.nix`, or `bootstrap/` as appropriate, and activation uses Home Manager.
 - WSL with `/etc/NIXOS` is NixOS-WSL and uses `.#wsl`; other WSL distributions use standalone Home Manager.
 - Never infer the current host from the working directory, hostname, flake outputs, `/run/current-system` alone, or wording such as “this machine” in older documentation. State the detected environment before choosing a mode-specific fix.
@@ -46,7 +46,7 @@ The core pattern. `packages/cli-dev.nix` is a **pure function** returning a cros
 ```
 packages/cli-dev.nix         ({ pkgs, pkgs-stable, pkgs-master, ... }: [ ... ])  cross-platform (platform-conditional inside)
         ├── profiles/cli.nix              → environment.systemPackages  (NixOS-WSL)
-        ├── modules/programs.nix          → environment.systemPackages  (system-level, sudo-visible)
+        ├── modules/desktop/programs.nix  → environment.systemPackages  (system-level, sudo-visible)
         ├── home/standalone-linux.nix     → home.packages               (user-level, non-NixOS Linux)
         └── home/standalone-darwin.nix    → home.packages               (user-level, macOS)
 ```
@@ -75,11 +75,10 @@ GUI HM config stays in `home/default.nix` only — **never** put GUI modules in 
 
 ```
 flake.nix                  # Explicit host/home outputs; pkgsFor creates stable/master per system
-configuration.nix          # Desktop NixOS config; imports profiles/nixos-base.nix
-profiles/                  # Explicit shared NixOS base, locale and CLI modules
+profiles/                  # Explicit shared profiles: nixos-base, desktop, locale, CLI
 hosts/wsl/                 # NixOS-WSL entry, no physical hardware config
-hosts/nixos/               # Current host entry + tracked hardware-configuration.nix
-modules/                   # AUTO-LOADED into nixosConfigurations.nixos (every *.nix)
+hosts/nixos/               # Current machine entry (host-specific settings) + tracked hardware-configuration.nix
+modules/                   # Shared NixOS modules (fix-network); modules/desktop/ = desktop-host-only modules
 home/                      # Home Manager config (NixOS + standalone)
 packages/cli-dev.nix       # Shared CLI tool list (pure function) — see architecture above
 bootstrap/linux.sh         # Seven-step installer for standalone Linux/WSL
@@ -92,18 +91,25 @@ AGENTS.md                  # Maintained architecture and operating conventions
 
 ## Host layout
 
-`hosts/nixos/default.nix` is the current machine entry and imports both the desktop `configuration.nix` and its tracked `hardware-configuration.nix`. Keep generated hardware files under `hosts/<hostname>/` and track them so Git Flake evaluation remains pure and reproducible. Add a sibling host directory and a matching `nixosConfigurations.<hostname>` output for each additional machine; the root `/hardware-configuration.nix` path is ignored only to prevent accidental regeneration in the wrong location.
+`hosts/nixos/default.nix` is the current machine entry: it imports `profiles/desktop.nix` and its tracked `hardware-configuration.nix`, and holds only machine-specific settings (boot/loader, kernel, `networking.hostName`, power/lid policy, user groups, sshd). There is no root `configuration.nix`. Keep generated hardware files under `hosts/<hostname>/` and track them so Git Flake evaluation remains pure and reproducible; the root `/hardware-configuration.nix` path is ignored only to prevent accidental regeneration in the wrong location.
 
-## Desktop modules (auto-loaded); WSL profiles (explicit imports)
+**Adding a new machine:**
 
-`flake.nix`'s `generatedModules` scans `modules/*.nix` and loads **all** of them into the desktop NixOS config. WSL uses an explicit module list; never append generatedModules to it. Adding a `.nix` file to `modules/` is enough; removing/renaming one drops it from the build.
+1. Create `hosts/<hostname>/default.nix` importing the appropriate profiles (`profiles/nixos-base.nix` for a CLI-only host, `profiles/desktop.nix` for a desktop — it imports `nixos-base.nix` itself) plus `./hardware-configuration.nix`, and put host-specific settings (boot, hostname, hardware quirks) directly in it.
+2. Add a `nixosConfigurations.<hostname>` output in `flake.nix` pointing at `./hosts/<hostname>` (copy the desktop or WSL block as appropriate).
+3. If the host needs a different HM user profile, pass a different module to `nixosHome`.
+4. Build without activating via `nix build --no-link .#nixosConfigurations.<hostname>.config.system.build.toplevel` before the first `switch`; preserve that host's original `system.stateVersion` when adopting an existing system.
+
+## Module loading: explicit imports everywhere
+
+Both NixOS hosts import their modules explicitly through profiles — `flake.nix` does **not** scan `modules/` (no auto-loading). `modules/fix-network.nix` is shared (imported via `profiles/nixos-base.nix`); everything under `modules/desktop/` is desktop-host-only and imported explicitly by `profiles/desktop.nix`. Adding a module file changes nothing until it is added to the importing profile's list; likewise removing/renaming requires updating that list.
 
 Module function signatures vary. For new edits, declare the parameters you use and retain `...`; some existing headers contain unused parameters. Referenced package sets must be in scope and supplied via module arguments. `modules/fix-network.nix` currently uses `{ ... }:` and only declares settings/imports.
 
 Match the channel to the param you reference: `pkgs-stable` for stable, `pkgs-master` for master, `pkgs` (unstable) for everything else.
 
-Key modules:
-- `programs.nix` — giant GUI + CLI app list. Ends with `++ (import ../packages/cli-dev.nix {...})`. Platform-conditional packages use `stdenv.hostPlatform.isLinux` guards. Also defines a **wechat overlay**.
+Key modules (under `modules/desktop/` unless noted):
+- `programs.nix` — giant GUI + CLI app list. Ends with `++ (import ../../packages/cli-dev.nix {...})`. Platform-conditional packages use `stdenv.hostPlatform.isLinux` guards. Also defines a **wechat overlay**.
 - `niri.nix` — Niri (primary) + Hyprland + Sway fallbacks; `dms-shell` enabled as the shell.
 - `agents.nix` — `hermes-agent` service + AI tools (cursor, claude-code, codex, opencode…). See "Secrets" below.
 - `virtualization.nix` — Docker **and** Podman both enabled; don't point both at the same containers.
@@ -126,9 +132,9 @@ environment.systemPackages = with pkgs; [
 
 ## Flake inputs (actual)
 
-Active: `nixos-wsl`, `home-manager` (master), `nixvim` (nixos-26.05), `chaotic` (chaotic-cx/nyx), `hermes-agent`.
+Active: `nixos-wsl`, `home-manager` (master), `nixvim` (nixos-26.05), `hermes-agent`. The former `chaotic` input was removed on 2026-09-06; the shell stack it used to provide (`dms-shell`, `noctalia-shell`, `quickshell`, `dsearch`, and the `programs.dms-shell` NixOS module) now comes from nixpkgs unstable directly.
 
-**The `noctalia`, `dms`, `quickshell`, `zen-browser` inputs are commented out in `flake.nix`.** But `modules/niri.nix` still references the *packages* `noctalia-shell`, `dms-shell`, `quickshell`, `dsearch` — these come from **`chaotic`** (chaotic-cx/nyx), not from the commented flake inputs. Don't "fix" the missing inputs; don't reference `inputs.noctalia`/`inputs.dms`/`inputs.quickshell` — they don't exist.
+**The `noctalia`, `dms`, `quickshell`, `zen-browser` inputs are commented out in `flake.nix` and must stay that way** — they are obsolete. `modules/desktop/niri.nix` references the *packages* `noctalia-shell`, `dms-shell`, `quickshell`, `dsearch` and the `programs.dms-shell` option; all of these come from nixpkgs unstable (formerly via `chaotic`, which has been removed). Don't reference `inputs.noctalia`/`inputs.dms`/`inputs.quickshell` — they don't exist.
 
 Access flake packages in modules that declare `inputs`:
 ```nix
@@ -142,13 +148,13 @@ inputs.nixvim.homeModules.nixvim   # used in home/common.nix
 - **Single source of truth** for Nix binary-cache substituters is `home/nix-cn.nix`, imported by `modules/fix-network.nix` (NixOS daemon) and both `home/standalone-*.nix` entries. Current list: NJU → TUNA → USTC → SJTU → `cache.nixos.org` fallback (ordered by 2026-08 measured latency).
 - npm/npx 的 registry 统一在 `home/common.nix` 配置：默认 `NPM_CONFIG_REGISTRY=https://registry.npmmirror.com`（npmmirror）；A 不可用时用 bash 别名 `npmr` 切到 NJU 南大源（`https://repo.nju.edu.cn/repository/npm/`）。USTC 的 npm 反向代理已于 2026-06-12 停服（请求 302 → npmmirror），不要添加。
 - **Keep `bootstrap/linux.sh` in sync**: on non-NixOS multi-user installs the same list must be written to `/etc/nix/nix.custom.conf` as `trusted-substituters`, and `/etc/nix/nix.conf` must include that file. Otherwise Nix ignores the user-level substituters with a warning.
-- Binary caches only cover store paths. Flake inputs (`github:nixos/nixpkgs/...`, `home-manager`, `chaotic`, ...) still fetch source from GitHub; the nixpkgs **git** mirrors at USTC/SJTU are dead (404 as of 2026-08) — don't point flake inputs at them.
+- Binary caches only cover store paths. Flake inputs (`github:nixos/nixpkgs/...`, `home-manager`, ...) still fetch source from GitHub; the nixpkgs **git** mirrors at USTC/SJTU are dead (404 as of 2026-08) — don't point flake inputs at them.
 - SJTU is the only listed mirror providing nix-darwin binary cache (needed for `standalone-darwin`); TUNA/USTC/BFSU don't.
 - BFSU's `/nix-channels/store` is a 302 redirect to TUNA, not an independent source — don't add it.
 
 ## Secrets
 
-`modules/agents.nix` enables `services.hermes-agent` with `environmentFiles = [ "/etc/hermes/env" ];`. That file holds API keys (DeepSeek etc.) and is **not** in the repo — it must exist on the target machine or the service won't start with valid creds. `systemd.tmpfiles.rules` creates `/etc/hermes` (0750 root:hermes); `xuqihao` is added to the `hermes` group for shared-state access.
+`modules/desktop/agents.nix` enables `services.hermes-agent` with `environmentFiles = [ "/etc/hermes/env" ];`. That file holds API keys (DeepSeek etc.) and is **not** in the repo — it must exist on the target machine or the service won't start with valid creds. `systemd.tmpfiles.rules` creates `/etc/hermes` (0750 root:hermes); `xuqihao` is added to the `hermes` group for shared-state access.
 
 ## Handling EOL / insecure packages
 
@@ -184,9 +190,9 @@ Hard-won — read the header comments there before editing that file:
 ## Quick rules
 
 - Track `hosts/<hostname>/hardware-configuration.nix` for reproducible Git Flake builds; only the accidental root path `/hardware-configuration.nix` is ignored.
-- Adding a module file to `modules/` auto-activates it only for the desktop; WSL imports modules explicitly.
+- Modules are imported explicitly: desktop-host-only modules go in `modules/desktop/` **and** must be added to `profiles/desktop.nix`'s import list; shared NixOS modules go in `modules/` and are imported by the relevant profile.
 - GUI HM modules → `home/default.nix` only; CLI → `home/common.nix` (needs config) or `packages/cli-dev.nix` (bare tool); Linux-only/Darwin-only packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` inside `cli-dev.nix`.
-- Don't uncomment the `noctalia`/`dms`/`quickshell` inputs — those packages are provided by `chaotic`.
+- Don't uncomment the `noctalia`/`dms`/`quickshell` inputs — those packages now come from nixpkgs unstable (`chaotic` removed).
 - Adding an EOL exception → inspect **both** `flake.nix` and `profiles/nixos-base.nix` and update the affected nixpkgs instances; their current lists differ.
 
 ## NixOS-WSL

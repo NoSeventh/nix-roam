@@ -1,5 +1,5 @@
 { config, pkgs, pkgs-stable, lib, ... }: {
-  imports = [ ../profiles/locale.nix ];
+  imports = [ ../../profiles/locale.nix ];
 
   # 输入法配置（Fcitx5）
   i18n.inputMethod = {
