@@ -58,6 +58,27 @@ bash bootstrap/linux.sh
 
 脚本会跳过部分已完成步骤；Home Manager 已接管配置后，日常更新直接使用 `home-manager switch`。激活后打开新登录 shell；原 SSH 配置中需要保留的主机请合并到 `home/common.nix`。
 
+### NixOS 全新安装与迁移
+
+`bootstrap/nixos.sh` 覆盖 NixOS 侧两条链路，自动检测模式（`/etc/NIXOS` 存在即 adopt）与 flake 目标（WSL 内核特征 → `.#wsl`，否则 `.#nixos`），也可用子命令强制指定。
+
+实体机全新安装：从 NixOS 安装 ISO 启动后，手动分区并把目标盘挂载到 `/mnt`（ESP 挂 `/mnt/boot`，参考命令见脚本头部注释），再以 root 运行：
+
+```bash
+curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/nixos.sh -o nixos.sh
+bash nixos.sh install
+```
+
+脚本会配置国内镜像、可选配置 GitHub token、克隆仓库到 `/mnt/etc/nixos`、按当前磁盘重新生成 `hosts/nixos/hardware-configuration.nix`（原版备份在同目录）、执行 `nixos-install` 并设置 `xuqihao` 的登录密码；分区与格式化不在脚本职责内。
+
+在已运行的 NixOS 或刚按官方文档导入的 NixOS-WSL 上迁移到本仓库：
+
+```bash
+sudo bash bootstrap/nixos.sh          # 等价于 adopt 子命令
+```
+
+迁移链路会整体备份旧的 `/etc/nixos` 再克隆本仓库；若目标系统原有 `system.stateVersion` 与仓库共享值不同，脚本会要求先在主机入口用 `lib.mkForce` 保留原值。两条链路都要求 root，且可安全重复运行。
+
 ### NixOS 桌面
 
 NixOS 桌面模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。当前机器的配置位于 `hosts/nixos/` 并纳入版本控制，以保证 Git Flake 可以纯求值和重复构建；其他机器应建立独立的 `hosts/<hostname>/`，不要直接复用现有硬件配置。
@@ -75,6 +96,8 @@ sudo nixos-rebuild switch --flake .#nixos
 ```bash
 sudo nixos-rebuild switch --flake .#wsl
 ```
+
+刚导入的发行版也可以直接运行 `sudo bash bootstrap/nixos.sh`：脚本会识别 WSL 走 adopt 链路，完成克隆与切换。
 
 默认用户为 `xuqihao`，主机名为 `wsl`。系统和 Home Manager 一起激活，无需另外运行 `home-manager switch` 或 `bootstrap/linux.sh`。首次接入已有系统时保留该系统原有的 `system.stateVersion`，必要时在主机入口用 `lib.mkForce` 覆盖共享值。
 
@@ -155,6 +178,8 @@ nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 ├── packages/cli-dev.nix        # 各入口共享的 CLI 软件列表
 ├── bootstrap/
 │   ├── linux.sh                # 全新普通 Linux / WSL 引导脚本
+│   ├── darwin.sh               # 全新 macOS（Apple Silicon）引导脚本
+│   ├── nixos.sh                # NixOS 全新安装 / 迁移引导脚本（install / adopt）
 │   └── gc.sh                   # 跨平台手动垃圾回收
 ├── dotfiles/                   # Home Manager 引用的原始配置文件
 ├── .github/                    # GitHub 同步工作流与操作说明
@@ -202,7 +227,7 @@ git remote add github git@github.com:NoSeventh/nix-roam.git
 - `hosts/<hostname>/hardware-configuration.nix` 是机器专用文件，应与对应主机入口一起提交；只有仓库根目录下误生成的 `/hardware-configuration.nix` 被忽略。
 - NixOS 桌面配置中的 Hermes Agent 需要目标机器自行提供 `/etc/hermes/env`。
 - 多用户 Nix 安装需要让 daemon 信任自定义 substituter；`bootstrap/linux.sh` 会处理新机器的这项配置。
-- macOS 输出目前尚未完成真实设备构建验证。
+- macOS 输出目前尚未完成真实设备构建验证；`bootstrap/nixos.sh` 的两条链路同样尚未实机验证。
 
 ## License
 
