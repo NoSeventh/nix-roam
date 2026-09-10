@@ -1,40 +1,19 @@
-{ config, pkgs, pkgs-stable, lib, ... }:
+{ pkgs, lib, ... }:
 
 {
   # ============================================
   # AGENTS.NIX - AI/Agent 相关配置
   # ============================================
 
-  # --- 1. Hermes Agent ---
+  # --- 1. Hermes Agent（最小配置）---
+  # DeepSeek 端点与规范模型名由上游内置 provider 插件提供（v0.21+），
+  # 密钥经 /etc/hermes/env 的 DEEPSEEK_API_KEY 注入，provider 自动探测。
+  # toolsets/plugins/mcpServers 均不声明：toolsets 顶级键上游已废弃，
+  # plugins.enabled 是白名单（勿填不存在的插件名），需要时按上游文档再加。
   services.hermes-agent = {
     enable = true;
     addToSystemPackages = true;
-
-    settings = {
-      model = {
-        base_url = "https://api.deepseek.com";
-        default = "deepseek-v4-flash";
-      };
-      toolsets = [ "all" ];
-      compression = {
-        enabled = true;
-        threshold = 0.85;
-      };
-      plugins = {
-        enabled = [ "rtk-hermes" ];
-      };
-    };
-
-    # 声明式 MCP servers
-    mcpServers = {
-      codegraph = {
-        command = "codegraph";
-        args = [ "serve" "--mcp" ];
-        timeout = 120;
-        connect_timeout = 60;
-      };
-    };
-
+    settings.model.default = "deepseek/deepseek-flash";
     environmentFiles = [ "/etc/hermes/env" ];
   };
 
