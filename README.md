@@ -28,6 +28,26 @@
 
 ## 快速开始
 
+### 一键安装（无需克隆）
+
+按目标机器场景任选一条复制运行，执行的都是下文各节详述的同一个引导脚本：
+
+```bash
+# 全新普通 Linux / WSL（自动把仓库取到 ~/nix-roam，CLONE_DIR 环境变量可覆盖）
+bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/linux.sh)
+
+# 全新 macOS（Apple Silicon）
+bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/darwin.sh)
+
+# 已运行的 NixOS / NixOS-WSL（自动检测 adopt 与 flake 目标）
+curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/nixos.sh -o /tmp/nixos.sh && sudo bash /tmp/nixos.sh
+
+# 刚导入、默认以 root 进入且未装任何工具的 NixOS-WSL
+nix-env -f '<nixpkgs>' -iA curl && curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/nixos.sh -o /tmp/nixos.sh && bash /tmp/nixos.sh
+```
+
+`bash <(...)` 的写法保留终端交互（可直接粘贴 GitHub token）；换成 `curl ... | bash` 也能运行，但会跳过 token 提示。NixOS 侧先下载再 `sudo bash`，是因为 sudo 会关闭继承的文件描述符，`sudo bash <(curl ...)` 不可靠。
+
 ### 已安装 Nix 和 Home Manager
 
 无需克隆即可激活 Linux / WSL 配置：
@@ -46,12 +66,11 @@ home-manager switch --flake .#xuqihao
 
 ### 全新的 Linux / WSL
 
-安装 Git 并克隆仓库后，运行引导脚本：
+一键命令会自动把仓库取到 `~/nix-roam`（`CLONE_DIR` 环境变量可覆盖；无 git 时退到 Gitee 压缩包）再执行；等价的手动流程：
 
 ```bash
-git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git nix-roam
-cd nix-roam
-bash bootstrap/linux.sh
+git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git ~/nix-roam
+bash ~/nix-roam/bootstrap/linux.sh
 ```
 
 脚本会依次安装 Nix、配置国内缓存信任、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活 `xuqihao` 配置。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
@@ -71,7 +90,7 @@ bash nixos.sh install
 
 脚本会配置国内镜像、可选配置 GitHub token、克隆仓库到 `/mnt/etc/nixos`、按当前磁盘重新生成 `hosts/nixos/hardware-configuration.nix`（原版备份在同目录）、执行 `nixos-install` 并设置 `xuqihao` 的登录密码；分区与格式化不在脚本职责内。
 
-在已运行的 NixOS 或刚按官方文档导入的 NixOS-WSL 上迁移到本仓库：
+在已运行的 NixOS 或刚按官方文档导入的 NixOS-WSL 上迁移到本仓库（未克隆仓库时用一键安装小节的对应命令）：
 
 ```bash
 sudo bash bootstrap/nixos.sh          # 等价于 adopt 子命令
@@ -97,7 +116,7 @@ sudo nixos-rebuild switch --flake .#nixos
 sudo nixos-rebuild switch --flake .#wsl
 ```
 
-刚导入的发行版也可以直接运行 `sudo bash bootstrap/nixos.sh`：脚本会识别 WSL 走 adopt 链路，完成克隆与切换。
+刚导入的发行版也可以直接运行 `sudo bash bootstrap/nixos.sh`：脚本会识别 WSL 走 adopt 链路，完成克隆与切换。全新导入的发行版连 curl 都没有，直接用一键安装小节的最后一条命令（先经 `nixpkgs` 通道装 curl，下载后以 root 运行）。
 
 默认用户为 `xuqihao`，主机名为 `wsl`。系统和 Home Manager 一起激活，无需另外运行 `home-manager switch` 或 `bootstrap/linux.sh`。首次接入已有系统时保留该系统原有的 `system.stateVersion`，必要时在主机入口用 `lib.mkForce` 覆盖共享值。
 
@@ -110,8 +129,10 @@ sudo nixos-rebuild switch --flake .#wsl
 全新 Apple Silicon 机器一键安装（装 Nix → 配镜像 → 配 token → 开 flakes → 备份冲突文件 → 装 HM → 激活）：
 
 ```bash
-bash bootstrap/darwin.sh
+bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/darwin.sh)
 ```
+
+与先 `git clone` 到本地再运行 `bash bootstrap/darwin.sh` 等价。
 
 已有 Nix + Home Manager 的机器，在仓库根目录手动激活：
 
