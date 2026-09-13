@@ -177,6 +177,8 @@ Current source values (not a claim that every target builds):
 
 These lists currently differ. Add an approved exact package/version exception to every affected instance in both files as needed; do not assume one edit covers all four outputs or expand permissions just to make documentation match. Validate the affected package/target after changing exceptions.
 
+`pnpm-10.29.2` on system unstable is referenced only by the desktop closure (GNOME module chain via `services.desktopManager.gnome`); the WSL toplevel derivation is byte-identical without it (verified 2026-09-14). It must still be declared in the shared `profiles/nixos-base.nix`: `nixpkgs.config` merges shallowly across modules, so a second `permittedInsecurePackages` list in `profiles/desktop.nix` would shadow the `electron-40.10.5` entry instead of extending it.
+
 ## buildEnv conflict gotchas
 
 Hard-won — read the header comments in `packages/cli-dev.nix` before editing that file. The managed Python environment now lives only in `profiles/nixos-base.nix`; do not reintroduce it into standalone Home Manager:
