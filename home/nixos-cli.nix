@@ -1,5 +1,5 @@
 # NixOS Home Manager entry without desktop configuration.
-# Bare CLI packages are installed by profiles/cli.nix at system level.
+# Shared tools: profiles/cli.nix; NixOS runtimes: profiles/nixos-base.nix.
 { ... }:
 
 {

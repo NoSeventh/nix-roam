@@ -63,40 +63,13 @@ with pkgs; [
   pkgs-stable.gopls
   pkgs-stable.delve
   pkgs-stable.go-tools
-  # pkgs-stable.nodejs_26
-  pkgs-stable.pnpm
+  # Node/npm/pnpm and the Python scientific environment are NixOS-only
+  # (profiles/nixos-base.nix). Standalone projects manage their own runtimes.
+  pkgs-stable.uv
   # pkgs-master.bun
   pkgs-stable.jq
   opencode
   pi-coding-agent
-
-  # --- Python 环境（跨平台，三处共享） ---
-  # 注意：bare python3 不单独放（会与 withPackages 的 python3-env 产生 buildEnv 冲突）。
-  # 不要在其他地方再出现 python3.withPackages —— 多个 python3-env 在同一 HM home.packages
-  # buildEnv 里会碰撞 bin/idle3 等文件。所有 Python 包都汇总于此，Linux-only 包用
-  # stdenv.hostPlatform.isLinux 条件判断。
-  (python3.withPackages (
-    python-pkgs: with python-pkgs; [
-      pip
-      jupyter
-      pyyaml
-      pandas
-      polars
-      numpy
-      scipy
-      sympy
-      matplotlib
-      requests
-      uv
-      pytest
-    ] ++ lib.optionals stdenv.hostPlatform.isLinux (with python-pkgs; [
-      pkgs-stable.root
-      uproot
-      rpy2
-      torch
-      
-    ])
-  ))
 
   # --- Nix 工具 ---
   nil
@@ -109,6 +82,7 @@ with pkgs; [
 ] ++ lib.optionals stdenv.hostPlatform.isLinux [
   # --- Linux-only 包 ---
   pkgs-stable.valgrind
+  # C++ ROOT application; PyROOT is configured separately on NixOS.
   pkgs-stable.root
 ] ++ [
   # --- AI 开发辅助 CLI ---

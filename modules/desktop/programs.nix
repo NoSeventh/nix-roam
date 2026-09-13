@@ -183,7 +183,7 @@
     # → go / gopls / delve / go-tools 已移至 packages/cli-dev.nix（共享）
 
     # Node.js（稳定）
-    # → nodejs / jq 已移至 packages/cli-dev.nix（共享）
+    # → nodejs 在 profiles/nixos-base.nix；jq 在 packages/cli-dev.nix
 
     # 其他开发工具（稳定）
     pkgs-stable.rstudio
@@ -194,7 +194,7 @@
     # → ripgrep 已移至 packages/cli-dev.nix（共享）
 
     # --- 17. Python 环境 ---
-    # → 已移至 packages/cli-dev.nix（NixOS 与 home/standalone-linux.nix 共享）
+    # → profiles/nixos-base.nix（仅 NixOS 桌面与 WSL 共享）
 
     # --- 18. JetBrains IDEs ---
     # pkgs-stable.jetbrains-toolbox

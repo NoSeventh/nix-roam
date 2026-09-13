@@ -56,6 +56,7 @@ packages/cli-dev.nix         ({ pkgs, pkgs-stable, pkgs-master, ... }: [ ... ]) 
 
 - **NixOS**: CLI tools land in `environment.systemPackages` → `/run/current-system/sw/bin` → inside sudo `secure_path`, so `sudo <tool>` works. This intentionally makes bare CLI tools available to root without a separate root profile.
 - **Non-NixOS**: same list → `home.packages` → user profile. Home Manager does not configure sudoers; do not assume `sudo -E` bypasses the native sudo `secure_path`.
+- **NixOS-only runtimes**: `profiles/nixos-base.nix` adds stable Node.js/npm, pnpm, R and a single stable Python scientific environment (including PyROOT) to both desktop and WSL. Python and PyROOT use the same Python package set; its wrapper sets the matching `R_HOME` for rpy2. Standalone Linux/Darwin do not explicitly install these runtimes; shared `packages/cli-dev.nix` retains standalone `uv`. The separate C++ ROOT application (`pkgs-stable.root`) remains in the shared Linux-only list for NixOS and standalone Linux, not Darwin. Internal interpreter dependencies of applications/editors are not project runtimes and should not be removed. npm registry/prefix configuration remains shared for natively installed Node.
 - When adding a CLI tool, decide: needs a dotfile/HM module → `home/common.nix`; bare CLI binary → `packages/cli-dev.nix`. Don't duplicate between the two.
 - Linux-only / Darwin-only packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` inside the main list.
 
@@ -64,7 +65,7 @@ packages/cli-dev.nix         ({ pkgs, pkgs-stable, pkgs-master, ... }: [ ... ]) 
 | File | Role |
 |---|---|
 | `home/common.nix` | Cross-platform **CLI-only** HM core (git, bash, starship, helix, ssh, nixvim, fastfetch, btop dotfile). Imported by both modes. **Zero GUI assumptions.** |
-| `home/nixos-cli.nix` | NixOS-WSL HM entry = `common.nix` + user identity. CLI packages installed system-wide by `profiles/cli.nix`. |
+| `home/nixos-cli.nix` | NixOS-WSL HM entry = `common.nix` + user identity. Shared CLI tools installed system-wide by `profiles/cli.nix`; development runtimes by `profiles/nixos-base.nix`. |
 | `home/default.nix` | NixOS entry = `common.nix` + GUI terminals (alacritty/ghostty/fuzzel) + GUI terminal dotfiles (kitty/wezterm). |
 | `home/standalone-linux.nix` | Non-NixOS Linux entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isLinux`. Zero GUI. |
 | `home/standalone-darwin.nix` | macOS entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isDarwin`. Zero GUI. Keeps zsh native: no `programs.zsh`, never takes over `~/.zshrc`; an idempotent activation script appends a guarded `hm-session-vars.sh` loader so session variables/PATH load in zsh. |
@@ -176,9 +177,9 @@ Current source values (not a claim that every target builds):
 
 These lists currently differ. Add an approved exact package/version exception to every affected instance in both files as needed; do not assume one edit covers all four outputs or expand permissions just to make documentation match. Validate the affected package/target after changing exceptions.
 
-## buildEnv conflict gotchas (in `packages/cli-dev.nix`)
+## buildEnv conflict gotchas
 
-Hard-won — read the header comments there before editing that file:
+Hard-won — read the header comments in `packages/cli-dev.nix` before editing that file. The managed Python environment now lives only in `profiles/nixos-base.nix`; do not reintroduce it into standalone Home Manager:
 - **Never put both `gcc` and `clang` in a Home Manager `home.packages`**: both wrappers provide `bin/ld` → buildEnv conflict → build fails. On NixOS system-level (`environment.systemPackages`) they coexist fine; in user-level HM they don't. Need clang on a non-NixOS box → use the native package manager.
 - **Never put bare `python3` alongside `python3.withPackages (...)`**: buildEnv conflict. Use only the `withPackages` form.
 - **Never have two separate `python3.withPackages (...)` calls in the same HM `home.packages`**: both produce python3-env derivations that collide on `bin/idle3` etc. in HM's buildEnv. Merge all Python packages into a single `withPackages` call, using `stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` guards for platform-specific packages.
@@ -204,7 +205,7 @@ Hard-won — read the header comments there before editing that file:
 
 `hosts/wsl/default.nix` imports `profiles/nixos-base.nix` and `profiles/cli.nix`; the flake supplies NixOS-WSL and integrated Home Manager with `home/nixos-cli.nix`. Software tracks standalone Linux via the same list and common HM configuration. Do not import `home/standalone-linux.nix` into NixOS. Shared system settings belong in `profiles/`; desktop services stay in the desktop module set. NixOS-WSL does not require a generated physical hardware configuration.
 
-“CLI-only” means software alignment with standalone Linux, including tools such as mpv; do not remove packages merely because they can use graphics. Keep one shared CLI list and `home/common.nix`. WSL uses system-level installation for bare tools and integrated Home Manager for user configuration; do not separately activate standalone Home Manager there.
+“CLI-only” means shared base tools with standalone Linux, including tools such as mpv and the C++ ROOT application; do not remove packages merely because they can use graphics. Keep one shared CLI list and `home/common.nix`. Node/npm/pnpm and Python/PyROOT/R are an intentional NixOS-only addition through `profiles/nixos-base.nix`, identical on desktop and WSL. WSL uses system-level installation for bare tools and integrated Home Manager for user configuration; do not separately activate standalone Home Manager there.
 
 Default WSL host/user are `wsl` / `xuqihao`. Activate explicitly with `sudo nixos-rebuild switch --flake .#wsl`. A freshly imported distro can be brought under this configuration by running `sudo bash bootstrap/nixos.sh` (auto-detected adopt → `.#wsl`). Shared defaults include `system.stateVersion = "26.05"`; preserve an existing target's original stateVersion when adopting this configuration. Desktop sessions, databases, container services, Hermes and remote mounts are not enabled by this entry; add services only when requested. WSLg integration follows NixOS-WSL defaults.
 
@@ -232,13 +233,15 @@ Use `home.sessionVariables.NPM_CONFIG_REGISTRY` and the Bash `npmr` alias, rathe
 ## Repository hosting and synchronization
 
 - Gitee is the primary repository: `https://gitee.com/qihaoxu/nixos-niri-noctalia.git`; GitHub is `https://github.com/NoSeventh/nix-roam`. The project is named nix-roam, but the Gitee path retains the older name.
-- Local remotes are `origin` (Gitee) and `github` (GitHub); `.git/config` is not shared by commits. A new clone has only its clone source as `origin`; inspect `git remote -v` before pushing.
+- Remote naming convention is `origin` (Gitee) and optional `github` (GitHub); `.git/config` is not shared by commits. A new clone has only its clone source as `origin`; inspect `git remote -v` before pushing.
 - `.github/workflows/sync-from-gitee.yml` runs at minutes 17 and 47 each hour, via manual dispatch, and on pushes changing that workflow on `master`. It fetches public Gitee heads/tags with Git protocol v1 and up to four attempts, then pushes atomically using `GITHUB_TOKEN` with `contents: write`.
 - Normal changes go to Gitee; Actions copies them to GitHub. No forced history updates or remote deletions; divergence and rewritten tags require intervention. This copies Git refs, not Issues, PRs, release assets or LFS objects.
 - Keep workflow changes on both remotes using local credentials; the built-in token cannot push workflow-file changes. For public repositories, scheduled runs may be delayed and are disabled after 60 days without activity. Operational details: [`.github/SYNC.md`](.github/SYNC.md).
 
 ## Validation boundaries
 
+2026-09-14 runtime split validation on NixOS 26.11 / WSL2: WSL system closure and standalone Linux activation package built without activation; standalone Darwin activation derivation and desktop system derivation evaluated. Desktop/WSL Node, pnpm, Python, R and ROOT package paths match exactly. The built WSL profile passed Node/npm/pnpm/uv execution, npm registry queries, all 15 configured Python module imports, and ROOT/R computations through PyROOT/rpy2. After restoring shared C++ ROOT, WSL and standalone Linux were rebuilt and the standalone artifact passed a C++ ROOT computation. This does not verify activation of these edits, a Darwin build, or desktop boot. Desktop full build remains unverified after a QQ source download failure; further QQ diagnosis was skipped and QQ is unchanged at the user's request.
+
 For documentation-only edits, check source consistency, local links, removed-path references and `git diff --check`; no system rebuild or activation is needed. For Nix changes, parse edited files, evaluate affected options/derivations, then build the appropriate target. Do not treat evaluation as a build, a build as activation, or a command found on the current host as proof of another target's package contents.
 
-Historical verification on 2026-09-05 used AlmaLinux 9.8 / WSL2 standalone Nix: WSL's system closure built; the desktop host-layout refactor preserved its derivation; standalone Linux/Darwin activation derivations evaluated. These records predate later edits and do not certify the current lock/package set. Real NixOS-WSL boot/login/switch and a Darwin build remain unverified. GitHub synchronization was separately verified by pushing a documentation commit only to Gitee and observing Actions update GitHub.
+Historical verification on 2026-09-05 used AlmaLinux 9.8 / WSL2 standalone Nix: WSL's system closure built; the desktop host-layout refactor preserved its derivation; standalone Linux/Darwin activation derivations evaluated. These records predate later edits and do not certify the current lock/package set. Activation and subsequent boot/login of the current WSL edits, and a Darwin build, remain unverified; the 2026-09-14 checks exercised build artifacts without activating these edits. GitHub synchronization was separately verified by pushing a documentation commit only to Gitee and observing Actions update GitHub.

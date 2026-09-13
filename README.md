@@ -8,8 +8,8 @@
 
 | 模式 | Flake 输出 | 状态 | 用途 |
 |---|---|---|---|
-| Linux / WSL | `homeConfigurations.xuqihao` | 已有使用记录，变更后需重新验证 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
-| NixOS-WSL | `nixosConfigurations.wsl` | 有构建通过记录、待目标机实测 | NixOS 系统管理，软件环境与 standalone Linux 对齐 |
+| Linux / WSL | `homeConfigurations.xuqihao` | 本次构建通过，未激活 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
+| NixOS-WSL | `nixosConfigurations.wsl` | 构建与运行时冒烟通过，本次改动未激活 | 共享基础 CLI，另加 NixOS 专用开发运行时 |
 | NixOS | `nixosConfigurations.nixos` | 保留 | x86_64-linux 完整系统、桌面与服务配置 |
 | macOS | `homeConfigurations.xuqihao-darwin` | 结构就绪、未实测 | aarch64-darwin 纯 CLI 环境 |
 
@@ -17,10 +17,12 @@
 
 表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；macOS 仅支持 Apple Silicon（aarch64-darwin），Linux 输出为 x86_64-linux。
 
+2026-09-14 在 NixOS 26.11 / WSL2 验证运行时拆分：WSL 系统闭包与 standalone Linux activation package 构建通过，桌面系统 derivation 与 standalone Darwin activation derivation 求值通过；桌面/WSL 运行时路径一致，WSL 构建产物的 Node/npm/pnpm/uv、15 个 Python 模块导入及通过 PyROOT/rpy2 调用的 ROOT/R 计算通过。恢复共享 C++ ROOT 后重新构建 WSL 与 standalone Linux，并从 standalone 构建产物执行 C++ ROOT 计算通过。未激活本次修改；桌面完整构建曾因 QQ 下载失败中止，按用户要求未继续排查或调整 QQ；未验证桌面启动或 Darwin 构建。
+
 ## 主要内容
 
 - Home Manager 管理的 Bash、Git、SSH、Starship、Helix、NixVim、Fastfetch 与 btop 配置
-- 跨平台共享的现代 CLI、Git 工具、C/C++、Rust、Go、Python、Typst 与 AI 辅助工具
+- 跨平台共享的现代 CLI、Git 工具、C/C++、Rust、Go、uv、Typst 与 AI 辅助工具；Node/npm 和 Python 科学计算环境仅在 NixOS 安装
 - Linux / WSL 上不依赖 root profile 的便携用户环境
 - NixOS 上的 Niri 桌面、GUI 应用、服务与虚拟化配置
 - 面向中国大陆网络的 Nix binary cache 和 npm 镜像配置
@@ -120,7 +122,7 @@ sudo nixos-rebuild switch --flake .#wsl
 
 默认用户为 `xuqihao`，主机名为 `wsl`。系统和 Home Manager 一起激活，无需另外运行 `home-manager switch` 或 `bootstrap/linux.sh`。首次接入已有系统时保留该系统原有的 `system.stateVersion`，必要时在主机入口用 `lib.mkForce` 覆盖共享值。
 
-该入口复用 `packages/cli-dev.nix` 和 `home/common.nix`：裸 CLI 工具系统级安装，用户配置由集成的 Home Manager 管理。这里“CLI”指与 standalone 的软件环境对齐，保留清单中的 mpv 等工具。WSL 适配使用 NixOS-WSL 模块，不导入实体机硬件配置，也不自动加载桌面模块、数据库、容器服务、Hermes 服务或远程挂载。
+该入口复用 `packages/cli-dev.nix` 和 `home/common.nix`：裸 CLI 工具系统级安装，用户配置由集成的 Home Manager 管理。基础 CLI 与 standalone 对齐，保留清单中的 mpv、C++ ROOT 等工具；此外通过 `profiles/nixos-base.nix` 与 NixOS 桌面共享 Node/npm/pnpm、Python 科学计算环境（含 PyROOT）及 R。WSL 适配使用 NixOS-WSL 模块，不导入实体机硬件配置，也不自动加载桌面模块、数据库、容器服务、Hermes 服务或远程挂载。
 
 普通 Ubuntu/AlmaLinux 等 WSL 发行版仍使用上面的 standalone 入口；只有 NixOS 发行版使用 `.#wsl`。
 
@@ -209,13 +211,37 @@ nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 
 ## 配置约定
 
-CLI 工具只维护一份列表：`packages/cli-dev.nix`。它会被安装到以下位置：
+跨模式共享 CLI 工具维护在 `packages/cli-dev.nix`。它会被安装到以下位置：
 
 - NixOS 桌面 / NixOS-WSL：`environment.systemPackages`，因此 `sudo` 环境也能找到相关命令
 - 普通 Linux / WSL：Home Manager 的 `home.packages`
 - macOS：Home Manager 的 `home.packages`
 
 需要 Home Manager 托管配置文件的 CLI 放在 `home/common.nix`；GUI Home Manager 配置只放在 `home/default.nix`，避免给 WSL 和 macOS 引入桌面依赖。
+
+Node.js（含 npm）、pnpm、Python 科学计算环境（含 PyROOT）和 R 仅由 `profiles/nixos-base.nix` 安装，NixOS 桌面与 WSL 使用完全相同的 stable 包。Python 与 PyROOT 来自同一 Python 包集，Python wrapper 为 rpy2 设置匹配的 `R_HOME`。不要用 pip 修改这套只读环境。
+
+独立的 C++ ROOT 高能物理计算软件与 Python 的 PyROOT 绑定分开配置：`pkgs-stable.root` 保留在 `packages/cli-dev.nix` 的 Linux-only 列表中，普通 Linux、NixOS 桌面及 WSL 均安装，macOS 保持原先不安装的范围。它的内部 Python 依赖不等于安装共享的 Python 科学计算环境。
+
+Standalone Linux/macOS 不再显式安装 Node.js/npm、pnpm、上述 Python 科学计算环境及 R，保留独立的 `uv`；standalone Linux 仍安装 C++ ROOT。编辑器或其他应用仍可能通过 Nix 引入内部 Node/Python 依赖，这不代表它们接管项目运行时。npm 镜像与用户级 prefix 配置仍共享：全局安装目录是 `~/.npm-global`，`~/.npm-global/bin` 加入 PATH；standalone 需要自行安装 Node（例如使用原生包管理器或 fnm）。
+
+### 普通 Linux 的 Python 管理
+
+系统 Python 交给 apt/dnf 等原生包管理器，不替换 `/usr/bin/python3`，不用 `sudo pip` 或 `--break-system-packages`。一般项目推荐 uv 管理 Python 版本、项目 `.venv` 和锁文件；uv 本身可以由本仓库的 Nix 配置提供，项目解释器和依赖不必由 Nix 提供。
+
+```bash
+uv python install 3.13
+uv init --python 3.13 my-analysis
+cd my-analysis
+uv add numpy pandas matplotlib uproot
+uv add --dev pytest
+uv run python -c 'import numpy; print(numpy.__version__)'
+# 添加项目测试后，使用 uv run pytest 运行。
+```
+
+提交 `pyproject.toml`、`uv.lock` 和 `.python-version`，不提交 `.venv`；其他机器用 `uv sync --locked` 恢复环境。独立命令行工具用 `uv tool install <工具>`。从旧 Nix Python 迁移的虚拟环境应保留依赖清单并重新创建，不能假设旧 `.venv` 已脱离 Nix store。
+
+需要 ROOT、R、复杂 C/C++ 动态库的科研项目可优先考虑 conda-forge + micromamba，或者实验组提供的容器/CVMFS 环境；只读取 ROOT 文件时先考虑 uv + uproot。uv 并不自动解决所有系统库、CUDA 或外部科研软件依赖。上述 uv 下载解释器方案针对普通 Linux，不应直接当作 NixOS 的通用方案；NixOS 项目需要额外依赖时优先使用项目级 `nix develop`。
 
 更完整的架构说明和维护约定见 [`AGENTS.md`](AGENTS.md)。
 
