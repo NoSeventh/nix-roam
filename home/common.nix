@@ -46,7 +46,8 @@ in
       root = "root -l";
     } // lib.optionalAttrs isLinux {
       # Linux 专用：macOS 上无 nixos-rebuild / distrobox，不注入避免误用
-      nrs = "sudo nixos-rebuild switch";
+      # nrs 需在仓库根目录下运行：--flake . 按 cwd 解析，attr 自动补 #$(hostname)
+      nrs = "sudo nixos-rebuild switch --flake .";
       archbox = "distrobox enter archbox";
       susebox = "distrobox enter susebox";
       fedorabox = "distrobox enter fedorabox";
