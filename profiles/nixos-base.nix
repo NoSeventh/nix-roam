@@ -1,5 +1,5 @@
 # Shared NixOS foundation for desktop and WSL hosts.
-{ ... }:
+{ pkgs-stable, ... }:
 
 {
   imports = [
@@ -10,6 +10,36 @@
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
   time.timeZone = "Asia/Shanghai";
 
+  # --- 1. NixOS development runtimes (desktop and WSL) ---
+  # Standalone hosts use native/project runtime management instead.
+  environment.systemPackages = with pkgs-stable; [
+    nodejs
+    pnpm
+    R
+    # The C++ ROOT application comes from packages/cli-dev.nix.
+    # Keep Python and ROOT bindings in the same package set / Python ABI.
+    ((python3.withPackages (ps: with ps; [
+      pip
+      jupyter
+      pyyaml
+      pandas
+      polars
+      numpy
+      scipy
+      sympy
+      matplotlib
+      requests
+      pytest
+      root # PyROOT bindings from the Python package set.
+      uproot
+      rpy2
+      torch
+    ])).override {
+      # rpy2 needs R at runtime, not only in its build environment.
+      makeWrapperArgs = [ "--set" "R_HOME" "${pkgs-stable.R}/lib/R" ];
+    })
+  ];
+
   users.users.xuqihao = {
     isNormalUser = true;
     description = "xuqihao";
@@ -19,6 +49,9 @@
   nixpkgs.config.allowUnfree = true;
   nixpkgs.config.permittedInsecurePackages = [
     "electron-40.10.5"
+    # pnpm-10.29.2 仅桌面闭包引用（GNOME 模块链，flatpak-linyaps.nix）；
+    # WSL 不引用但删掉无效也无益——nixpkgs.config 跨模块浅合并，
+    # 拆到 profiles/desktop.nix 会遮蔽 electron 条目，只能在共享处单点声明。
     "pnpm-10.29.2"
   ];
 

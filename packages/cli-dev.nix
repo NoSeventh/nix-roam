@@ -3,7 +3,7 @@
 # 跨平台共享 CLI 开发工具列表 —— 纯函数，返回 package list。
 # 单一事实源，被四处导入：
 #   - profiles/cli.nix             → NixOS-WSL 的 environment.systemPackages
-#   - modules/programs.nix         → NixOS 的 environment.systemPackages（系统级、sudo 可见）
+#   - modules/desktop/programs.nix         → NixOS 的 environment.systemPackages（系统级、sudo 可见）
 #   - home/standalone-linux.nix    → 非 NixOS Linux 的 home.packages（用户级）
 #   - home/standalone-darwin.nix   → macOS 的 home.packages（用户级）
 #
@@ -15,7 +15,7 @@
 
 with pkgs; [
   # --- 现代基础 CLI ---
-  # 与 modules/programs.nix 共享的工具统一走 stable（全局版本一致）；
+  # 与 modules/desktop/programs.nix 共享的工具统一走 stable（全局版本一致）；
   # 仅追新的小工具（sd / bottom / gh / lazygit）走 unstable。
   pkgs-stable.ripgrep
   pkgs-stable.fd
@@ -42,12 +42,15 @@ with pkgs; [
   pkgs-stable.ffmpeg
   pkgs-stable.pandoc
   pkgs-stable.cmatrix
+  pkgs-stable.sl
+  pkgs-stable.asciiquarium
+  pkgs-stable.oneko
 
   # --- 开发工具链（稳定通道） ---
   # 注意：只保留 gcc 作为 C/C++ 工具链。不要同时放 gcc + clang ——
   # 两者的 wrapper 都提供 bin/ld，在同一个 home-manager profile 的 buildEnv 里会
   # 产生路径冲突导致 build 失败。需要 clang 的机器请用原生包管理器安装，或在
-  # NixOS 上经 modules/programs.nix（那里 gcc+clang 共存于 environment.systemPackages 不冲突）。
+  # NixOS 上经 modules/desktop/programs.nix（那里 gcc+clang 共存于 environment.systemPackages 不冲突）。
   pkgs-stable.gcc
   pkgs-stable.gnumake
   pkgs-stable.cmake
@@ -60,40 +63,13 @@ with pkgs; [
   pkgs-stable.gopls
   pkgs-stable.delve
   pkgs-stable.go-tools
-  # pkgs-stable.nodejs_26
-  pkgs-stable.pnpm
+  # Node/npm/pnpm and the Python scientific environment are NixOS-only
+  # (profiles/nixos-base.nix). Standalone projects manage their own runtimes.
+  pkgs-stable.uv
   # pkgs-master.bun
   pkgs-stable.jq
   opencode
   pi-coding-agent
-
-  # --- Python 环境（跨平台，三处共享） ---
-  # 注意：bare python3 不单独放（会与 withPackages 的 python3-env 产生 buildEnv 冲突）。
-  # 不要在其他地方再出现 python3.withPackages —— 多个 python3-env 在同一 HM home.packages
-  # buildEnv 里会碰撞 bin/idle3 等文件。所有 Python 包都汇总于此，Linux-only 包用
-  # stdenv.hostPlatform.isLinux 条件判断。
-  (python3.withPackages (
-    python-pkgs: with python-pkgs; [
-      pip
-      jupyter
-      pyyaml
-      pandas
-      polars
-      numpy
-      scipy
-      sympy
-      matplotlib
-      requests
-      uv
-      pytest
-    ] ++ lib.optionals stdenv.hostPlatform.isLinux (with python-pkgs; [
-      pkgs-stable.root
-      uproot
-      rpy2
-      torch
-      
-    ])
-  ))
 
   # --- Nix 工具 ---
   nil
@@ -106,6 +82,7 @@ with pkgs; [
 ] ++ lib.optionals stdenv.hostPlatform.isLinux [
   # --- Linux-only 包 ---
   pkgs-stable.valgrind
+  # C++ ROOT application; PyROOT is configured separately on NixOS.
   pkgs-stable.root
 ] ++ [
   # --- AI 开发辅助 CLI ---

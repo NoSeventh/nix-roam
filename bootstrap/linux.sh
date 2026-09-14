@@ -4,23 +4,54 @@
 # 在一台干净的普通 Linux / WSL 上，从零搭建 Nix + Home Manager 便携 CLI 环境。
 # 覆盖完整链路：安装 Nix → 配置镜像 → 配置 GitHub token → 开启 flakes → 备份冲突文件 → 安装 HM → 激活。
 #
-# 前置：已 git clone 本仓库。在仓库根目录运行：
-#     bash bootstrap/linux.sh [flake-target]     # 默认 target = xuqihao
+# 用法（两种等价入口，默认 flake target = xuqihao）：
+#     bash bootstrap/linux.sh [flake-target]     # 仓库内运行
+#     bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/linux.sh)
+#                                                # 仓库外一键运行：先把仓库取到 ~/nix-roam 再重跑本脚本
 #
 # 幂等：可安全重复运行。已完成的步骤会跳过；已被 home-manager 托管的文件（symlink）不会重复备份。
 set -euo pipefail
 
-# 切到仓库根（脚本位于 bootstrap/ 下）
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# --- 0. 平台守卫 ---
+[ "$(uname -s)" = "Linux" ] || { echo "错误：此脚本仅用于普通 Linux / WSL；NixOS 请用 bootstrap/nixos.sh，macOS 请用 bootstrap/darwin.sh。" >&2; exit 1; }
+
+# --- 0.5 仓库定位 / 自取 ---
+#     bootstrap/ 相对布局成立且能找到 flake.nix → 仓库内运行，直接用；
+#     否则（curl 管道 / 单独下载）先把仓库取到 CLONE_DIR（默认 ~/nix-roam）再 exec 仓库内副本重跑。
+#     git 优先；无 git 时退到 Gitee 压缩包（非 git 克隆，日后更新请改用 git clone）。
+REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")/.." 2>/dev/null && pwd)" || REPO_ROOT=""
+if [ -z "$REPO_ROOT" ] || [ ! -f "$REPO_ROOT/flake.nix" ]; then
+  CLONE_DIR="${CLONE_DIR:-$HOME/nix-roam}"
+  if [ -d "$CLONE_DIR/.git" ] && git -C "$CLONE_DIR" config --get remote.origin.url 2>/dev/null | grep -qE 'nixos-niri-noctalia|nix-roam'; then
+    log "复用已有仓库克隆：${CLONE_DIR}（如需更新请自行 git pull --ff-only）"
+  else
+    if [ -e "$CLONE_DIR" ]; then
+      echo "错误：${CLONE_DIR} 已存在且不是本仓库克隆；请移走，或用 CLONE_DIR=<目录> 指定其他位置。" >&2
+      exit 1
+    fi
+    if have git; then
+      git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git "$CLONE_DIR"
+    elif have curl; then
+      log "无 git，改用 Gitee 压缩包获取仓库"
+      mkdir -p "$CLONE_DIR"
+      curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/repository/archive/master.tar.gz \
+        | tar -xz -C "$CLONE_DIR" --strip-components=1
+    else
+      echo "错误：仓库外运行需要 git 或 curl，请先安装其一后重试。" >&2
+      exit 1
+    fi
+  fi
+  exec bash "$CLONE_DIR/bootstrap/linux.sh" "$@"
+fi
 cd "$REPO_ROOT"
 
 FLAKE_TARGET="${1:-xuqihao}"
 TS="$(date +%Y%m%d-%H%M%S)"
 NIX_CONF="$HOME/.config/nix/nix.conf"
 GITHUB_TOKEN_CONF="$HOME/.config/nix/github-access-tokens.conf"
-
-log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
-have() { command -v "$1" >/dev/null 2>&1; }
 
 # ---------------------------------------------------------------------------
 # 1/7 安装 Nix（Determinate Systems 安装器，默认开启 flakes）

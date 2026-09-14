@@ -1,4 +1,4 @@
-# Same software list as standalone, installed system-wide on NixOS.
+# Shared standalone tools; NixOS runtimes come from nixos-base.nix.
 { pkgs, pkgs-stable, pkgs-master, ... }:
 
 {
