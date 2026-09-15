@@ -131,7 +131,15 @@ in
           (mkEntry "magenta" "Media Session" "media")
           (mkEntry "magenta" "Wireless Network" "wifi" // { format = "{ssid}"; })
           (mkEntry "magenta" "Local IP Address" "localip")
-          (mkEntry "magenta" "Public IP Address" "publicip")
+          (
+            # 内置 publicip 仅支持明文 http 且无回退, 在被劫持/重定向的网络上必然失败;
+            # 改用 curl 多级回退兼顾国内外, -m 1 逐级封顶, -f 避免把错误页当成 IP 显示
+            mkEntry "magenta" "Public IP Address" "command"
+            // {
+              keyIcon = "󰩠";
+              text = "curl -fs -m 1 http://ip.3322.net || curl -fs -m 1 http://members.3322.org/dyndns/getip || curl -fs -m 1 https://api.ipify.org";
+            }
+          )
           (mkFoot "magenta")
         ];
       };
