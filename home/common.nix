@@ -37,6 +37,9 @@ in
       hms = if isLinux then "home-manager switch --flake .#xuqihao" else "home-manager switch --flake .#xuqihao-darwin";
       # npm 兜底源（npmmirror 不可用时）：npmr install <pkg>
       npmr = "npm --registry=https://repo.nju.edu.cn/repository/npm/";
+      # 轻量 fastfetch：ff 极简列表（无 packages/publicip 等慢模块）；ffn 无配置默认样式（带 logo）
+      ff = "fastfetch --structure 'title:os:kernel:uptime:shell:cpu:memory:disk'";
+      ffn = "fastfetch -c none";
       shh = "ssh xuqihao@lxlogin.ihep.ac.cn";
       shhfs = "sshfs -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 xuqihao@lxlogin.ihep.ac.cn:/ ~/mnt/juno/";
       afs = "cd ~/mnt/juno/afs/ihep.ac.cn/users/x/xuqihao";
