@@ -3,7 +3,7 @@
 # 跨平台、纯 CLI 的 Home Manager 核心配置。
 # 被 home/default.nix（NixOS）与 home/standalone-{linux,darwin}.nix（非 NixOS）共同导入。
 # 零 GUI 假设：NixOS / WSL / 普通 Linux / macOS 均可运行。
-{ config, pkgs, inputs, lib, ... }:
+{ config, pkgs, inputs, lib, isStandalone, ... }:
 
 let
   isLinux = pkgs.stdenv.hostPlatform.isLinux;
@@ -32,8 +32,6 @@ in
       ll = "eza -l --icons";
       lt = "eza -lT --icons";
       la = "eza -la --icons";
-      # flake target 按平台区分，避免在 macOS 上误激活 Linux 配置（homeDirectory 不同）
-      hms = if isLinux then "home-manager switch --flake .#xuqihao" else "home-manager switch --flake .#xuqihao-darwin";
       # npm 兜底源（npmmirror 不可用时）：npmr install <pkg>
       npmr = "npm --registry=https://repo.nju.edu.cn/repository/npm/";
       # 轻量 fastfetch：ff 极简列表（无 packages/publicip 等慢模块）；ffn 无配置默认样式（带 logo）
@@ -46,6 +44,10 @@ in
       junofs = "cd ~/mnt/juno/junofs/users/xuqihao";
       workfs = "cd ~/mnt/juno/workfs2/juno/xuqihao";
       root = "root -l";
+    } // lib.optionalAttrs isStandalone {
+      # 仅 standalone 模式注入：NixOS（桌面/WSL）走集成 HM + nrs，没有 standalone profile 可切。
+      # flake target 按平台区分，避免在 macOS 上误激活 Linux 配置（homeDirectory 不同）
+      hms = if isLinux then "home-manager switch --flake .#xuqihao" else "home-manager switch --flake .#xuqihao-darwin";
     } // lib.optionalAttrs isLinux {
       # Linux 专用：macOS 上无 nixos-rebuild / distrobox，不注入避免误用
       # nrs 需在仓库根目录下运行：--flake . 按 cwd 解析，attr 自动补 #$(hostname)

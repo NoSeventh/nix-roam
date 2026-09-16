@@ -26,7 +26,7 @@
 - Linux / WSL 上不依赖 root profile 的便携用户环境
 - NixOS 上的 Niri 桌面、GUI 应用、服务与虚拟化配置
 - 面向中国大陆网络的 Nix binary cache 和 npm 镜像配置
-- unstable、stable 与 master 三套 nixpkgs 通道，按软件稳定性选用
+- unstable 与 stable 两套 nixpkgs 通道，按软件稳定性选用
 
 ## 快速开始
 
@@ -185,7 +185,7 @@ nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 
 ```text
 .
-├── flake.nix                   # 双模式 flake 输出与三套 nixpkgs 通道
+├── flake.nix                   # 双模式 flake 输出与两套 nixpkgs 通道（unstable / stable）
 ├── hosts/
 │   ├── nixos/                  # 当前 NixOS 主机入口（机器专属设置）与硬件配置
 │   └── wsl/                    # NixOS-WSL 主机入口
