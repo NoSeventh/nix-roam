@@ -11,7 +11,7 @@
 # cli-dev-{linux,darwin}.nix 文件。
 # 只放"无需 HM 托管 dotfile 的纯命令行工具"。
 # 需要 dotfile 配置的（git/bash/starship/helix/ssh/nixvim/fastfetch）见 home/common.nix。
-{ pkgs, pkgs-stable, pkgs-master, ... }:
+{ pkgs, pkgs-stable, ... }:
 
 with pkgs; [
   # --- 现代基础 CLI ---

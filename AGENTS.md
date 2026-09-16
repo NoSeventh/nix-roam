@@ -32,7 +32,7 @@ This repository defines both NixOS and standalone Home Manager targets; **the ta
 | Existing Nix+HM Linux/WSL | `home-manager switch --flake .#xuqihao` |
 | Remote (no clone) | `home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia.git#xuqihao"` |
 
-Aliases `nrs` / `hms` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`. They are platform-gated there: `hms` picks `.#xuqihao` on Linux and `.#xuqihao-darwin` on macOS (never NixOS-WSL); `nrs` and the distrobox aliases are Linux-only via `lib.optionalAttrs`. `nrs` runs `sudo nixos-rebuild switch --flake .` — the relative path resolves against the current working directory (sudo preserves cwd) and the output attribute is auto-suffixed from the hostname (`.#wsl` on WSL, `.#nixos` on the desktop), so it must be run from a checkout of this repository; running it elsewhere silently falls back to nothing useful (nixos-rebuild-ng only auto-detects `/etc/nixos`, never the cwd). There is no `nrrs` alias. Update flake dependencies with `nix flake update`, review and commit `flake.lock`, then build the affected targets; `nix-channel --update` does not update the lock file.
+Aliases `nrs` / `hms` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`. They are gated there: `hms` is **standalone-only** — injected via `lib.optionalAttrs isStandalone`, where `isStandalone` is passed by the flake (`true` from `mkStandaloneHome`, `false` from `nixosHome`), so NixOS hosts (desktop and WSL) don't get it at all and cannot accidentally activate a standalone profile; on standalone it picks `.#xuqihao` on Linux and `.#xuqihao-darwin` on macOS. `nrs` and the distrobox aliases are Linux-only via `lib.optionalAttrs`. `nrs` runs `sudo nixos-rebuild switch --flake .` — the relative path resolves against the current working directory (sudo preserves cwd) and the output attribute is auto-suffixed from the hostname (`.#wsl` on WSL, `.#nixos` on the desktop), so it must be run from a checkout of this repository; running it elsewhere silently falls back to nothing useful (nixos-rebuild-ng only auto-detects `/etc/nixos`, never the cwd). There is no `nrrs` alias. Update flake dependencies with `nix flake update`, review and commit `flake.lock`, then build the affected targets; `nix-channel --update` does not update the lock file.
 
 **Evaluation CI exists (`.github/workflows/eval.yml`); no build/test framework.** The workflow evaluates the drvPath of all four outputs on pushes (after Gitee → GitHub sync), daily, and manually — it catches upstream option removals but is post-hoc, not a pre-push gate. Build without activation using `nix build --no-link` with the appropriate target:
 
@@ -47,7 +47,7 @@ Aliases `nrs` / `hms` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defi
 The core pattern. `packages/cli-dev.nix` is a **pure function** returning a cross-platform package list, imported in **four** places. Platform-specific packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` guards inside `cli-dev.nix`:
 
 ```
-packages/cli-dev.nix         ({ pkgs, pkgs-stable, pkgs-master, ... }: [ ... ])  cross-platform (platform-conditional inside)
+packages/cli-dev.nix         ({ pkgs, pkgs-stable, ... }: [ ... ])  cross-platform (platform-conditional inside)
         ├── profiles/cli.nix              → environment.systemPackages  (NixOS-WSL)
         ├── modules/desktop/programs.nix  → environment.systemPackages  (system-level, sudo-visible)
         ├── home/standalone-linux.nix     → home.packages               (user-level, non-NixOS Linux)
@@ -78,7 +78,7 @@ GUI HM config stays in `home/default.nix` only — **never** put GUI modules in 
 ## Directory structure
 
 ```
-flake.nix                  # Explicit host/home outputs; pkgsFor creates stable/master per system
+flake.nix                  # Explicit host/home outputs; pkgsFor creates the stable channel per system
 profiles/                  # Explicit shared profiles: nixos-base, desktop, locale, CLI
 hosts/wsl/                 # NixOS-WSL entry, no physical hardware config
 hosts/nixos/               # Current machine entry (host-specific settings) + tracked hardware-configuration.nix
@@ -112,7 +112,7 @@ Both NixOS hosts import their modules explicitly through profiles — `flake.nix
 
 Module function signatures vary. For new edits, declare the parameters you use and retain `...`; some existing headers contain unused parameters. Referenced package sets must be in scope and supplied via module arguments. `modules/fix-network.nix` currently uses `{ ... }:` and only declares settings/imports.
 
-Match the channel to the param you reference: `pkgs-stable` for stable, `pkgs-master` for master, `pkgs` (unstable) for everything else.
+Match the channel to the param you reference: `pkgs-stable` for stable, `pkgs` (unstable) for everything else. There is no `pkgs-master` — the master channel was removed on 2026-09-16 (it had no consumers); reintroduce it in `flake.nix` (`inputs` + `pkgsFor` + `specialArgs`) if ever needed.
 
 Key modules (under `modules/desktop/` unless noted):
 - `programs.nix` — giant GUI + CLI app list. Ends with `++ (import ../../packages/cli-dev.nix {...})`. Platform-conditional packages use `stdenv.hostPlatform.isLinux` guards. Also defines a **wechat overlay**.
@@ -120,13 +120,12 @@ Key modules (under `modules/desktop/` unless noted):
 - `agents.nix` — `hermes-agent` service + AI tools (cursor, claude-code, codex, opencode…). See "Secrets" below.
 - `virtualization.nix` — Docker is the container engine (podman commented out; enable one or the other, never both). `services.nix` keeps rustdesk-server disabled until a real relay host replaces the old `example.com` placeholder.
 
-## Three nixpkgs channels
+## Two nixpkgs channels
 
 - `nixpkgs` (unstable) → `pkgs`
 - `nixpkgs-stable` (nixos-26.05) → `pkgs-stable`
-- `nixpkgs-master` → `pkgs-master` (wired into `specialArgs`; use sparingly)
 
-NixOS provides its own unstable `pkgs`; `mkStandaloneHome` imports unstable for standalone. `pkgsFor` separately instantiates stable/master per system and passes them via `specialArgs` / `extraSpecialArgs`. The `supportedSystems` / `forAllSystems` helper is currently unused; editing that list alone does not add an output. Convention: heavy/stability-sensitive packages (editors, office, toolchains) on `pkgs-stable.`; bleeding-edge stuff on `pkgs`.
+NixOS provides its own unstable `pkgs`; `mkStandaloneHome` imports unstable for standalone. `pkgsFor` separately instantiates stable per system and passes it via `specialArgs` / `extraSpecialArgs`. The `supportedSystems` / `forAllSystems` helper is currently unused; editing that list alone does not add an output. Convention: heavy/stability-sensitive packages (editors, office, toolchains) on `pkgs-stable.`; bleeding-edge stuff on `pkgs`.
 
 ```nix
 environment.systemPackages = with pkgs; [
@@ -173,9 +172,8 @@ Current source values (not a claim that every target builds):
 | Stable, all targets | `flake.nix` → `pkgsFor.stable` | `electron-38.8.4` |
 | Standalone unstable | `flake.nix` → `mkStandaloneHome` | `electron-38.8.4` |
 | NixOS unstable, desktop/WSL | `profiles/nixos-base.nix` | `electron-40.10.5`, `pnpm-10.29.2` |
-| Master | `flake.nix` → `pkgsFor.master` | No explicit allowlist |
 
-These lists currently differ. Add an approved exact package/version exception to every affected instance in both files as needed; do not assume one edit covers all four outputs or expand permissions just to make documentation match. Validate the affected package/target after changing exceptions.
+These lists currently differ. Add an approved exact package/version exception to every affected instance in both files as needed; do not assume one edit covers every output or expand permissions just to make documentation match. Validate the affected package/target after changing exceptions.
 
 `pnpm-10.29.2` on system unstable is referenced only by the desktop closure (GNOME module chain via `services.desktopManager.gnome`); the WSL toplevel derivation is byte-identical without it (verified 2026-09-14). It must still be declared in the shared `profiles/nixos-base.nix`: `nixpkgs.config` merges shallowly across modules, so a second `permittedInsecurePackages` list in `profiles/desktop.nix` would shadow the `electron-40.10.5` entry instead of extending it.
 
@@ -241,6 +239,8 @@ Use `home.sessionVariables.NPM_CONFIG_REGISTRY` and the Bash `npmr` alias, rathe
 - Keep workflow changes on both remotes using local credentials; the built-in token cannot push workflow-file changes. For public repositories, scheduled runs may be delayed and are disabled after 60 days without activity. Operational details: [`.github/SYNC.md`](.github/SYNC.md).
 
 ## Validation boundaries
+
+2026-09-16 repair/cleanup pass on Fedora 44 / WSL2 standalone Nix (offline evaluation): after removing the stale `programs.dms-shell.enableSystemMonitoring` definition (removed upstream in the locked nixpkgs; it had broken desktop evaluation since the 2026-09-14 lock bump), all four outputs evaluate — desktop toplevel (hermes-agent input stubbed locally due to GitHub 429), WSL toplevel, standalone Linux and standalone Darwin activation packages. WSL and standalone Linux drvPaths were byte-identical across the P0/P1 edits, confirming those were semantics-preserving. Changes this pass: rustdesk-server disabled (placeholder relay host), podman commented out (docker stays), niri/hypr dotfiles now deployed via `home/default.nix`, orphan dotfiles deleted, `hms` gated behind `isStandalone`, the unused nixpkgs-master channel removed (flake.nix + flake.lock + all plumbing), plasma6/gnome kept with cosmic commented out. None of this was built or activated; desktop boot, Darwin build and WSL activation remain unverified.
 
 2026-09-14 runtime split validation on NixOS 26.11 / WSL2: WSL system closure and standalone Linux activation package built without activation; standalone Darwin activation derivation and desktop system derivation evaluated. Desktop/WSL Node, pnpm, Python, R and ROOT package paths match exactly. The built WSL profile passed Node/npm/pnpm/uv execution, npm registry queries, all 15 configured Python module imports, and ROOT/R computations through PyROOT/rpy2. After restoring shared C++ ROOT, WSL and standalone Linux were rebuilt and the standalone artifact passed a C++ ROOT computation. This does not verify activation of these edits, a Darwin build, or desktop boot. Desktop full build remains unverified after a QQ source download failure; further QQ diagnosis was skipped and QQ is unchanged at the user's request.
 

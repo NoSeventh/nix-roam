@@ -4,7 +4,6 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     nixpkgs-stable.url = "github:nixos/nixpkgs/nixos-26.05";
-    nixpkgs-master.url = "github:nixos/nixpkgs/master";
 
     # zen-browser = {
     #   url = "github:youwen5/zen-browser-flake";
@@ -65,16 +64,12 @@
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs supportedSystems (system: f system);
 
-      # 按 system 实例化 stable / master
+      # 按 system 实例化 stable
       pkgsFor = system: {
         stable = import nixpkgs-stable {
           inherit system;
           config.allowUnfree = true;
           config.permittedInsecurePackages = [ "electron-38.8.4" ];
-        };
-        master = import inputs.nixpkgs-master {
-          inherit system;
-          config.allowUnfree = true;
         };
       };
 
@@ -89,8 +84,8 @@
         home-manager.users.xuqihao = import homeModule;
         home-manager.extraSpecialArgs = {
           inherit inputs;
+          isStandalone = false;
           pkgs-stable = nixosPkgs.stable;
-          pkgs-master = nixosPkgs.master;
         };
       };
 
@@ -113,8 +108,8 @@
           inherit pkgs;
           extraSpecialArgs = {
             inherit inputs;
+            isStandalone = true;
             pkgs-stable = extra.stable;
-            pkgs-master = extra.master;
           };
           modules = [
             standaloneModule
@@ -134,7 +129,6 @@
         specialArgs = {
           inherit inputs;
           pkgs-stable = nixosPkgs.stable;
-          pkgs-master = nixosPkgs.master;
         };
         # Host entry hosts/nixos pulls in profiles/desktop.nix, which imports
         # the explicit desktop module list under modules/desktop/.
@@ -152,7 +146,6 @@
         specialArgs = {
           inherit inputs;
           pkgs-stable = nixosPkgs.stable;
-          pkgs-master = nixosPkgs.master;
         };
         modules = [
           inputs.nixos-wsl.nixosModules.default

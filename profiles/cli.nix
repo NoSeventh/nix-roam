@@ -1,8 +1,8 @@
 # Shared standalone tools; NixOS runtimes come from nixos-base.nix.
-{ pkgs, pkgs-stable, pkgs-master, ... }:
+{ pkgs, pkgs-stable, ... }:
 
 {
   environment.systemPackages = import ../packages/cli-dev.nix {
-    inherit pkgs pkgs-stable pkgs-master;
+    inherit pkgs pkgs-stable;
   };
 }
