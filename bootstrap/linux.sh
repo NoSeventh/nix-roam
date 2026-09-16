@@ -53,6 +53,18 @@ TS="$(date +%Y%m%d-%H%M%S)"
 NIX_CONF="$HOME/.config/nix/nix.conf"
 GITHUB_TOKEN_CONF="$HOME/.config/nix/github-access-tokens.conf"
 
+# --- 0.7 目标用户守卫 ---
+#     standalone HM 只能为当前用户激活：target 用户名与当前登录用户不符时直接中止，
+#     避免出现「先改了系统 nix 配置、激活阶段才写不进他人 HOME」的半配置状态。
+#     换用户名使用本仓库：改 flake.nix 顶部 username 单点定义，再传对应 target。
+TARGET_USER="${FLAKE_TARGET%-darwin}"
+if [ "$(id -un)" != "$TARGET_USER" ]; then
+  echo "错误：当前用户 $(id -un) 与 flake target ${FLAKE_TARGET} 的用户 ${TARGET_USER} 不一致。" >&2
+  echo "      如需以 $(id -un) 使用本仓库：编辑 flake.nix 顶部 username = \"$(id -un)\"（单点定义），" >&2
+  echo "      然后运行 bash bootstrap/linux.sh $(id -un)。" >&2
+  exit 1
+fi
+
 # ---------------------------------------------------------------------------
 # 1/7 安装 Nix（Determinate Systems 安装器，默认开启 flakes）
 # ---------------------------------------------------------------------------

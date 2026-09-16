@@ -57,6 +57,11 @@
       ...
     }@inputs:
     let
+      # 本地用户名单点定义：换用户名只改这一行。
+      # NixOS users.users.*、home-manager.users.*、standalone 输出名（.#xuqihao / .#xuqihao-darwin）
+      # 与 hms 别名目标均由它派生；远程身份（IHEP 账号、git 邮箱）在 home/common.nix，需单独调整。
+      username = "xuqihao";
+
       # 支持的 system 列表
       supportedSystems = [
         "x86_64-linux"
@@ -81,9 +86,9 @@
       nixosHome = homeModule: {
         home-manager.useGlobalPkgs = true;
         home-manager.useUserPackages = true;
-        home-manager.users.xuqihao = import homeModule;
+        home-manager.users.${username} = import homeModule;
         home-manager.extraSpecialArgs = {
-          inherit inputs;
+          inherit inputs username;
           isStandalone = false;
           pkgs-stable = nixosPkgs.stable;
         };
@@ -93,7 +98,6 @@
       mkStandaloneHome = {
         system,
         homeDirectory,
-        username ? "xuqihao",
         standaloneModule ? ./home/standalone-linux.nix,
       }:
       let
@@ -107,7 +111,7 @@
         home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           extraSpecialArgs = {
-            inherit inputs;
+            inherit inputs username;
             isStandalone = true;
             pkgs-stable = extra.stable;
           };
@@ -127,7 +131,7 @@
       nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
         system = nixosSystem;
         specialArgs = {
-          inherit inputs;
+          inherit inputs username;
           pkgs-stable = nixosPkgs.stable;
         };
         # Host entry hosts/nixos pulls in profiles/desktop.nix, which imports
@@ -144,7 +148,7 @@
       nixosConfigurations.wsl = nixpkgs.lib.nixosSystem {
         system = nixosSystem;
         specialArgs = {
-          inherit inputs;
+          inherit inputs username;
           pkgs-stable = nixosPkgs.stable;
         };
         modules = [
@@ -156,15 +160,15 @@
       };
 
       # --- 2. 非 NixOS 便携 CLI 环境（Home Manager standalone, x86_64-linux） ---
-      homeConfigurations.xuqihao = mkStandaloneHome {
+      homeConfigurations.${username} = mkStandaloneHome {
         system = "x86_64-linux";
-        homeDirectory = "/home/xuqihao";
+        homeDirectory = "/home/${username}";
       };
 
       # --- 3. macOS 预留（aarch64-darwin，仅结构就绪，未实测 build） ---
-      homeConfigurations.xuqihao-darwin = mkStandaloneHome {
+      homeConfigurations."${username}-darwin" = mkStandaloneHome {
         system = "aarch64-darwin";
-        homeDirectory = "/Users/xuqihao";
+        homeDirectory = "/Users/${username}";
         standaloneModule = ./home/standalone-darwin.nix;
       };
     };

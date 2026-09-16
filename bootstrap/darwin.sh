@@ -59,6 +59,18 @@ TS="$(date +%Y%m%d-%H%M%S)"
 NIX_CONF="$HOME/.config/nix/nix.conf"
 GITHUB_TOKEN_CONF="$HOME/.config/nix/github-access-tokens.conf"
 
+# --- 0.7 目标用户守卫 ---
+#     standalone HM 只能为当前用户激活：target 用户名与当前登录用户不符时直接中止，
+#     避免出现「先改了系统 nix 配置、激活阶段才写不进他人 HOME」的半配置状态。
+#     换用户名使用本仓库：改 flake.nix 顶部 username 单点定义，再传对应 target。
+TARGET_USER="${FLAKE_TARGET%-darwin}"
+if [ "$(id -un)" != "$TARGET_USER" ]; then
+  echo "错误：当前用户 $(id -un) 与 flake target ${FLAKE_TARGET} 的用户 ${TARGET_USER} 不一致。" >&2
+  echo "      如需以 $(id -un) 使用本仓库：编辑 flake.nix 顶部 username = \"$(id -un)\"（单点定义），" >&2
+  echo "      然后运行 bash bootstrap/darwin.sh $(id -un)-darwin。" >&2
+  exit 1
+fi
+
 # ---------------------------------------------------------------------------
 # 1/7 安装 Nix（Determinate Systems 安装器，默认开启 flakes）
 # ---------------------------------------------------------------------------
@@ -194,7 +206,7 @@ cat <<EOF
   · 默认 shell 保持 zsh 不变：HM 不接管 ~/.zshrc，激活时已向其追加一段
     hm-session-vars 加载（幂等、可整段删除）；PATH 中 nix 工具优先于 Homebrew 同名命令。
   · starship 提示符与 ll/hms 等别名只对 bash 会话生效，zsh 保持原生提示符；
-    hms 在 macOS 指向 .#xuqihao-darwin。
+    hms 在 macOS 指向 .#${FLAKE_TARGET}。
   · 被接管文件的原版备份在：~/*.bak-${TS} 与 ~/.config/nix/nix.conf.backup
   · ⚠️ programs.ssh 用 enableDefaultConfig=false，新 ~/.ssh/config 只含 HM 定义的 host。
     如果你旧 ssh config（备份在 ~/.ssh/config.bak-${TS}）里还有别的 host，需要手动合并回

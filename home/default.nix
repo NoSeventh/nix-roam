@@ -2,17 +2,17 @@
 #
 # NixOS 模式下的 Home Manager 入口（作为 home-manager.users.<user> 导入）。
 # = common（便携 CLI 核心）+ GUI HM 模块（仅 NixOS 桌面）+ GUI 终端 dotfiles + 用户信息。
-{ ... }:
+{ username, ... }:
 
 {
   imports = [
     ./common.nix
   ];
 
-  # 用户信息（NixOS 固定）
+  # 用户信息（username 由 flake 单点定义，经 specialArgs 注入）
   home = {
-    username = "xuqihao";
-    homeDirectory = "/home/xuqihao";
+    inherit username;
+    homeDirectory = "/home/${username}";
     stateVersion = "26.05";
   };
 

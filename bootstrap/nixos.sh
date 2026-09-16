@@ -210,6 +210,11 @@ else
   git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git "$CLONE_DIR"
 fi
 
+# 目标用户名从仓库单点定义读取（flake.nix 顶部 username），
+# 避免 flake 改了用户名后脚本仍给旧账号设密码。
+NIXOS_USER="$(sed -n 's/^ *username = "\([^"]*\)";/\1/p' "$CLONE_DIR/flake.nix" | head -n 1)"
+: "${NIXOS_USER:=xuqihao}"
+
 # ---------------------------------------------------------------------------
 # 4/7 生成硬件配置（install）/ 对齐 stateVersion（adopt）
 # ---------------------------------------------------------------------------
@@ -267,7 +272,7 @@ fi
 # ---------------------------------------------------------------------------
 if [ "$MODE" = install ]; then
   log "5/7 安装 NixOS（nixos-install → .#nixos）"
-  # 结束时会交互式提示设置 root 密码：保留作 TTY 救急通道，日常登录用 xuqihao
+  # 结束时会交互式提示设置 root 密码：保留作 TTY 救急通道，日常登录用目标用户
   nixos-install --root /mnt --flake "${CLONE_DIR}#nixos"
 else
   log "5/7 切换系统配置（nixos-rebuild switch → .#${TARGET}）"
@@ -276,12 +281,12 @@ fi
 
 # ---------------------------------------------------------------------------
 # 6/7 设置用户密码
-#     仓库配置未给 xuqihao 定义任何密码字段（账号为锁定状态）：
+#     仓库配置未给目标用户定义任何密码字段（账号为锁定状态）：
 #     install 实体机不设置则无法登录 GDM；WSL 免密登录、adopt 沿用既有账号，均跳过。
 # ---------------------------------------------------------------------------
 log "6/7 设置用户密码"
 if [ "$MODE" = install ] && [ "$TARGET" = nixos ]; then
-  nixos-enter --root /mnt -c 'passwd xuqihao'
+  nixos-enter --root /mnt -c "passwd ${NIXOS_USER}"
 else
   echo "    当前场景无需设置（WSL 免密登录；adopt 沿用既有账号），跳过"
 fi
@@ -295,7 +300,7 @@ if [ "$MODE" = install ]; then
 
 完成。拔掉安装介质后 reboot 进入新系统。
 
-  · xuqihao 的登录密码已设置；root 密码在 nixos-install 结尾设置（TTY 救急用）。
+  · ${NIXOS_USER} 的登录密码已设置；root 密码在 nixos-install 结尾设置（TTY 救急用）。
   · hosts/nixos/hardware-configuration.nix 已按本次磁盘重新生成（原版备份在同目录 *.bak-${TS}），
     确认无误后请提交回 Gitee，保持仓库可复现构建。
   · 以后更新配置：cd ${CLONE_DIR} && sudo nixos-rebuild switch --flake .#nixos
@@ -305,7 +310,7 @@ else
 
 完成。系统与集成 Home Manager 已一起切换。
 
-  · 以 xuqihao 注销重登（WSL：从 Windows 重新进入发行版）后，Home Manager 用户配置生效。
+  · 以 ${NIXOS_USER} 注销重登（WSL：从 Windows 重新进入发行版）后，Home Manager 用户配置生效。
   · 原配置目录（若有被替换）备份在：${CLONE_DIR}.bak-${TS}
   · 以后更新配置：cd ${CLONE_DIR} && sudo nixos-rebuild switch --flake .#${TARGET}
 EOF
