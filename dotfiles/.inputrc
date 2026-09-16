@@ -1,7 +1,0 @@
-# 让 ↑/↓ 只匹配已输入的前缀
-"\e[A": history-search-backward   # ↑ 向上搜历史
-"\e[B": history-search-forward    # ↓ 向下搜历史
-
-# 可选：忽略大小写 + 显示所有选项
-set completion-ignore-case on
-set show-all-if-ambiguous on

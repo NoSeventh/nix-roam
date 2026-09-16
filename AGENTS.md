@@ -66,7 +66,7 @@ packages/cli-dev.nix         ({ pkgs, pkgs-stable, pkgs-master, ... }: [ ... ]) 
 |---|---|
 | `home/common.nix` | Cross-platform **CLI-only** HM core (git, bash, starship, helix, ssh, nixvim, fastfetch, btop dotfile). Imported by both modes. **Zero GUI assumptions.** |
 | `home/nixos-cli.nix` | NixOS-WSL HM entry = `common.nix` + user identity. Shared CLI tools installed system-wide by `profiles/cli.nix`; development runtimes by `profiles/nixos-base.nix`. |
-| `home/default.nix` | NixOS entry = `common.nix` + GUI terminals (alacritty/ghostty/fuzzel) + GUI terminal dotfiles (kitty/wezterm). |
+| `home/default.nix` | NixOS entry = `common.nix` + GUI terminals (alacritty/ghostty/fuzzel) + GUI dotfiles (kitty/wezterm terminals; niri/hypr compositor configs). |
 | `home/standalone-linux.nix` | Non-NixOS Linux entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isLinux`. Zero GUI. |
 | `home/standalone-darwin.nix` | macOS entry = `common.nix` + `packages/cli-dev.nix`. Platform-conditional via `stdenv.hostPlatform.isDarwin`. Zero GUI. Keeps zsh native: no `programs.zsh`, never takes over `~/.zshrc`; an idempotent activation script appends a guarded `hm-session-vars.sh` loader so session variables/PATH load in zsh. |
 | `home/nixvim.nix`, `home/fastfetch.nix` | Split sub-configs imported by `common.nix`. |

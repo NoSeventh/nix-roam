@@ -2,7 +2,7 @@
 #
 # NixOS 模式下的 Home Manager 入口（作为 home-manager.users.<user> 导入）。
 # = common（便携 CLI 核心）+ GUI HM 模块（仅 NixOS 桌面）+ GUI 终端 dotfiles + 用户信息。
-{ config, pkgs, pkgs-stable, pkgs-master, inputs, ... }:
+{ ... }:
 
 {
   imports = [
@@ -78,7 +78,7 @@
     };
   };
 
-  # --- GUI 终端 dotfiles（仅 NixOS） ---
+  # --- GUI 终端与合成器 dotfiles（仅 NixOS 桌面） ---
   home.file = {
     ".config/kitty" = {
       source = ../dotfiles/.config/kitty;
@@ -86,6 +86,16 @@
     };
     ".config/wezterm" = {
       source = ../dotfiles/.config/wezterm;
+      recursive = true;
+    };
+    # 主合成器：config.kdl 内 include "./noctalia.kdl" 是相对路径，需整目录部署才能解析
+    ".config/niri" = {
+      source = ../dotfiles/.config/niri;
+      recursive = true;
+    };
+    # Hyprland fallback 会话配置（programs.hyprland 在 modules/desktop/niri.nix 启用）
+    ".config/hypr" = {
+      source = ../dotfiles/.config/hypr;
       recursive = true;
     };
   };
