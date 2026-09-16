@@ -34,7 +34,7 @@ This repository defines both NixOS and standalone Home Manager targets; **the ta
 
 Aliases `nrs` / `hms` and the IHEP/JUNO `ssh`/`sshfs`/distrobox aliases are defined in **`home/common.nix`** (`programs.bash.shellAliases`), not in a root `home.nix`. They are platform-gated there: `hms` picks `.#xuqihao` on Linux and `.#xuqihao-darwin` on macOS (never NixOS-WSL); `nrs` and the distrobox aliases are Linux-only via `lib.optionalAttrs`. `nrs` runs `sudo nixos-rebuild switch --flake .` — the relative path resolves against the current working directory (sudo preserves cwd) and the output attribute is auto-suffixed from the hostname (`.#wsl` on WSL, `.#nixos` on the desktop), so it must be run from a checkout of this repository; running it elsewhere silently falls back to nothing useful (nixos-rebuild-ng only auto-detects `/etc/nixos`, never the cwd). There is no `nrrs` alias. Update flake dependencies with `nix flake update`, review and commit `flake.lock`, then build the affected targets; `nix-channel --update` does not update the lock file.
 
-**No repository test framework.** Build without activation using `nix build --no-link` with the appropriate target:
+**Evaluation CI exists (`.github/workflows/eval.yml`); no build/test framework.** The workflow evaluates the drvPath of all four outputs on pushes (after Gitee → GitHub sync), daily, and manually — it catches upstream option removals but is post-hoc, not a pre-push gate. Build without activation using `nix build --no-link` with the appropriate target:
 
 - Desktop: `.#nixosConfigurations.nixos.config.system.build.toplevel`
 - NixOS-WSL: `.#nixosConfigurations.wsl.config.system.build.toplevel`
@@ -91,7 +91,7 @@ bootstrap/nixos.sh         # NixOS bootstrap: install (live ISO) / adopt (runnin
 bootstrap/gc.sh            # Manual GC with host detection and dry-run
 dotfiles/                  # Raw config files, referenced via ../dotfiles from home/ and modules/
 AGENTS.md                  # Maintained architecture and operating conventions
-.github/workflows/         # Gitee → GitHub synchronization
+.github/workflows/         # Gitee → GitHub synchronization + flake output evaluation CI (eval.yml)
 .github/SYNC.md            # Synchronization operation and limitations
 ```
 
@@ -118,7 +118,7 @@ Key modules (under `modules/desktop/` unless noted):
 - `programs.nix` — giant GUI + CLI app list. Ends with `++ (import ../../packages/cli-dev.nix {...})`. Platform-conditional packages use `stdenv.hostPlatform.isLinux` guards. Also defines a **wechat overlay**.
 - `niri.nix` — Niri (primary) + Hyprland + Sway fallbacks; `dms-shell` enabled as the shell.
 - `agents.nix` — `hermes-agent` service + AI tools (cursor, claude-code, codex, opencode…). See "Secrets" below.
-- `virtualization.nix` — Docker **and** Podman both enabled; don't point both at the same containers.
+- `virtualization.nix` — Docker is the container engine (podman commented out; enable one or the other, never both). `services.nix` keeps rustdesk-server disabled until a real relay host replaces the old `example.com` placeholder.
 
 ## Three nixpkgs channels
 

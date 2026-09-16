@@ -1,0 +1,48 @@
+name: Evaluate flake outputs
+
+# 求值级 CI：不构建、不激活，只验证四个 flake 输出仍然可以求值。
+# 拦截"上游 nixpkgs 删除选项 / 包改名"这类静默断裂（如 2026-09 的
+# programs.dms-shell.enableSystemMonitoring 移除导致桌面输出失效两天无人发现）。
+#
+# 注意（见 .github/SYNC.md）：
+#   - 该 workflow 在 Gitee 同步到 GitHub 之后运行，属于事后报警而非事前拦截；
+#     push 前想本地拦截可运行同样的四条 nix eval。
+#   - workflow 文件变更 GITHUB_TOKEN 推送不了，需用本机凭据同时推 Gitee 与 GitHub。
+
+on:
+  schedule:
+    - cron: '31 3 * * *'
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-flake-outputs
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    if: github.repository == 'NoSeventh/nix-roam'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Evaluate NixOS desktop toplevel
+        run: nix eval --raw .#nixosConfigurations.nixos.config.system.build.toplevel.drvPath
+
+      - name: Evaluate NixOS-WSL toplevel
+        run: nix eval --raw .#nixosConfigurations.wsl.config.system.build.toplevel.drvPath
+
+      - name: Evaluate standalone Linux Home Manager
+        run: nix eval --raw .#homeConfigurations.xuqihao.activationPackage.drvPath
+
+      - name: Evaluate standalone Darwin Home Manager
+        run: nix eval --raw .#homeConfigurations.xuqihao-darwin.activationPackage.drvPath

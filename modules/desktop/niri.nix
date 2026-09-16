@@ -19,7 +19,7 @@
     enable = true;
     # quickshell.package = inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.quickshell;
     systemd.enable = true;
-    enableSystemMonitoring = true;
+    # enableSystemMonitoring 已被 nixpkgs 移除（mkRemovedOptionModule，内置无需额外依赖）
     enableDynamicTheming = true;
     enableAudioWavelength = true;
     enableVPN = true;

@@ -1,12 +1,13 @@
 # virtualization.nix
 {pkgs, pkgs-stable, ...}: {
-  # Only enable either docker or podman -- Not both
+  # 容器引擎二选一：docker 为主（xuqihao 已在 docker 组）；
+  # podman 备选，需要时再启用，勿与 docker 同时开启
   virtualisation = {
     docker = {
       enable = true;
     };
 
-    podman.enable = true;
+    # podman.enable = true;
 
     waydroid.enable = true;
 

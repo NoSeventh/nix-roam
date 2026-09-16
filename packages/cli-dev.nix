@@ -79,7 +79,7 @@ with pkgs; [
   typst
   tinymist
   typstyle
-] ++ lib.optionals stdenv.hostPlatform.isLinux [
+] ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
   # --- Linux-only 包 ---
   pkgs-stable.valgrind
   # C++ ROOT application; PyROOT is configured separately on NixOS.
