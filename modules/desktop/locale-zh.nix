@@ -1,4 +1,4 @@
-{ config, pkgs, pkgs-stable, lib, ... }: {
+{ pkgs-stable, ... }: {
   imports = [ ../../profiles/locale.nix ];
 
   # 输入法配置（Fcitx5）

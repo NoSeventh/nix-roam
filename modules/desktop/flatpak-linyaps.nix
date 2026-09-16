@@ -5,13 +5,14 @@
   services.flatpak.enable = true;
   services.linyaps.enable = true;
 
-  # 2. GNOME && KDE Software 配置（备用）
+  # 2. 桌面环境：niri 主会话（GDM defaultSession），gnome/plasma6 日常保留；
+  #    cosmic 偶尔试验，需要时取消注释
   services.desktopManager.gnome.enable = true;
   services.desktopManager.plasma6.enable = true;
-  services.desktopManager.cosmic = {
-    enable = true;
-    xwayland.enable = true;
-  };
+  # services.desktopManager.cosmic = {
+  #   enable = true;
+  #   xwayland.enable = true;
+  # };
   # services.xserver.desktopManager.xfce.enable = true;
   # services.xserver.desktopManager.mate.enable = true;
   # services.xserver.desktopManager.lxqt.enable = true;

@@ -3,7 +3,7 @@
 # 跨平台、纯 CLI 的 Home Manager 核心配置。
 # 被 home/default.nix（NixOS）与 home/standalone-{linux,darwin}.nix（非 NixOS）共同导入。
 # 零 GUI 假设：NixOS / WSL / 普通 Linux / macOS 均可运行。
-{ config, pkgs, pkgs-stable, pkgs-master, inputs, lib, ... }:
+{ config, pkgs, inputs, lib, ... }:
 
 let
   isLinux = pkgs.stdenv.hostPlatform.isLinux;
@@ -28,7 +28,6 @@ in
   programs.bash = {
     enable = true;
     enableCompletion = true;
-    bashrcExtra = "";
     shellAliases = {
       ll = "eza -l --icons";
       lt = "eza -lT --icons";

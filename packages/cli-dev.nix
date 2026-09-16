@@ -66,7 +66,6 @@ with pkgs; [
   # Node/npm/pnpm and the Python scientific environment are NixOS-only
   # (profiles/nixos-base.nix). Standalone projects manage their own runtimes.
   pkgs-stable.uv
-  # pkgs-master.bun
   pkgs-stable.jq
   opencode
   pi-coding-agent
@@ -79,12 +78,7 @@ with pkgs; [
   typst
   tinymist
   typstyle
-] ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
-  # --- Linux-only 包 ---
-  pkgs-stable.valgrind
-  # C++ ROOT application; PyROOT is configured separately on NixOS.
-  pkgs-stable.root
-] ++ [
+
   # --- AI 开发辅助 CLI ---
   codegraph
   rtk
@@ -95,4 +89,9 @@ with pkgs; [
   pkgs-stable.wget
   pkgs-stable.curl
   pkgs-stable.aria2
+] ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+  # --- Linux-only 包 ---
+  pkgs-stable.valgrind
+  # C++ ROOT application; PyROOT is configured separately on NixOS.
+  pkgs-stable.root
 ]

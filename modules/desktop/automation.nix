@@ -1,4 +1,4 @@
-{ config, pkgs, pkgs-stable, ... }:
+{ pkgs-stable, ... }:
 
 {
   # -------------------------
@@ -7,7 +7,7 @@
   nix.gc = {
     automatic = true;                # 启用自动垃圾回收
     dates = "weekly";                # 执行频率，可用 "daily", "weekly", "monthly" 或具体时间如 "03:15"
-    options = "--delete-older-than 2w";  # 删除超过30天的旧系统世代并回收垃圾
+    options = "--delete-older-than 2w";  # 删除超过 2 周的旧系统世代并回收垃圾
     # 可选：如果你想保留最近的几个版本，可以改为 "--delete-older-than 30d --keep-last 3"
   };
 
@@ -16,7 +16,7 @@
   # -------------------------
   nix.optimise = {
     automatic = true;                # 启用自动存储优化
-    dates = [ "daily" ];            # 每天凌晨3:15执行一次优化（可根据需要调整）
+    dates = [ "daily" ];             # 每日执行一次优化（可根据需要调整）
   };
 
   # -------------------------
