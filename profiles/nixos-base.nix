@@ -1,5 +1,5 @@
 # Shared NixOS foundation for desktop and WSL hosts.
-{ pkgs-stable, ... }:
+{ pkgs-stable, username, ... }:
 
 {
   imports = [
@@ -40,9 +40,9 @@
     })
   ];
 
-  users.users.xuqihao = {
+  users.users.${username} = {
     isNormalUser = true;
-    description = "xuqihao";
+    description = "${username}";
     extraGroups = [ "wheel" ];
   };
 

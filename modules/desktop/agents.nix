@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }:
+{ pkgs, lib, username, ... }:
 
 {
   # ============================================
@@ -23,7 +23,7 @@
   ];
 
   # --- 3. 允许当前用户访问 Hermes 共享状态 ---
-  users.users.xuqihao.extraGroups = lib.mkAfter [ "hermes" ];
+  users.users.${username}.extraGroups = lib.mkAfter [ "hermes" ];
 
   # --- 4. AI 相关工具/IDE ---
   environment.systemPackages = with pkgs; [

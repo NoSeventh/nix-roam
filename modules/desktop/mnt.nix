@@ -1,8 +1,8 @@
-{ pkgs-stable, ... }:
+{ pkgs-stable, username, ... }:
 
 let
-  user = "xuqihao";
-  mountPoint = "/home/xuqihao/mnt/juno";
+  mountPoint = "/home/${username}/mnt/juno";
+  # IHEP 集群账号（远程身份），与本地用户名无关，不随 username 单点定义联动
   remote = "xuqihao@lxlogin.ihep.ac.cn:/";
 in
 {
@@ -11,7 +11,7 @@ in
 
   # 2. 创建挂载点目录（如果不存在）
   systemd.tmpfiles.rules = [
-    "d ${mountPoint} 0755 ${user} users -"
+    "d ${mountPoint} 0755 ${username} users -"
   ];
 
   # 3. 定义用户 systemd 服务

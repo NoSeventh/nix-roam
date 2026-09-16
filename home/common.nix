@@ -3,10 +3,11 @@
 # 跨平台、纯 CLI 的 Home Manager 核心配置。
 # 被 home/default.nix（NixOS）与 home/standalone-{linux,darwin}.nix（非 NixOS）共同导入。
 # 零 GUI 假设：NixOS / WSL / 普通 Linux / macOS 均可运行。
-{ config, pkgs, inputs, lib, isStandalone, ... }:
+{ config, pkgs, inputs, lib, isStandalone, username, ... }:
 
 let
   isLinux = pkgs.stdenv.hostPlatform.isLinux;
+  hmTarget = if isLinux then username else "${username}-darwin";
 in
 {
   imports = [
@@ -46,8 +47,9 @@ in
       root = "root -l";
     } // lib.optionalAttrs isStandalone {
       # 仅 standalone 模式注入：NixOS（桌面/WSL）走集成 HM + nrs，没有 standalone profile 可切。
-      # flake target 按平台区分，避免在 macOS 上误激活 Linux 配置（homeDirectory 不同）
-      hms = if isLinux then "home-manager switch --flake .#xuqihao" else "home-manager switch --flake .#xuqihao-darwin";
+      # target 由 flake.nix 单点定义的 username 派生（Linux .#<user>，macOS .#<user>-darwin，避免误激活另一平台）；
+      # 先校验当前登录用户，不符时明确拒绝，而不是把配置写进别人的 HOME。
+      hms = "if [ \"$(id -un)\" = ${username} ]; then home-manager switch --flake .#${hmTarget}; else echo \"hms: 当前用户是 $(id -un)，不是 ${username}；拒绝切换（本地用户名在 flake.nix 单点定义）\"; false; fi";
     } // lib.optionalAttrs isLinux {
       # Linux 专用：macOS 上无 nixos-rebuild / distrobox，不注入避免误用
       # nrs 需在仓库根目录下运行：--flake . 按 cwd 解析，attr 自动补 #$(hostname)

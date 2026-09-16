@@ -4,7 +4,7 @@
 # To add a new machine: create hosts/<hostname>/ with a default.nix like this
 # one (importing the relevant profiles + ./hardware-configuration.nix), then
 # add a nixosConfigurations.<hostname> output in flake.nix.
-{ pkgs, pkgs-stable, ... }:
+{ pkgs, pkgs-stable, username, ... }:
 
 {
   imports = [
@@ -32,7 +32,7 @@
   };
 
   # --- 4. 用户与安全 ---
-  users.users.xuqihao = {
+  users.users.${username} = {
     extraGroups = [
       "networkmanager"
       "libvirtd"

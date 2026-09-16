@@ -13,7 +13,7 @@
 | NixOS | `nixosConfigurations.nixos` | 保留 | x86_64-linux 完整系统、桌面与服务配置 |
 | macOS | `homeConfigurations.xuqihao-darwin` | 结构就绪、未实测 | aarch64-darwin 纯 CLI 环境 |
 
-> 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。直接复用前，请先搜索 `xuqihao` 并按自己的环境调整。
+> 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。本地用户名在 `flake.nix` 顶部单点定义（`username = "xuqihao"`），换登录名只改这一行——standalone 输出名（`.#xuqihao` / `.#xuqihao-darwin`）、NixOS 用户创建与 `hms` 别名目标都随之联动，`bootstrap/linux.sh`/`darwin.sh` 会在目标用户与当前登录用户不符时直接拒绝。远程 IHEP/JUNO 账号与 git 身份在 `home/common.nix`，需单独调整。直接复用前，请先搜索 `xuqihao` 并按自己的环境核对。
 
 表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；macOS 仅支持 Apple Silicon（aarch64-darwin），Linux 输出为 x86_64-linux。
 

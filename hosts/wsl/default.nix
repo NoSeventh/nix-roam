@@ -1,5 +1,5 @@
 # WSL boot and integration are provided by NixOS-WSL, not PC hardware config.
-{ ... }:
+{ username, ... }:
 
 {
   imports = [
@@ -10,6 +10,6 @@
   networking.hostName = "wsl";
   wsl = {
     enable = true;
-    defaultUser = "xuqihao";
+    defaultUser = username;
   };
 }
