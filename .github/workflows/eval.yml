@@ -1,12 +1,14 @@
 name: Evaluate flake outputs
 
-# 求值级 CI：不构建、不激活，只验证五个 flake 输出仍然可以求值。
-# 拦截"上游 nixpkgs 删除选项 / 包改名"这类静默断裂（如 2026-09 的
-# programs.dms-shell.enableSystemMonitoring 移除导致桌面输出失效两天无人发现）。
+# 求值级 CI + standalone x86_64 构建级：五个 flake 输出验证求值，再实际构建
+# standalone Linux activation package（不激活）。求值拦截"上游 nixpkgs 删除选项 / 包改名"
+# 这类静默断裂（如 2026-09 的 programs.dms-shell.enableSystemMonitoring 移除导致桌面输出
+# 失效两天无人发现）；构建拦截求值发现不了的问题（HM buildEnv 冲突，如 gcc+clang、
+# 双 python3.withPackages —— 历史坑全是构建期错误）。NixOS toplevel 仍只求值（闭包过大）。
 #
 # 注意（见 .github/SYNC.md）：
 #   - 该 workflow 在 Gitee 同步到 GitHub 之后运行，属于事后报警而非事前拦截；
-#     push 前想本地拦截可运行同样的五条 nix eval。
+#     push 前想本地拦截可运行同样的五条 nix eval + 一条 nix build。
 #   - workflow 文件变更 GITHUB_TOKEN 推送不了，需用本机凭据同时推 Gitee 与 GitHub。
 
 on:
@@ -27,10 +29,16 @@ jobs:
   eval:
     if: github.repository == 'NoSeventh/nix-roam'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Free disk space for the standalone build
+        # standalone 闭包含 C++ ROOT + gcc/rust/go 工具链，约 6-8GB；runner 预装项清出余量
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          sudo df -h /
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v16
@@ -49,3 +57,7 @@ jobs:
 
       - name: Evaluate standalone Darwin Home Manager
         run: nix eval --raw .#homeConfigurations.xuqihao-darwin.activationPackage.drvPath
+
+      - name: Build standalone Linux activation package (x86_64)
+        # 唯一能在 x86_64 runner 上直接构建的产物；aarch64 需 ARM 实机，NixOS toplevel 闭包过大
+        run: nix build --no-link .#homeConfigurations.xuqihao.activationPackage
