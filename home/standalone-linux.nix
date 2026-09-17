@@ -20,10 +20,18 @@
   # 不启用 programs.zsh / programs.fish、不接管 rc 文件，只在每次激活时幂等地追加带守卫的
   # 加载段（不改其余内容；不需要时删掉该段即可退出）。bash 登录链（.profile/.bash_profile）
   # 由 HM 自管，不经过这里。
+  # zsh 与 fish 均按「实际使用」门控：登录 shell 是它、或其 rc 文件已存在才追加 ——
+  # 不为没用到的 shell 凭空创建文件，bash-only 机器激活后不留痕。
+  # （darwin 入口不门控 zsh：macOS 默认 shell 就是 zsh。）
   # zsh 可直接 source POSIX 语法的 hm-session-vars.sh；fish 不行 —— 装了 bass 则完整加载，
   # 否则仅把 nix profile 加入 PATH（保证工具可用；完整变量需 bash/zsh 或安装 bass）。
   home.activation.loadHMVarsInZsh = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    if ! grep -qF 'hm-session-vars.sh' "$HOME/.zshrc" 2>/dev/null; then
+    zsh_in_use=0
+    case "''${SHELL:-}" in
+      *zsh) zsh_in_use=1 ;;
+      *) [ -f "$HOME/.zshrc" ] && zsh_in_use=1 ;;
+    esac
+    if [ "$zsh_in_use" = "1" ] && ! grep -qF 'hm-session-vars.sh' "$HOME/.zshrc" 2>/dev/null; then
       if printf '\n# Home Manager session variables (appended by nix-roam; safe to remove)\nif [ -f "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" ]; then\n  . "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"\nfi\n' >> "$HOME/.zshrc" 2>/dev/null; then
         echo "  ~/.zshrc: 已追加 Home Manager 会话环境加载（其余内容未改动）"
       else
@@ -32,8 +40,7 @@
     fi
   '';
 
-  # fish：仅在确实使用 fish 时才动它的配置（登录 shell 是 fish，或 config.fish 已存在），
-  # 不为不存在的 fish 安装凭空创建文件。
+  # fish（门控条件同上：登录 shell 是 fish，或 config.fish 已存在）。
   home.activation.loadHMVarsInFish = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     FISH_CONFIG="$HOME/.config/fish/config.fish"
     fish_in_use=0

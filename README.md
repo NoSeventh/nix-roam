@@ -8,7 +8,7 @@
 
 | 模式 | Flake 输出 | 状态 | 用途 |
 |---|---|---|---|
-| Linux / WSL（x86_64） | `homeConfigurations.xuqihao` | 构建通过；本仓库正在 Ubuntu 26.04 / WSL2 实机运行 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
+| Linux / WSL（x86_64） | `homeConfigurations.xuqihao` | 构建通过；作者的 WSL2 standalone 实机日常在用 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
 | Linux / WSL（aarch64） | `homeConfigurations.xuqihao-aarch64` | 求值通过，未实机构建 | ARM SBC / Asahi 等的纯用户级 CLI 环境 |
 | NixOS-WSL | `nixosConfigurations.wsl` | 构建与运行时冒烟通过，本次改动未激活 | 共享基础 CLI，另加 NixOS 专用开发运行时 |
 | NixOS | `nixosConfigurations.nixos` | 保留 | x86_64-linux 完整系统、桌面与服务配置 |
@@ -16,11 +16,13 @@
 
 > 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。本地用户名在 `flake.nix` 顶部单点定义（`username = "xuqihao"`），换登录名只改这一行——standalone 输出名（`.#xuqihao` / `.#xuqihao-aarch64` / `.#xuqihao-darwin`）、NixOS 用户创建与 `hms` 别名目标都随之联动，`bootstrap/linux.sh`/`darwin.sh` 会在目标用户与当前登录用户不符时直接拒绝。远程 IHEP/JUNO 账号与 git 身份在 `home/common.nix`，需单独调整。直接复用前，请先搜索 `xuqihao` 并按自己的环境核对。
 
-表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；macOS 仅支持 Apple Silicon（aarch64-darwin），standalone Linux 提供 x86_64 与 aarch64 两个显式输出（NixOS 输出仍为 x86_64-linux）。
+表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；具体验证环境（发行版 / 主机）以各条验证记录为准，状态表不钉住易变的发行版名。macOS 仅支持 Apple Silicon（aarch64-darwin），standalone Linux 提供 x86_64 与 aarch64 两个显式输出（NixOS 输出仍为 x86_64-linux）。
 
 2026-09-14 在 NixOS 26.11 / WSL2 验证运行时拆分：WSL 系统闭包与 standalone Linux activation package 构建通过，桌面系统 derivation 与 standalone Darwin activation derivation 求值通过；桌面/WSL 运行时路径一致，WSL 构建产物的 Node/npm/pnpm/uv、15 个 Python 模块导入及通过 PyROOT/rpy2 调用的 ROOT/R 计算通过。恢复共享 C++ ROOT 后重新构建 WSL 与 standalone Linux，并从 standalone 构建产物执行 C++ ROOT 计算通过。未激活本次修改；桌面完整构建曾因 QQ 下载失败中止，按用户要求未继续排查或调整 QQ；未验证桌面启动或 Darwin 构建。
 
-2026-09-17 边界拓展在 Ubuntu 26.04 / WSL2 standalone Nix 实机验证：新增 `xuqihao-aarch64`（aarch64-linux）输出，共享 Linux-only 包在锁定 rev 上确认 aarch64 可用（root 非 broken、在 platforms 内）；`hms` 别名与统一入口 `bootstrap/bootstrap.sh` 按架构自动选择 target；standalone Linux 激活时幂等追加 zsh/fish 会话环境加载段（本机实测生成了带守卫的 `~/.zshrc` 段）；`bootstrap/linux.sh` 增加 WSL1 拒绝、单用户安装分支（无 systemd / 无 sudo 时官方安装器 `--no-daemon`，镜像写用户级 nix.conf）与 HM symlink 跳过守卫。五个输出全部求值通过；nixos/wsl toplevel 与改动前逐字节一致，darwin 输出一致，x86_64 standalone 因 hms 文本与激活块按预期变化。统一入口在本机端到端跑通（非交互会话自动落入单用户分支，实测其幂等守卫；激活为 generation 2）；调度器分支以桩测覆盖（Darwin / WSL1 / 架构 / 非 bash / 显式参数）。未验证：aarch64 实机构建、真实无 root 机器上的单用户安装、macOS。
+2026-09-17 边界拓展在 Ubuntu 26.04 / WSL2 standalone Nix 实机验证：新增 `xuqihao-aarch64`（aarch64-linux）输出，共享 Linux-only 包在锁定 rev 上确认 aarch64 可用（root 非 broken、在 platforms 内）；`hms` 别名与统一入口 `bootstrap/bootstrap.sh` 按架构自动选择 target；standalone Linux 激活时幂等追加 zsh/fish 会话环境加载段（在该 Ubuntu 26.04 distro 实测生成了带守卫的 `~/.zshrc` 段）；`bootstrap/linux.sh` 增加 WSL1 拒绝、单用户安装分支（无 systemd / 无 sudo 时官方安装器 `--no-daemon`，镜像写用户级 nix.conf）与 HM symlink 跳过守卫。五个输出全部求值通过；nixos/wsl toplevel 与改动前逐字节一致，darwin 输出一致，x86_64 standalone 因 hms 文本与激活块按预期变化。统一入口在该 distro 端到端跑通（非交互会话自动落入单用户分支，实测其幂等守卫；激活为 generation 2）；调度器分支以桩测覆盖（Darwin / WSL1 / 架构 / 非 bash / 显式参数）。未验证：aarch64 实机构建、真实无 root 机器上的单用户安装、macOS。
+
+2026-09-17 后续修订在 Fedora 44 / WSL2 standalone Nix 验证：`bootstrap/bootstrap.sh` 补齐执行位（此前误提交为 644，其余脚本均为 755）；zsh 会话环境追加段改为与 fish 同款的「实际使用」门控（登录 shell 是 zsh 或 `~/.zshrc` 已存在才追加），bash-only 的机器激活后不再凭空创建 `~/.zshrc`；验证记录的环境表述规范化（显式注明 distro，状态表不再钉住发行版名——日常在用的 standalone 主机是 Fedora 44 / WSL2，与边界拓展激活测试所用的 Ubuntu 26.04 distro 是两套环境）。五个输出在当前 lock 重新求值通过，bootstrap 脚本全部通过 `bash -n`；带门控的激活块尚未在任何主机实机激活。
 
 ## 主要内容
 
@@ -78,7 +80,7 @@ bash ~/nix-roam/bootstrap/bootstrap.sh
 
 脚本会依次安装 Nix（systemd + sudo → 多用户 Determinate；否则单用户 `--no-daemon`，见一键安装小节）、配置国内缓存（多用户写 `/etc/nix` daemon 信任，单用户写用户级 nix.conf）、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活按架构选择的 target（x86_64 → `xuqihao`，aarch64 → `xuqihao-aarch64`）。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
 
-脚本会跳过部分已完成步骤；Home Manager 已接管配置后，日常更新直接使用 `home-manager switch`（或 `hms` 别名，自动选择当前架构的 target）。激活后打开新登录 shell；原 SSH 配置中需要保留的主机请合并到 `home/common.nix`。登录 shell 不是 bash 时，激活会自动向 `~/.zshrc` / fish 配置幂等追加 HM 会话环境加载段（fish 未装 bass 时仅加 PATH）。
+脚本会跳过部分已完成步骤；Home Manager 已接管配置后，日常更新直接使用 `home-manager switch`（或 `hms` 别名，自动选择当前架构的 target）。激活后打开新登录 shell；原 SSH 配置中需要保留的主机请合并到 `home/common.nix`。实际使用 zsh / fish 时（登录 shell 是它，或对应 rc 文件已存在），激活会幂等追加 HM 会话环境加载段（fish 未装 bass 时仅加 PATH）；bash-only 的机器不会凭空创建这些文件。
 
 ### NixOS 全新安装与迁移
 

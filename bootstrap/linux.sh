@@ -290,7 +290,8 @@ cat <<EOF
   · ⚠️ programs.ssh 用 enableDefaultConfig=false，新 ~/.ssh/config 只含 HM 定义的 host。
     如果你旧 ssh config（备份在 ~/.ssh/config.bak-${TS}）里还有别的 host，需要手动合并回
     home/common.nix 的 programs.ssh。
-  · 登录 shell 若不是 bash：激活时已自动向 ~/.zshrc / fish config 追加带守卫的
-    HM 会话环境加载段（fish 无 bass 时仅加 PATH，完整变量需 bash/zsh 或安装 bass）。
+  · 实际使用 zsh / fish 时（登录 shell 是它，或对应 rc 文件已存在）：激活会幂等追加
+    带守卫的 HM 会话环境加载段（fish 无 bass 时仅加 PATH，完整变量需 bash/zsh 或安装 bass）；
+    bash-only 的机器不会凭空创建这些 rc 文件。
   · 以后更新配置： cd ${REPO_ROOT} && home-manager switch --flake .#${FLAKE_TARGET}
 EOF

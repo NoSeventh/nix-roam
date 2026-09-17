@@ -87,7 +87,7 @@ case "$(uname -s)" in
 
     # 非 bash 登录 shell：信息性提示（zsh/fish 的会话环境由激活脚本自动兜底，见 standalone-linux.nix）
     case "${SHELL:-}" in
-      *zsh|*fish) log "提示：登录 shell 是 ${SHELL##*/}；激活时会自动追加 HM 会话环境加载段" ;;
+      *zsh|*fish) log "提示：登录 shell 是 ${SHELL##*/}；激活时会向对应 rc 文件幂等追加 HM 会话环境加载段" ;;
     esac
 
     log "检测到普通 Linux/WSL（$(uname -m)）→ bootstrap/linux.sh，target 默认 ${DEFAULT_TARGET}"
