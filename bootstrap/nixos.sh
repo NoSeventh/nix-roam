@@ -2,6 +2,7 @@
 # bootstrap/nixos.sh
 #
 # NixOS 侧引导脚本，与 bootstrap/linux.sh（standalone Linux）、bootstrap/darwin.sh（macOS）平行。
+# 统一入口是 bootstrap/bootstrap.sh（自动检测环境后派发；非 root 运行会自动 sudo 拾起本脚本）。
 # 两条链路（自动检测，也可用子命令强制指定）：
 #   install —— NixOS 安装 ISO 中全新安装实体机：
 #       配置镜像 → 可选 token → 克隆仓库 → 生成硬件配置 → nixos-install → 设置用户密码

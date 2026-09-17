@@ -4,6 +4,8 @@
 # 在一台干净的 macOS（Apple Silicon）上，从零搭建 Nix + Home Manager 便携 CLI 环境。
 # 覆盖完整链路：安装 Nix → 配置镜像 → 配置 GitHub token → 开启 flakes → 备份冲突文件 → 安装 HM → 激活。
 #
+# 统一入口是 bootstrap/bootstrap.sh（自动检测环境后派发到本脚本）；本脚本仍可单独运行。
+#
 # 用法（两种等价入口，默认 flake target = xuqihao-darwin，当前用户需可 sudo）：
 #     bash bootstrap/darwin.sh [flake-target]    # 仓库内运行
 #     bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/darwin.sh)
@@ -21,7 +23,7 @@ log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 # --- 0. 平台守卫：仅 macOS / Apple Silicon（flake 只提供 aarch64-darwin 输出） ---
-[ "$(uname -s)" = "Darwin" ] || { echo "错误：此脚本仅用于 macOS；普通 Linux/WSL 请用 bootstrap/linux.sh。" >&2; exit 1; }
+[ "$(uname -s)" = "Darwin" ] || { echo "错误：此脚本仅用于 macOS；普通 Linux/WSL 请用 bootstrap/linux.sh（或统一入口 bootstrap/bootstrap.sh）。" >&2; exit 1; }
 [ "$(uname -m)" = "arm64" ] || { echo "错误：flake 仅提供 aarch64-darwin 输出，不支持 Intel Mac。" >&2; exit 1; }
 
 # --- 0.5 仓库定位 / 自取 ---
