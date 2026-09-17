@@ -14,7 +14,7 @@
 | NixOS | `nixosConfigurations.nixos` | 保留 | x86_64-linux 完整系统、桌面与服务配置 |
 | macOS | `homeConfigurations.xuqihao-darwin` | 结构就绪、未实测 | aarch64-darwin 纯 CLI 环境 |
 
-> 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。本地用户名在 `flake.nix` 顶部单点定义（`username = "xuqihao"`），换登录名只改这一行——standalone 输出名（`.#xuqihao` / `.#xuqihao-aarch64` / `.#xuqihao-darwin`）、NixOS 用户创建与 `hms` 别名目标都随之联动，`bootstrap/linux.sh`/`darwin.sh` 会在目标用户与当前登录用户不符时直接拒绝。远程 IHEP/JUNO 账号与 git 身份在 `home/common.nix`，需单独调整。直接复用前，请先搜索 `xuqihao` 并按自己的环境核对。
+> 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。本地用户名在仓库根 `meta.json` 单点定义（`"username": "xuqihao"`），换登录名只改这一行——standalone 输出名（`.#xuqihao` / `.#xuqihao-aarch64` / `.#xuqihao-darwin`）、NixOS 用户创建、`hms` 函数目标与 bootstrap 默认 target 都随之联动；`bootstrap/linux.sh`/`darwin.sh` 会在目标用户与当前登录用户不符时直接拒绝，脚本解析不到 username 时也会明确报错而非回落默认值。远程 IHEP/JUNO 账号与 git 身份在 `home/common.nix`，需单独调整。直接复用前，请先搜索 `xuqihao` 并按自己的环境核对。
 
 表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；具体验证环境（发行版 / 主机）以各条验证记录为准，状态表不钉住易变的发行版名。macOS 仅支持 Apple Silicon（aarch64-darwin），standalone Linux 提供 x86_64 与 aarch64 两个显式输出（NixOS 输出仍为 x86_64-linux）。
 
@@ -93,7 +93,7 @@ curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/ni
 bash nixos.sh install
 ```
 
-脚本会配置国内镜像、可选配置 GitHub token、克隆仓库到 `/mnt/etc/nixos`、按当前磁盘重新生成 `hosts/nixos/hardware-configuration.nix`（原版备份在同目录）、执行 `nixos-install` 并设置 `xuqihao` 的登录密码；分区与格式化不在脚本职责内。
+脚本会配置国内镜像、可选配置 GitHub token、克隆仓库到 `/mnt/etc/nixos`、按当前磁盘重新生成 `hosts/nixos/hardware-configuration.nix`（原版备份在同目录）、执行 `nixos-install` 并为 `meta.json` 定义的本地用户设置登录密码；分区与格式化不在脚本职责内。
 
 在已运行的 NixOS 或刚按官方文档导入的 NixOS-WSL 上迁移到本仓库（未克隆仓库时用一键安装小节的对应命令）：
 
@@ -123,7 +123,7 @@ sudo nixos-rebuild switch --flake .#wsl
 
 刚导入的发行版也可以直接运行 `sudo bash bootstrap/nixos.sh`：脚本会识别 WSL 走 adopt 链路，完成克隆与切换。全新导入的发行版连 curl 都没有，直接用一键安装小节的最后一条命令（先经 `nixpkgs` 通道装 curl，下载后以 root 运行）。
 
-默认用户为 `xuqihao`，主机名为 `wsl`。系统和 Home Manager 一起激活，无需另外运行 `home-manager switch` 或 `bootstrap/linux.sh`。首次接入已有系统时保留该系统原有的 `system.stateVersion`，必要时在主机入口用 `lib.mkForce` 覆盖共享值。
+默认用户由 `meta.json` 的 username 定义（当前为 `xuqihao`），主机名为 `wsl`。系统和 Home Manager 一起激活，无需另外运行 `home-manager switch` 或 `bootstrap/linux.sh`。首次接入已有系统时保留该系统原有的 `system.stateVersion`，必要时在主机入口用 `lib.mkForce` 覆盖共享值。
 
 该入口复用 `packages/cli-dev.nix` 和 `home/common.nix`：裸 CLI 工具系统级安装，用户配置由集成的 Home Manager 管理。基础 CLI 与 standalone 对齐，保留清单中的 mpv、C++ ROOT 等工具；此外通过 `profiles/nixos-base.nix` 与 NixOS 桌面共享 Node/npm/pnpm、Python 科学计算环境（含 PyROOT）及 R。WSL 适配使用 NixOS-WSL 模块，不导入实体机硬件配置，也不自动加载桌面模块、数据库、容器服务、Hermes 服务或远程挂载。
 
@@ -190,11 +190,14 @@ nix build --no-link .#nixosConfigurations.nixos.config.system.build.toplevel
 nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 ```
 
+GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五条求值之外，还会实际构建 x86_64 standalone activation package——求值拦不住的 Home Manager buildEnv 冲突（如 gcc+clang、双 `python3.withPackages`）在这一层才会暴露。它在 Gitee 同步之后运行，属于事后报警而非 push 前拦截；NixOS toplevel 与 aarch64 仍只做求值。按日期的验证记录见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
+
 ## 目录结构
 
 ```text
 .
 ├── flake.nix                   # 双模式 flake 输出与两套 nixpkgs 通道（unstable / stable）
+├── meta.json                   # 本地用户名单点定义（flake 与 bootstrap 脚本共读）
 ├── hosts/
 │   ├── nixos/                  # 当前 NixOS 主机入口（机器专属设置）与硬件配置
 │   └── wsl/                    # NixOS-WSL 主机入口
@@ -215,6 +218,7 @@ nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 │   ├── nixos.sh                # NixOS 全新安装 / 迁移引导脚本（install / adopt）
 │   └── gc.sh                   # 跨平台手动垃圾回收
 ├── dotfiles/                   # Home Manager 引用的原始配置文件
+├── docs/VALIDATION.md          # 按日期记录的验证边界（验证到求值 / 构建 / 激活哪一层）
 ├── .github/                    # GitHub 同步工作流与操作说明
 └── AGENTS.md                   # 架构决策与维护约定
 ```
