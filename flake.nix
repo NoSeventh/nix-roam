@@ -57,26 +57,28 @@
       ...
     }@inputs:
     let
-      # 本地用户名单点定义：换用户名只改这一行。
-      # NixOS users.users.*、home-manager.users.*、standalone 输出名（.#xuqihao / .#xuqihao-aarch64 / .#xuqihao-darwin）
-      # 与 hms 别名目标均由它派生；远程身份（IHEP 账号、git 邮箱）在 home/common.nix，需单独调整。
-      username = "xuqihao";
+      # 本地用户名单点定义：仓库根 meta.json（bootstrap 脚本在装 Nix 之前也要读，不能只放 Nix 表达式里）。
+      # 换用户名只改 meta.json 一行。NixOS users.users.*、home-manager.users.*、standalone 输出名
+      # （.#xuqihao / .#xuqihao-aarch64 / .#xuqihao-darwin）与 hms 别名目标均由它派生；
+      # 远程身份（IHEP 账号、git 邮箱）在 home/common.nix，需单独调整。
+      username = (builtins.fromJSON (builtins.readFile ./meta.json)).username;
 
-      # 支持的 system 列表（forAllSystems 目前无消费者，仅作清单；standalone Linux 按 arch 拆两个显式输出）
-      supportedSystems = [
-        "x86_64-linux"
-        "aarch64-linux"
-        "aarch64-darwin"
-      ];
-      forAllSystems = f: nixpkgs.lib.genAttrs supportedSystems (system: f system);
+      # 共享 stateVersion 单点定义（home.stateVersion 与 system.stateVersion 同值）；
+      # 被采纳的老主机可在 hosts/<hostname>/ 入口用 mkForce 保留原值。
+      stateVersion = "26.05";
 
-      # 按 system 实例化 stable
+      # unstable / stable 实例共用的 nixpkgs config。NixOS unstable 实例的 insecure 列表另在
+      # profiles/nixos-base.nix 声明 —— 那是另一实例的刻意差异，不做合并扩权。
+      # （2026-09-17 验证后移除了此处的 electron-38.8.4：五个输出求值 + standalone 构建均不引用；
+      #   若日后 lock 更新再次需要，在此重新添加即可。）
+      nixpkgsConfig = {
+        allowUnfree = true;
+      };
+
+      # 按 system 实例化 unstable 与 stable
       pkgsFor = system: {
-        stable = import nixpkgs-stable {
-          inherit system;
-          config.allowUnfree = true;
-          config.permittedInsecurePackages = [ "electron-38.8.4" ];
-        };
+        unstable = import nixpkgs { inherit system; config = nixpkgsConfig; };
+        stable = import nixpkgs-stable { inherit system; config = nixpkgsConfig; };
       };
 
       # NixOS 仍固定 x86_64-linux
@@ -89,7 +91,7 @@
         home-manager.useUserPackages = true;
         home-manager.users.${username} = import homeModule;
         home-manager.extraSpecialArgs = {
-          inherit inputs username;
+          inherit inputs username stateVersion;
           isStandalone = false;
           pkgs-stable = nixosPkgs.stable;
         };
@@ -102,26 +104,20 @@
         standaloneModule ? ./home/standalone-linux.nix,
       }:
       let
-        pkgs = import nixpkgs {
-          inherit system;
-          config.allowUnfree = true;
-          config.permittedInsecurePackages = [ "electron-38.8.4" ];
-        };
-        extra = pkgsFor system;
+        channels = pkgsFor system;
       in
         home-manager.lib.homeManagerConfiguration {
-          inherit pkgs;
+          pkgs = channels.unstable;
           extraSpecialArgs = {
             inherit inputs username;
             isStandalone = true;
-            pkgs-stable = extra.stable;
+            pkgs-stable = channels.stable;
           };
           modules = [
             standaloneModule
             {
               home = {
-                inherit username homeDirectory;
-                stateVersion = "26.05";
+                inherit username homeDirectory stateVersion;
               };
             }
           ];
@@ -132,7 +128,7 @@
       nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
         system = nixosSystem;
         specialArgs = {
-          inherit inputs username;
+          inherit inputs username stateVersion;
           pkgs-stable = nixosPkgs.stable;
         };
         # Host entry hosts/nixos pulls in profiles/desktop.nix, which imports
@@ -149,7 +145,7 @@
       nixosConfigurations.wsl = nixpkgs.lib.nixosSystem {
         system = nixosSystem;
         specialArgs = {
-          inherit inputs username;
+          inherit inputs username stateVersion;
           pkgs-stable = nixosPkgs.stable;
         };
         modules = [

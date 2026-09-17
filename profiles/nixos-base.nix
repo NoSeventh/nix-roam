@@ -1,5 +1,5 @@
 # Shared NixOS foundation for desktop and WSL hosts.
-{ pkgs-stable, username, ... }:
+{ pkgs-stable, username, stateVersion, ... }:
 
 {
   imports = [
@@ -55,5 +55,6 @@
     "pnpm-10.29.2"
   ];
 
-  system.stateVersion = "26.05";
+  # 单点定义在 flake.nix 顶层 let，经 specialArgs 注入；被采纳的老主机在 hosts/<hostname>/ 用 mkForce 保留原值
+  system.stateVersion = stateVersion;
 }

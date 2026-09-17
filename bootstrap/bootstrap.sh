@@ -73,9 +73,9 @@ case "$(uname -s)" in
         ;;
     esac
 
-    # 架构 → 默认 target（用户名读 flake.nix 单点定义；显式传参优先）
-    FLAKE_USER="$(sed -n 's/^ *username = "\([^"]*\)";/\1/p' "$REPO_ROOT/flake.nix" | head -n 1)"
-    FLAKE_USER="${FLAKE_USER:-xuqihao}"
+    # 架构 → 默认 target（用户名读 meta.json 单点定义；显式传参优先）
+    FLAKE_USER="$(sed -n 's/.*"username": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
+    [ -n "$FLAKE_USER" ] || { echo "错误：无法从 meta.json 解析 username（文件缺失或格式变化）。" >&2; exit 1; }
     case "$(uname -m)" in
       x86_64)        DEFAULT_TARGET="$FLAKE_USER" ;;
       aarch64|arm64) DEFAULT_TARGET="$FLAKE_USER-aarch64" ;;

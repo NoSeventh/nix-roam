@@ -66,10 +66,10 @@ fi
 cd "$REPO_ROOT"
 
 # --- 0.6 默认 target 按架构 ---
-#     用户名读取 flake.nix 顶部单点定义（与 nixos.sh 同法）；默认 target：
+#     用户名读取 meta.json 单点定义（与 nixos.sh 同法）；默认 target：
 #     x86_64 → <username>，aarch64 → <username>-aarch64；显式传参可覆盖。
-FLAKE_USER="$(sed -n 's/^ *username = "\([^"]*\)";/\1/p' "$REPO_ROOT/flake.nix" | head -n 1)"
-FLAKE_USER="${FLAKE_USER:-xuqihao}"
+FLAKE_USER="$(sed -n 's/.*"username": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
+[ -n "$FLAKE_USER" ] || { echo "错误：无法从 meta.json 解析 username（文件缺失或格式变化）。" >&2; exit 1; }
 case "$(uname -m)" in
   x86_64)        DEFAULT_TARGET="$FLAKE_USER" ;;
   aarch64|arm64) DEFAULT_TARGET="$FLAKE_USER-aarch64" ;;
@@ -87,11 +87,11 @@ GITHUB_TOKEN_CONF="$HOME/.config/nix/github-access-tokens.conf"
 # --- 0.7 目标用户守卫 ---
 #     standalone HM 只能为当前用户激活：target 用户名与当前登录用户不符时直接中止，
 #     避免出现「先改了系统 nix 配置、激活阶段才写不进他人 HOME」的半配置状态。
-#     换用户名使用本仓库：改 flake.nix 顶部 username 单点定义，再传对应 target。
+#     换用户名使用本仓库：改 meta.json 的 username 单点定义，再传对应 target。
 TARGET_USER="$(printf '%s' "$FLAKE_TARGET" | sed -E 's/-(aarch64|darwin)$//')"
 if [ "$(id -un)" != "$TARGET_USER" ]; then
   echo "错误：当前用户 $(id -un) 与 flake target ${FLAKE_TARGET} 的用户 ${TARGET_USER} 不一致。" >&2
-  echo "      如需以 $(id -un) 使用本仓库：编辑 flake.nix 顶部 username = \"$(id -un)\"（单点定义），" >&2
+  echo "      如需以 $(id -un) 使用本仓库：编辑 meta.json 的 username 为 \"$(id -un)\"（单点定义），" >&2
   echo "      然后运行 bash bootstrap/linux.sh $(id -un)。" >&2
   exit 1
 fi
