@@ -211,10 +211,10 @@ else
   git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git "$CLONE_DIR"
 fi
 
-# 目标用户名从仓库单点定义读取（flake.nix 顶部 username），
-# 避免 flake 改了用户名后脚本仍给旧账号设密码。
-NIXOS_USER="$(sed -n 's/^ *username = "\([^"]*\)";/\1/p' "$CLONE_DIR/flake.nix" | head -n 1)"
-: "${NIXOS_USER:=xuqihao}"
+# 目标用户名从仓库单点定义读取（meta.json 的 username），
+# 避免 flake 改了用户名后脚本仍给旧账号设密码。解析失败直接中止，不回落到硬编码默认值。
+NIXOS_USER="$(sed -n 's/.*"username": *"\([^"]*\)".*/\1/p' "$CLONE_DIR/meta.json" | head -n 1)"
+[ -n "$NIXOS_USER" ] || die "无法从 meta.json 解析 username（文件缺失或格式变化）。"
 
 # ---------------------------------------------------------------------------
 # 4/7 生成硬件配置（install）/ 对齐 stateVersion（adopt）
