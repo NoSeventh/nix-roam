@@ -58,13 +58,14 @@
     }@inputs:
     let
       # 本地用户名单点定义：换用户名只改这一行。
-      # NixOS users.users.*、home-manager.users.*、standalone 输出名（.#xuqihao / .#xuqihao-darwin）
+      # NixOS users.users.*、home-manager.users.*、standalone 输出名（.#xuqihao / .#xuqihao-aarch64 / .#xuqihao-darwin）
       # 与 hms 别名目标均由它派生；远程身份（IHEP 账号、git 邮箱）在 home/common.nix，需单独调整。
       username = "xuqihao";
 
-      # 支持的 system 列表
+      # 支持的 system 列表（forAllSystems 目前无消费者，仅作清单；standalone Linux 按 arch 拆两个显式输出）
       supportedSystems = [
         "x86_64-linux"
+        "aarch64-linux"
         "aarch64-darwin"
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs supportedSystems (system: f system);
@@ -159,9 +160,16 @@
         ];
       };
 
-      # --- 2. 非 NixOS 便携 CLI 环境（Home Manager standalone, x86_64-linux） ---
+      # --- 2. 非 NixOS 便携 CLI 环境（Home Manager standalone，Linux 双架构显式输出） ---
       homeConfigurations.${username} = mkStandaloneHome {
         system = "x86_64-linux";
+        homeDirectory = "/home/${username}";
+      };
+
+      # aarch64 Linux（ARM SBC / Asahi 等）：同一入口模块、同一包列表，仅 system 不同。
+      # 共享列表的 Linux-only 包已在锁定 rev 上确认 aarch64-linux 可用（root 非 broken、在 platforms 内）。
+      homeConfigurations."${username}-aarch64" = mkStandaloneHome {
+        system = "aarch64-linux";
         homeDirectory = "/home/${username}";
       };
 

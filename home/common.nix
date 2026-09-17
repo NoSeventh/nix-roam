@@ -7,7 +7,12 @@
 
 let
   isLinux = pkgs.stdenv.hostPlatform.isLinux;
-  hmTarget = if isLinux then username else "${username}-darwin";
+  # standalone 输出名按求值目标架构派生：Linux 双架构显式输出 + macOS。
+  # hms 别名据此自动选 target，aarch64 机器上裸敲 hms 同样正确（→ .#xuqihao-aarch64）。
+  hmTarget =
+    if isLinux
+    then (if pkgs.stdenv.hostPlatform.isAarch64 then "${username}-aarch64" else username)
+    else "${username}-darwin";
 in
 {
   imports = [

@@ -8,16 +8,19 @@
 
 | 模式 | Flake 输出 | 状态 | 用途 |
 |---|---|---|---|
-| Linux / WSL | `homeConfigurations.xuqihao` | 本次构建通过，未激活 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
+| Linux / WSL（x86_64） | `homeConfigurations.xuqihao` | 构建通过；本仓库正在 Ubuntu 26.04 / WSL2 实机运行 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
+| Linux / WSL（aarch64） | `homeConfigurations.xuqihao-aarch64` | 求值通过，未实机构建 | ARM SBC / Asahi 等的纯用户级 CLI 环境 |
 | NixOS-WSL | `nixosConfigurations.wsl` | 构建与运行时冒烟通过，本次改动未激活 | 共享基础 CLI，另加 NixOS 专用开发运行时 |
 | NixOS | `nixosConfigurations.nixos` | 保留 | x86_64-linux 完整系统、桌面与服务配置 |
 | macOS | `homeConfigurations.xuqihao-darwin` | 结构就绪、未实测 | aarch64-darwin 纯 CLI 环境 |
 
-> 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。本地用户名在 `flake.nix` 顶部单点定义（`username = "xuqihao"`），换登录名只改这一行——standalone 输出名（`.#xuqihao` / `.#xuqihao-darwin`）、NixOS 用户创建与 `hms` 别名目标都随之联动，`bootstrap/linux.sh`/`darwin.sh` 会在目标用户与当前登录用户不符时直接拒绝。远程 IHEP/JUNO 账号与 git 身份在 `home/common.nix`，需单独调整。直接复用前，请先搜索 `xuqihao` 并按自己的环境核对。
+> 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。本地用户名在 `flake.nix` 顶部单点定义（`username = "xuqihao"`），换登录名只改这一行——standalone 输出名（`.#xuqihao` / `.#xuqihao-aarch64` / `.#xuqihao-darwin`）、NixOS 用户创建与 `hms` 别名目标都随之联动，`bootstrap/linux.sh`/`darwin.sh` 会在目标用户与当前登录用户不符时直接拒绝。远程 IHEP/JUNO 账号与 git 身份在 `home/common.nix`，需单独调整。直接复用前，请先搜索 `xuqihao` 并按自己的环境核对。
 
-表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；macOS 仅支持 Apple Silicon（aarch64-darwin），Linux 输出为 x86_64-linux。
+表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；macOS 仅支持 Apple Silicon（aarch64-darwin），standalone Linux 提供 x86_64 与 aarch64 两个显式输出（NixOS 输出仍为 x86_64-linux）。
 
 2026-09-14 在 NixOS 26.11 / WSL2 验证运行时拆分：WSL 系统闭包与 standalone Linux activation package 构建通过，桌面系统 derivation 与 standalone Darwin activation derivation 求值通过；桌面/WSL 运行时路径一致，WSL 构建产物的 Node/npm/pnpm/uv、15 个 Python 模块导入及通过 PyROOT/rpy2 调用的 ROOT/R 计算通过。恢复共享 C++ ROOT 后重新构建 WSL 与 standalone Linux，并从 standalone 构建产物执行 C++ ROOT 计算通过。未激活本次修改；桌面完整构建曾因 QQ 下载失败中止，按用户要求未继续排查或调整 QQ；未验证桌面启动或 Darwin 构建。
+
+2026-09-17 边界拓展在 Ubuntu 26.04 / WSL2 standalone Nix 实机验证：新增 `xuqihao-aarch64`（aarch64-linux）输出，共享 Linux-only 包在锁定 rev 上确认 aarch64 可用（root 非 broken、在 platforms 内）；`hms` 别名与统一入口 `bootstrap/bootstrap.sh` 按架构自动选择 target；standalone Linux 激活时幂等追加 zsh/fish 会话环境加载段（本机实测生成了带守卫的 `~/.zshrc` 段）；`bootstrap/linux.sh` 增加 WSL1 拒绝、单用户安装分支（无 systemd / 无 sudo 时官方安装器 `--no-daemon`，镜像写用户级 nix.conf）与 HM symlink 跳过守卫。五个输出全部求值通过；nixos/wsl toplevel 与改动前逐字节一致，darwin 输出一致，x86_64 standalone 因 hms 文本与激活块按预期变化。统一入口在本机端到端跑通（非交互会话自动落入单用户分支，实测其幂等守卫；激活为 generation 2）；调度器分支以桩测覆盖（Darwin / WSL1 / 架构 / 非 bash / 显式参数）。未验证：aarch64 实机构建、真实无 root 机器上的单用户安装、macOS。
 
 ## 主要内容
 
@@ -32,23 +35,21 @@
 
 ### 一键安装（无需克隆）
 
-按目标机器场景任选一条复制运行，执行的都是下文各节详述的同一个引导脚本：
+所有场景共用一条命令 —— `bootstrap/bootstrap.sh` 是统一入口，自动检测环境（macOS / NixOS / NixOS-WSL / 普通 Linux / WSL、x86_64 / aarch64、有无 systemd 与 sudo、登录 shell）并派发到对应引导链路，参数原样透传：
 
 ```bash
-# 全新普通 Linux / WSL（自动把仓库取到 ~/nix-roam，CLONE_DIR 环境变量可覆盖）
-bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/linux.sh)
-
-# 全新 macOS（Apple Silicon）
-bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/darwin.sh)
-
-# 已运行的 NixOS / NixOS-WSL（自动检测 adopt 与 flake 目标）
-curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/nixos.sh -o /tmp/nixos.sh && sudo bash /tmp/nixos.sh
-
-# 刚导入、默认以 root 进入且未装任何工具的 NixOS-WSL
-nix-env -f '<nixpkgs>' -iA curl && curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/nixos.sh -o /tmp/nixos.sh && bash /tmp/nixos.sh
+bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/bootstrap.sh)
 ```
 
-`bash <(...)` 的写法保留终端交互（可直接粘贴 GitHub token）；换成 `curl ... | bash` 也能运行，但会跳过 token 提示。NixOS 侧先下载再 `sudo bash`，是因为 sudo 会关闭继承的文件描述符，`sudo bash <(curl ...)` 不可靠。
+普通 Linux / WSL 上会自动把仓库取到 `~/nix-roam`（`CLONE_DIR` 环境变量可覆盖；无 git 时退到 Gitee 压缩包）再执行；NixOS 链路需要 root，非 root 运行入口会自动 `sudo` 拾起；standalone Linux 的 flake target 按架构自动选择（x86_64 → `xuqihao`，aarch64 → `xuqihao-aarch64`）。有 systemd + sudo 时走多用户 Determinate 安装（镜像信任写 `/etc/nix`）；无 systemd 或无 sudo 时走单用户安装（官方安装器 `--no-daemon`，镜像写用户级 nix.conf；`/nix` 前缀仍需一次性 root 创建，脚本会给出管理员命令）。WSL1 不受支持，会明确报错。
+
+`bash <(...)` 的写法保留终端交互（可直接粘贴 GitHub token，sudo 密码提示同理）；换成 `curl ... | bash` 也能运行，但会跳过 token 提示。刚导入、默认以 root 进入且连 curl 都没有的 NixOS-WSL：
+
+```bash
+nix-env -f '<nixpkgs>' -iA curl && curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/bootstrap.sh -o /tmp/bootstrap.sh && bash /tmp/bootstrap.sh
+```
+
+（下载后再运行而不是 `sudo bash <(curl ...)`，是因为 sudo 会关闭继承的文件描述符。）
 
 ### 已安装 Nix 和 Home Manager
 
@@ -72,12 +73,12 @@ home-manager switch --flake .#xuqihao
 
 ```bash
 git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git ~/nix-roam
-bash ~/nix-roam/bootstrap/linux.sh
+bash ~/nix-roam/bootstrap/bootstrap.sh
 ```
 
-脚本会依次安装 Nix、配置国内缓存信任、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活 `xuqihao` 配置。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
+脚本会依次安装 Nix（systemd + sudo → 多用户 Determinate；否则单用户 `--no-daemon`，见一键安装小节）、配置国内缓存（多用户写 `/etc/nix` daemon 信任，单用户写用户级 nix.conf）、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活按架构选择的 target（x86_64 → `xuqihao`，aarch64 → `xuqihao-aarch64`）。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
 
-脚本会跳过部分已完成步骤；Home Manager 已接管配置后，日常更新直接使用 `home-manager switch`。激活后打开新登录 shell；原 SSH 配置中需要保留的主机请合并到 `home/common.nix`。
+脚本会跳过部分已完成步骤；Home Manager 已接管配置后，日常更新直接使用 `home-manager switch`（或 `hms` 别名，自动选择当前架构的 target）。激活后打开新登录 shell；原 SSH 配置中需要保留的主机请合并到 `home/common.nix`。登录 shell 不是 bash 时，激活会自动向 `~/.zshrc` / fish 配置幂等追加 HM 会话环境加载段（fish 未装 bass 时仅加 PATH）。
 
 ### NixOS 全新安装与迁移
 
@@ -142,7 +143,7 @@ bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/boots
 home-manager switch --flake .#xuqihao-darwin
 ```
 
-这个入口只管理用户 CLI 环境，不管理 macOS 系统服务和 GUI，也不安装 nix-darwin；不要运行 Linux 引导脚本。flake 仅提供 aarch64-darwin 输出，Intel Mac 不受支持。
+这个入口只管理用户 CLI 环境，不管理 macOS 系统服务和 GUI，也不安装 nix-darwin；不要运行 Linux 引导脚本（统一入口 `bootstrap/bootstrap.sh` 会自动派发，无需手动区分）。flake 仅提供 aarch64-darwin 输出，Intel Mac 不受支持。
 
 该配置尊重 macOS 惯用用法：不改默认 shell，也不接管 `~/.zshrc`——首次激活只会向其追加一段幂等的 Home Manager 环境加载（会话变量与 PATH，可整段删除），zsh 的提示符和其余配置保持原生；starship 提示符和 bash 别名只影响 bash 会话，其中 `hms` 在 macOS 指向 `.#xuqihao-darwin`。与 Homebrew 共存时，PATH 中 nix 提供的工具优先于同名 brew 命令。
 
@@ -163,7 +164,7 @@ bash bootstrap/gc.sh --all            # 清理全部非当前世代，失去这�
 
 ```bash
 git pull --ff-only
-home-manager switch --flake .#xuqihao
+home-manager switch --flake .#xuqihao        # aarch64 机器用 .#xuqihao-aarch64；或直接用 hms 别名自动选择
 ```
 
 上面的更新使用仓库锁定的依赖版本。需要升级依赖时，运行 `nix flake update`，检查 `flake.lock` 差异并构建验证，再提交锁文件；`nix-channel --update` 不会更新 flake 依赖。
@@ -172,6 +173,12 @@ home-manager switch --flake .#xuqihao
 
 ```bash
 nix build --no-link .#homeConfigurations.xuqihao.activationPackage
+```
+
+aarch64 输出需在 ARM 实机上构建；x86_64 主机（以及 CI）只做求值验证：
+
+```bash
+nix eval --raw .#homeConfigurations.xuqihao-aarch64.activationPackage.drvPath
 ```
 
 验证 NixOS 系统闭包：
@@ -200,7 +207,8 @@ nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 │   └── nix-cn.nix              # Nix binary cache 单一配置源
 ├── packages/cli-dev.nix        # 各入口共享的 CLI 软件列表
 ├── bootstrap/
-│   ├── linux.sh                # 全新普通 Linux / WSL 引导脚本
+│   ├── bootstrap.sh            # 统一入口：自动检测环境（OS / NixOS / 架构 / sudo）派发到下列脚本
+│   ├── linux.sh                # 全新普通 Linux / WSL 引导脚本（多用户 / 单用户两种安装模式）
 │   ├── darwin.sh               # 全新 macOS（Apple Silicon）引导脚本
 │   ├── nixos.sh                # NixOS 全新安装 / 迁移引导脚本（install / adopt）
 │   └── gc.sh                   # 跨平台手动垃圾回收
@@ -273,8 +281,8 @@ git remote add github git@github.com:NoSeventh/nix-roam.git
 
 - `hosts/<hostname>/hardware-configuration.nix` 是机器专用文件，应与对应主机入口一起提交；只有仓库根目录下误生成的 `/hardware-configuration.nix` 被忽略。
 - NixOS 桌面配置中的 Hermes Agent 需要目标机器自行提供 `/etc/hermes/env`。
-- 多用户 Nix 安装需要让 daemon 信任自定义 substituter；`bootstrap/linux.sh` 会处理新机器的这项配置。
-- macOS 输出目前尚未完成真实设备构建验证；`bootstrap/nixos.sh` 的两条链路同样尚未实机验证。
+- 多用户 Nix 安装需要让 daemon 信任自定义 substituter，`bootstrap/linux.sh` 会处理新机器的这项配置；无 systemd / 无 sudo 的机器走单用户安装，镜像直接写用户级 nix.conf，无需 daemon 授权（`/nix` 仍需一次性 root 创建）。WSL1 不受支持，请先升级 WSL2。
+- macOS 输出目前尚未完成真实设备构建验证；`bootstrap/nixos.sh` 的两条链路同样尚未实机验证。aarch64 Linux 输出与单用户安装链路当前也仅求值/桩测验证，未在 ARM 或无 root 机器上实测。
 
 ## License
 
