@@ -8,6 +8,12 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-18 WSL getty@tty1 mask（NixOS-WSL 26.11，本机）
+
+改动：`hosts/wsl/default.nix` 增加 `systemd.units."getty@tty1.service".enable = false;`。背景：本机当日从 26.05 桌面代（systemd 257）切到 26.11 wsl 代（systemd 261）时，切换事务经 getty.target 拉起 `getty@tty1`，WSL 无真实 tty1，agetty 收 HUP 即退 → restart 循环 → start-limit，`switch-to-configuration` 以 status 4 失败、系统 degraded。诊断依据：开机段日志无任何 getty/Login Prompts 条目、静态配置与 generator 均无 tty1 的 wants 链接（generator 仅加已被 mask 的 console-getty）→ 正常开机不会拉起它，失败仅发生在跨版本切换事务内。
+
+验证：该选项求值为 `false`；wsl toplevel 构建通过（`5pcvyqz4…`），产物 `etc/systemd/system/getty@tty1.service` 指向 `unit-getty-tty1.service-disabled`（即 `/dev/null` mask，与系统对 console-getty 的处理同机制）；桌面输出 `systemd.units` 无该单元声明，行为不变。未验证：实际 switch 激活与重启后 degraded 清除（待本机执行 `nixos-rebuild switch --flake .#wsl` + Windows 侧 `wsl --shutdown`，后者同时令 wsl.conf 的 hostname=wsl 生效）。
+
 ## 2026-09-17 架构收敛 + CI 构建层 + 文档重构（Fedora 44 / WSL2 standalone Nix）
 
 改动：本地用户名单点移至仓库根 `meta.json`（`flake.nix` 经 `builtins.fromJSON` 读取；`bootstrap.sh`/`linux.sh`/`nixos.sh` 改为 sed 解析同一文件并在解析失败时中止——删掉了三处 `xuqihao` 静默兜底与 `darwin.sh` 的硬编码默认 target）；`pkgsFor` 统一实例化 unstable + stable（共享 `nixpkgsConfig`），`mkStandaloneHome` 不再内联 `import nixpkgs`；`stateVersion` 收敛到 flake 顶层单点并经 `specialArgs`/`extraSpecialArgs` 贯通 `home.stateVersion` 与 `system.stateVersion`；删除无消费者的 `supportedSystems`/`forAllSystems`；`hms` 从别名字符串改为 bash 函数（`programs.bash.initExtra`）；`eval.yml` 增加 standalone x86_64 activation package 构建步（含 runner 磁盘清理，timeout 30→45）；验证后移除共享 `nixpkgsConfig` 中无引用的 `electron-38.8.4`；验证记录拆至本文件。
