@@ -54,14 +54,20 @@ in
       workfs = "cd ~/mnt/juno/workfs2/juno/xuqihao";
       root = "root -l";
     } // lib.optionalAttrs isLinux {
-      # Linux 专用：macOS 上无 nixos-rebuild / distrobox，不注入避免误用
-      # nrs 需在仓库根目录下运行：--flake . 按 cwd 解析，attr 自动补 #$(hostname)
-      nrs = "sudo nixos-rebuild switch --flake .";
+      # Linux 专用：macOS 上无 distrobox，不注入避免误用
       archbox = "distrobox enter archbox";
       susebox = "distrobox enter susebox";
       fedorabox = "distrobox enter fedorabox";
       kalibox = "distrobox enter kalibox";
       debianbox = "distrobox enter debianbox";
+    } // lib.optionalAttrs (isLinux && !isStandalone) {
+      # nrs 仅 NixOS（桌面/WSL）注入：nh os 只对 NixOS 有意义；
+      # standalone 上原 sudo nixos-rebuild 也必然失败，收紧门控是修正而非删减。
+      # 需在仓库根目录下运行：flake 位置参数 . 按 cwd 解析，--hostname 默认取
+      # $(hostname) 恰为本仓库约定的输出属性名；nh 自行处理提权，无需 sudo 前缀；
+      # --diff always 在每次切换后打印新旧系统代的包差异（nvd）。
+      # （与 hms 同理用属性集级门控，理由见下方 initExtra 注释。）
+      nrs = "nh os switch --diff always .";
     };
   } // lib.optionalAttrs isStandalone {
     # hms 用 shell 函数而非别名：需要 if/fi 校验逻辑，嵌在别名字符串里可读性差。
