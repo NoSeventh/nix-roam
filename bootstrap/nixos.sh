@@ -124,7 +124,15 @@ else
   CLONE_DIR="/etc/nixos"
 fi
 TS="$(date +%Y%m%d-%H%M%S)"
+
+# --- 运行日志：全程 tee 到带时间戳的文件，事后排查用（token 输入走 stdin 不入日志）---
+#     本脚本以 root 运行：日志落在 root 的 ~/.local/state/nix-roam/（live ISO 即 /root 下）
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/nix-roam"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/nixos-$(date +%Y%m%d-%H%M%S).log"
+exec > >(tee -a "$LOG_FILE") 2>&1
 log "模式：${MODE}（flake 目标：${TARGET}，仓库位置：${CLONE_DIR}）"
+log "运行日志：$LOG_FILE"
 
 # ---------------------------------------------------------------------------
 # 1/7 配置国内镜像信任
