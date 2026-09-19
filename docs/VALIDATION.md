@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-19 nrs/nh 实机首验 + WSL cgroup 用户管理器故障（NixOS-WSL 26.11，本机 wsl）
+
+无代码改动；对 9d4d8e7（多机兼容性五连改）遗留未验项 `nrs` 的实机验证。本机当时代际：gen 7（2026-09-19 13:35，已含 nh 与新别名，由用户经 sudo nixos-rebuild 激活）。
+
+验证：`bash -ic 'type nrs && nrs'` 实跑——别名解析 ✓、cwd 相对 `.` 解析 ✓、`--hostname` 默认匹配 `.#wsl` ✓、构建 1s 全缓存 ✓、**nvd 代际 diff 输出正确**（2101→2101 路径、15.9 GiB→15.9 GiB、DIFF 0 字节——同树切换的预期值）、nh 对失败的呈现清晰（结构化错误 vs nixos-rebuild 的裸串）。
+
+发现（宿主故障，非仓库回归）：激活步 stc exit 4——`reloading user units for xuqihao: Failed to open dbus connection (Unable to autolaunch a dbus-daemon without $DISPLAY)`。A/B 对照：`sudo nixos-rebuild switch --flake .#wsl` **同样 exit 4、同样警告**，证明与 nh 无关。根因：本次 boot（13:34）起 `user@1000.service` 无法启动（`Failed to spawn executor: Device or resource busy`，同秒即败）；logind 建了 session c1 但从未尝试启动用户管理器；`/run/user/1000/bus` 不存在 → stc 用户单元重载失败。cgroup 现场确认幻影占用：`user.slice/user-1000.slice/user@1000.service` 下 `init.scope`/`session.slice` 的 `cgroup.procs` 为空、`cgroup.threads` 报 `0`、`cgroup.events` `populated=1` 永不落零、三者 `rmdir` 均 EBUSY（与 spawn 失败同 errno）；对照实验：`systemd-run --uid=1000 --slice=user-1000.slice` 可正常 spawn，问题特定于该单元的 cgroup 子树。上一 boot（9月16日，systemd[451]）用户管理器正常。影响面：本 boot `systemctl --user` 与 HM 用户单元全部不可用；系统其余正常（`is-system-running` running、gen 7 不变、无新代际——闭包相同未建 gen 8）。
+
+未验证：~~exit 0 的完整 nh 切换~~——已补验（同日 13:57）：Windows 侧 `wsl --shutdown` 重开后 `user@1000.service` 正常启动（幻影 cgroup 未随 fresh boot 复现，单次观察），`nrs` 重跑 **exit 0**，激活 + bootloader 步骤全过、无警告，系统保持 `running`、gen 7 不变（闭包相同未建新代际）；过程中注意到 dirty Git tree 会令 nh 打印 `warning: Git tree ... is dirty`（本地未提交的文档改动所致，无害）。幻影 cgroup 是否为偶发仍待观察（复现则需追 WSL2 内核/systemd 261 upstream）。桌面输出未动。
+
 ## 2026-09-19 多机兼容性五连改（Fedora 44 / WSL2 standalone Nix，本机）
 
 改动：借鉴 ZaneyOS 评审结论的五项：① per-host `hosts/<host>/variables.nix` 旋钮（`timeZone` 自 `profiles/nixos-base.nix` 迁出，flake 两个 nixosConfigurations 块以 `vars` specialArg 注入，接线点唯一）；② `profiles/hardware/` 休眠 GPU/VM profile 层（nvidia/amd/intel/vm-guest；nvidia 的 prime offload 由 `vars.gpuBusIDs` 条件启用，未提供时为纯 dGPU 配置）；③ `hosts/_template/` 主机模板 + `bootstrap/nixos.sh` 任意 `--target <主机名>` 脚手架（复制模板并替换 `__HOSTNAME__`，打印桌面/CLI 两种 flake 输出样例，人工粘贴后 grep 校验输出存在，不自动改 flake.nix；install 链路 `hosts/nixos/hardware-configuration.nix` 与 `.#nixos` 等硬编码泛化为 `${TARGET}`）；④ linux/darwin/nixos 三条链路全程时间戳日志（`${XDG_STATE_HOME:-$HOME/.local/state}/nix-roam/`）；⑤ `programs.nh.enable`（不设 flake、不开 clean）+ `nrs` 改走 `nh os switch --diff always .`（门控自 isLinux 收紧为 `isLinux && !isStandalone`，standalone 上原 sudo 形式同样必然失败）。
