@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-19 多机兼容性五连改（Fedora 44 / WSL2 standalone Nix，本机）
+
+改动：借鉴 ZaneyOS 评审结论的五项：① per-host `hosts/<host>/variables.nix` 旋钮（`timeZone` 自 `profiles/nixos-base.nix` 迁出，flake 两个 nixosConfigurations 块以 `vars` specialArg 注入，接线点唯一）；② `profiles/hardware/` 休眠 GPU/VM profile 层（nvidia/amd/intel/vm-guest；nvidia 的 prime offload 由 `vars.gpuBusIDs` 条件启用，未提供时为纯 dGPU 配置）；③ `hosts/_template/` 主机模板 + `bootstrap/nixos.sh` 任意 `--target <主机名>` 脚手架（复制模板并替换 `__HOSTNAME__`，打印桌面/CLI 两种 flake 输出样例，人工粘贴后 grep 校验输出存在，不自动改 flake.nix；install 链路 `hosts/nixos/hardware-configuration.nix` 与 `.#nixos` 等硬编码泛化为 `${TARGET}`）；④ linux/darwin/nixos 三条链路全程时间戳日志（`${XDG_STATE_HOME:-$HOME/.local/state}/nix-roam/`）；⑤ `programs.nh.enable`（不设 flake、不开 clean）+ `nrs` 改走 `nh os switch --diff always .`（门控自 isLinux 收紧为 `isLinux && !isStandalone`，standalone 上原 sudo 形式同样必然失败）。
+
+验证（本机求值/构建，未激活）：五输出 drvPath 求值全部通过；两主机 `time.timeZone` 经 vars 求值 `Asia/Shanghai`，`programs.nh.enable` 两边 `true`、`clean.enable` `false`、`flake` 未设。硬件层不在任何输出 import 链上（CI 不覆盖），四个 profile 经 `extendModules` 叠加 wsl 配置求值：nvidia 无 gpuBusIDs 时 prime 块缺省、注入 nvidia+intel 时 offload 与 `intelBusId` 正确接线，amd/intel early KMS 与 intel VA-API 包、vm-guest 两服务均按预期。模板经真实脚手架路径（仓库内 cp + sed）+ 桌面模块集（desktop.nix + hermes 模块 + 集成 HM）从零 `nixosSystem` 求值通过（hostname/systemd-boot/ext4 根/timeZone/hermes/HM 用户全对）；过程中确认 `networking.hostName` 的类型模式会拒绝未替换的 `__HOSTNAME__` 占位符（下划线不可开头）——sed 失败时求值大声失败。四脚本 `bash -n` 通过；linux.sh 日志以错误 target 触发用户守卫实跑验证（日志文件落盘且内容完整）。standalone x86_64 activationPackage 构建通过，仅 bashrc 相关 4 个派生重建（与 nrs 门控改动的预期影响面一致），产物 `home-files/.bashrc` 已无 `nrs`、`hms` 函数仍在。
+
+未验证：`nh os switch` 实机切换（需 NixOS 桌面/WSL，桌面下次 `nrs` 即首验，注意确认代际 diff 输出）；GPU/VM profile 无实机；nixos.sh 脚手架流程未实跑（仅求值级验证，脚本路径改动经 bash -n + 逐段核对）；install 链路、macOS 输出、darwin/nixos 日志实跑（仅 linux.sh 前段实测）；CI 在本批提交上的运行（推送后自动触发）。
+
 ## 2026-09-18 WSL getty@tty1 mask（NixOS-WSL 26.11，本机）
 
 改动：`hosts/wsl/default.nix` 增加 `systemd.units."getty@tty1.service".enable = false;`。背景：本机当日从 26.05 桌面代（systemd 257）切到 26.11 wsl 代（systemd 261）时，切换事务经 getty.target 拉起 `getty@tty1`，WSL 无真实 tty1，agetty 收 HUP 即退 → restart 循环 → start-limit，`switch-to-configuration` 以 status 4 失败、系统 degraded。诊断依据：开机段日志无任何 getty/Login Prompts 条目、静态配置与 generator 均无 tty1 的 wants 链接（generator 仅加已被 mask 的 console-getty）→ 正常开机不会拉起它，失败仅发生在跨版本切换事务内。
