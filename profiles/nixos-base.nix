@@ -1,5 +1,5 @@
 # Shared NixOS foundation for desktop and WSL hosts.
-{ pkgs-stable, username, stateVersion, ... }:
+{ pkgs-stable, username, stateVersion, vars, ... }:
 
 {
   imports = [
@@ -8,7 +8,8 @@
   ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
-  time.timeZone = "Asia/Shanghai";
+  # 时区是机器级参数，经 hosts/<hostname>/variables.nix → specialArgs.vars 注入
+  time.timeZone = vars.timeZone;
 
   # --- 1. NixOS development runtimes (desktop and WSL) ---
   # Standalone hosts use native/project runtime management instead.
