@@ -84,7 +84,7 @@ bash ~/nix-roam/bootstrap/bootstrap.sh
 
 ### NixOS 全新安装与迁移
 
-`bootstrap/nixos.sh` 覆盖 NixOS 侧两条链路，自动检测模式（`/etc/NIXOS` 存在即 adopt）与 flake 目标（WSL 内核特征 → `.#wsl`，否则 `.#nixos`），也可用子命令强制指定。
+`bootstrap/nixos.sh` 覆盖 NixOS 侧两条链路，自动检测模式（`/etc/NIXOS` 存在即 adopt）与 flake 目标（WSL 内核特征 → `.#wsl`，否则 `.#nixos`），也可用子命令强制指定；`--target` 可传任意主机名（见下方「新 NixOS 机器」）。
 
 实体机全新安装：从 NixOS 安装 ISO 启动后，手动分区并把目标盘挂载到 `/mnt`（ESP 挂 `/mnt/boot`，参考命令见脚本头部注释），再以 root 运行：
 
@@ -93,7 +93,7 @@ curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/ni
 bash nixos.sh install
 ```
 
-脚本会配置国内镜像、可选配置 GitHub token、克隆仓库到 `/mnt/etc/nixos`、按当前磁盘重新生成 `hosts/nixos/hardware-configuration.nix`（原版备份在同目录）、执行 `nixos-install` 并为 `meta.json` 定义的本地用户设置登录密码；分区与格式化不在脚本职责内。
+脚本会配置国内镜像、可选配置 GitHub token、克隆仓库到 `/mnt/etc/nixos`、按当前磁盘重新生成 `hosts/<target>/hardware-configuration.nix`（默认 target 为 `nixos`，原版备份在同目录）、执行 `nixos-install` 并为 `meta.json` 定义的本地用户设置登录密码；分区与格式化不在脚本职责内。
 
 在已运行的 NixOS 或刚按官方文档导入的 NixOS-WSL 上迁移到本仓库（未克隆仓库时用一键安装小节的对应命令）：
 
@@ -103,9 +103,11 @@ sudo bash bootstrap/nixos.sh          # 等价于 adopt 子命令
 
 迁移链路会整体备份旧的 `/etc/nixos` 再克隆本仓库；若目标系统原有 `system.stateVersion` 与仓库共享值不同，脚本会要求先在主机入口用 `lib.mkForce` 保留原值。两条链路都要求 root，且可安全重复运行。
 
+新 NixOS 机器（第三台起）：在目标机上直接 `sudo bash bootstrap/nixos.sh adopt --target <新主机名>`（实体机全新安装同理加 `install`）。`hosts/<主机名>/` 不存在时，脚本从 `hosts/_template/` 复制出主机目录（自动替换主机名占位符），打印桌面/CLI 两种 flake 输出样例块，等你完成 `variables.nix` 旋钮、GPU profile（`profiles/hardware/`，可不选）和输出块粘贴后校验继续——脚本不自动改 `flake.nix`。约定主机目录名 = `networking.hostName` = flake 输出属性名。`adopt` 已有系统时把原机 `hardware-configuration.nix` 拷进新目录；`install` 链路会自动重新生成。
+
 ### NixOS 桌面
 
-NixOS 桌面模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。当前机器的配置位于 `hosts/nixos/` 并纳入版本控制，以保证 Git Flake 可以纯求值和重复构建；其他机器应建立独立的 `hosts/<hostname>/`，不要直接复用现有硬件配置。
+NixOS 桌面模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。当前机器的配置位于 `hosts/nixos/` 并纳入版本控制，以保证 Git Flake 可以纯求值和重复构建；其他机器应建立独立的 `hosts/<hostname>/`（从 `hosts/_template/` 模板复制，或用 bootstrap 的 `--target` 脚手架），不要直接复用现有硬件配置。
 
 在已准备好硬件配置的目标机器上：
 
