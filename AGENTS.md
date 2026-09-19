@@ -85,7 +85,7 @@ flake.nix                  # Explicit host/home outputs; pkgsFor instantiates un
 meta.json                  # Single-point local username (read by flake.nix AND all bootstrap scripts — data file, not Nix)
 profiles/                  # Explicit shared profiles: nixos-base, desktop, locale, CLI
 hosts/wsl/                 # NixOS-WSL entry, no physical hardware config
-hosts/nixos/               # Current machine entry (host-specific settings) + tracked hardware-configuration.nix
+hosts/nixos/               # Current machine entry (host-specific settings) + tracked hardware-configuration.nix + variables.nix knobs
 modules/                   # Shared NixOS modules (fix-network); modules/desktop/ = desktop-host-only modules
 home/                      # Home Manager config (NixOS + standalone)
 packages/cli-dev.nix       # Shared CLI tool list (pure function) — see architecture above
@@ -104,6 +104,8 @@ AGENTS.md                  # Maintained architecture and operating conventions
 ## Host layout
 
 `hosts/nixos/default.nix` is the current machine entry: it imports `profiles/desktop.nix` and its tracked `hardware-configuration.nix`, and holds only machine-specific settings (boot/loader, kernel, `networking.hostName`, power/lid policy, user groups, sshd). There is no root `configuration.nix`. Keep generated hardware files under `hosts/<hostname>/` and track them so Git Flake evaluation remains pure and reproducible; the root `/hardware-configuration.nix` path is ignored only to prevent accidental regeneration in the wrong location.
+
+Each NixOS host also carries a **`hosts/<hostname>/variables.nix`** knob file (a plain attrset). `flake.nix` loads it and passes it as the `vars` specialArg — the only wiring point; modules that need per-host variation declare `vars` in their function header (see `profiles/nixos-base.nix`'s `time.timeZone` and the optional `gpuBusIDs` consumed by `profiles/hardware/nvidia.nix`) instead of importing `hosts/${host}/...` by string path. A module requiring `vars` that isn't reached through a `nixosConfigurations` block passing it fails at evaluation (fail-loud). Standalone Home Manager entries deliberately receive no `vars` — no consumer exists and unguarded references would break standalone evaluation.
 
 **Adding a new machine:**
 

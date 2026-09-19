@@ -130,6 +130,9 @@
         specialArgs = {
           inherit inputs username stateVersion;
           pkgs-stable = nixosPkgs.stable;
+          # 主机级旋钮：hosts/<hostname>/variables.nix，接线点只在 flake.nix
+          # （模块不做 import ../../hosts/... 字符串路径，经函数参数 vars 取用）
+          vars = import ./hosts/nixos/variables.nix;
         };
         # Host entry hosts/nixos pulls in profiles/desktop.nix, which imports
         # the explicit desktop module list under modules/desktop/.
@@ -147,6 +150,7 @@
         specialArgs = {
           inherit inputs username stateVersion;
           pkgs-stable = nixosPkgs.stable;
+          vars = import ./hosts/wsl/variables.nix;
         };
         modules = [
           inputs.nixos-wsl.nixosModules.default
