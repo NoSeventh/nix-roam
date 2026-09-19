@@ -83,7 +83,7 @@ The local username is defined **once** — `username` in the repo-root **`meta.j
 ```
 flake.nix                  # Explicit host/home outputs; pkgsFor instantiates unstable + stable per system (shared nixpkgsConfig)
 meta.json                  # Single-point local username (read by flake.nix AND all bootstrap scripts — data file, not Nix)
-profiles/                  # Explicit shared profiles: nixos-base, desktop, locale, CLI
+profiles/                  # Explicit shared profiles: nixos-base, desktop, locale, CLI; hardware/ = dormant GPU/VM profiles
 hosts/wsl/                 # NixOS-WSL entry, no physical hardware config
 hosts/nixos/               # Current machine entry (host-specific settings) + tracked hardware-configuration.nix + variables.nix knobs
 modules/                   # Shared NixOS modules (fix-network); modules/desktop/ = desktop-host-only modules
@@ -106,6 +106,8 @@ AGENTS.md                  # Maintained architecture and operating conventions
 `hosts/nixos/default.nix` is the current machine entry: it imports `profiles/desktop.nix` and its tracked `hardware-configuration.nix`, and holds only machine-specific settings (boot/loader, kernel, `networking.hostName`, power/lid policy, user groups, sshd). There is no root `configuration.nix`. Keep generated hardware files under `hosts/<hostname>/` and track them so Git Flake evaluation remains pure and reproducible; the root `/hardware-configuration.nix` path is ignored only to prevent accidental regeneration in the wrong location.
 
 Each NixOS host also carries a **`hosts/<hostname>/variables.nix`** knob file (a plain attrset). `flake.nix` loads it and passes it as the `vars` specialArg — the only wiring point; modules that need per-host variation declare `vars` in their function header (see `profiles/nixos-base.nix`'s `time.timeZone` and the optional `gpuBusIDs` consumed by `profiles/hardware/nvidia.nix`) instead of importing `hosts/${host}/...` by string path. A module requiring `vars` that isn't reached through a `nixosConfigurations` block passing it fails at evaluation (fail-loud). Standalone Home Manager entries deliberately receive no `vars` — no consumer exists and unguarded references would break standalone evaluation.
+
+**Dormant hardware profiles live in `profiles/hardware/`** (`nvidia.nix`, `amd.nix`, `intel.nix`, `vm-guest.nix`) for future machines with different GPUs or VM guests. Following the explicit-import rule, they are inert until a host's `default.nix` imports one (choose per machine; `hosts/nixos` stays on the default mesa stack and imports none). `nvidia.nix` reads the optional `vars.gpuBusIDs` knobs — without them it is a plain dGPU config, with `nvidia+intel`/`nvidia+amdgpu` it enables prime offload. They are not in any output's module list, so CI evaluation does not cover them; they were eval-verified via `extendModules` overlays (2026-09-19, see VALIDATION.md) but never on real hardware — validate on the first machine that imports one.
 
 **Adding a new machine:**
 
@@ -208,6 +210,7 @@ Hard-won — read the header comments in `packages/cli-dev.nix` before editing t
 
 - Track `hosts/<hostname>/hardware-configuration.nix` for reproducible Git Flake builds; only the accidental root path `/hardware-configuration.nix` is ignored.
 - Modules are imported explicitly: desktop-host-only modules go in `modules/desktop/` **and** must be added to `profiles/desktop.nix`'s import list; shared NixOS modules go in `modules/` and are imported by the relevant profile.
+- GPU/VM differences are handled by `profiles/hardware/*.nix` dormant profiles imported per host (not by GPU-named flake outputs); hybrid-graphics BusIDs go in that host's `variables.nix` as `gpuBusIDs`.
 - GUI HM modules → `home/default.nix` only; CLI → `home/common.nix` (needs config) or `packages/cli-dev.nix` (bare tool); Linux-only/Darwin-only packages use `lib.optionals stdenv.hostPlatform.isLinux` / `stdenv.hostPlatform.isDarwin` inside `cli-dev.nix`.
 - Don't uncomment the `noctalia`/`dms`/`quickshell` inputs — those packages now come from nixpkgs unstable (`chaotic` removed).
 - The local username lives in one place: the repo-root `meta.json` (`{"username": "xuqihao"}`), read by `flake.nix` (fromJSON) and every bootstrap script (sed on a format we own, fail-loud). Everything else (`users.users.*`, `home-manager.users.*`, standalone output names, `hms` target, bootstrap password setup and default targets) derives from or reads that value; don't reintroduce hardcoded local usernames or silent fallbacks. Remote identities (IHEP/JUNO accounts, git email) in `home/common.nix` are separate.
