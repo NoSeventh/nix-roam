@@ -10,10 +10,12 @@
 #       配置镜像 → 可选 token → 备份旧配置并克隆仓库 → 对齐 stateVersion → nixos-rebuild switch
 #
 # 用法（必须以 root 运行）：
-#     bash bootstrap/nixos.sh                      # 自动检测模式与 flake 目标
-#     bash bootstrap/nixos.sh install              # 强制全新安装（ISO 内，目标盘挂载在 /mnt）
-#     bash bootstrap/nixos.sh adopt                # 强制迁移（已安装的 NixOS / NixOS-WSL）
-#     bash bootstrap/nixos.sh adopt --target wsl   # 覆盖自动检测的 flake 目标
+#     bash bootstrap/nixos.sh                        # 自动检测模式与 flake 目标
+#     bash bootstrap/nixos.sh install                # 强制全新安装（ISO 内，目标盘挂载在 /mnt）
+#     bash bootstrap/nixos.sh adopt                  # 强制迁移（已安装的 NixOS / NixOS-WSL）
+#     bash bootstrap/nixos.sh adopt --target wsl     # 覆盖自动检测的 flake 目标
+#     bash bootstrap/nixos.sh adopt --target mybox   # 任意主机名：hosts/<target>/ 不存在时
+#                                                    # 从 hosts/_template/ 脚手架（见 3/7 步骤）
 #
 # install 不做分区/格式化，请先自行完成并挂载（systemd-boot 布局参考）：
 #     parted /dev/nvme0n1 -- mklabel gpt
@@ -27,6 +29,8 @@
 #
 # 幂等：可安全重复运行。镜像/token 已配置则跳过；仓库已克隆则复用；
 # install 每次重新生成硬件配置（真实反映 /mnt 当前挂载状态）。
+# 新主机：--target <新主机名> 且 hosts/<主机名>/ 缺失时，从 hosts/_template/ 复制并
+# 打印 flake 输出样例块，等人工粘贴到 flake.nix 后校验再继续（不自动改 flake.nix）。
 set -euo pipefail
 
 usage() {
@@ -38,7 +42,8 @@ usage() {
   adopt                迁移：在已运行的 NixOS / NixOS-WSL 上采用本仓库并切换
 
 选项：
-  --target nixos|wsl   指定 flake 目标（默认自动检测；install 固定为 nixos）
+  --target <主机名>    指定 flake 目标（默认自动检测 nixos/wsl；install 固定为 nixos，
+                       除非显式传新主机名）。hosts/<主机名>/ 不存在时走模板脚手架
   -h, --help           显示帮助
 
 必须以 root 运行（sudo bash bootstrap/nixos.sh）。
@@ -62,10 +67,11 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --target)
-      [ "$#" -ge 2 ] || die '--target 需要参数：nixos 或 wsl'
+      [ "$#" -ge 2 ] || die '--target 需要参数：主机名（如 nixos、wsl、新机器名）'
       case "$2" in
         nixos|wsl) TARGET_ARG="$2" ;;
-        *) die '--target 只支持 nixos 或 wsl' ;;
+        ''|*[!a-zA-Z0-9-]*|-*|*-) die '--target 只接受 [a-zA-Z0-9-] 且不以连字符开头/结尾的主机名' ;;
+        *) TARGET_ARG="$2" ;;
       esac
       shift 2
       ;;
@@ -216,6 +222,65 @@ fi
 NIXOS_USER="$(sed -n 's/.*"username": *"\([^"]*\)".*/\1/p' "$CLONE_DIR/meta.json" | head -n 1)"
 [ -n "$NIXOS_USER" ] || die "无法从 meta.json 解析 username（文件缺失或格式变化）。"
 
+# --- 新主机脚手架：hosts/<target>/ 缺失时从 hosts/_template/ 复制 ---
+#     只替换 default.nix 里的 __HOSTNAME__ 占位符；flake.nix 输出块由人工粘贴
+#     （脚本打印现成样例并校验存在），保持显式可审查，与 sed 改配置划清界限。
+if [ ! -d "$CLONE_DIR/hosts/$TARGET" ]; then
+  log "新主机 target：${TARGET}（hosts/${TARGET} 不存在，走模板脚手架）"
+  [ -t 0 ] || die "非交互终端无法走脚手架；请先在仓库内手工创建 hosts/${TARGET}/（照 hosts/_template/ 填写）。"
+  [ -d "$CLONE_DIR/hosts/_template" ] || die "仓库缺少 hosts/_template/ 模板目录（克隆过旧？git pull --ff-only 后重试）。"
+  cat >&2 <<EOF
+    将复制 hosts/_template/ → hosts/${TARGET}/（自动替换主机名占位符），随后需要你手工完成：
+      1. 检查 hosts/${TARGET}/variables.nix（时区 / 混合显卡 gpuBusIDs）
+      2. 检查 hosts/${TARGET}/default.nix（桌面 or CLI 变体、GPU profile 三选一）
+      3. 把输出块粘贴进 flake.nix（样例随后打印，桌面/CLI 二选一）
+      4. adopt 已有系统：把原机 hardware-configuration.nix 内容拷进 hosts/${TARGET}/
+EOF
+  read -r -p "    继续创建 hosts/${TARGET}/？[y/N] " SCAFFOLD_ANSWER
+  case "$SCAFFOLD_ANSWER" in
+    y|Y) ;;
+    *) die "已中止。" ;;
+  esac
+  cp -r "$CLONE_DIR/hosts/_template" "$CLONE_DIR/hosts/$TARGET"
+  sed -i "s/__HOSTNAME__/${TARGET}/g" "$CLONE_DIR/hosts/$TARGET/default.nix"
+  cat <<EOF | sed "s/__HOSTNAME__/${TARGET}/g"
+    ---- flake.nix 输出块样例 A：桌面机（profiles/desktop.nix + 桌面 HM + Hermes）----
+      nixosConfigurations.__HOSTNAME__ = nixpkgs.lib.nixosSystem {
+        system = nixosSystem;
+        specialArgs = {
+          inherit inputs username stateVersion;
+          pkgs-stable = nixosPkgs.stable;
+          vars = import ./hosts/__HOSTNAME__/variables.nix;
+        };
+        modules = [
+          ./hosts/__HOSTNAME__
+          home-manager.nixosModules.home-manager
+          inputs.hermes-agent.nixosModules.default
+          (nixosHome ./home/default.nix)
+        ];
+      };
+
+    ---- 样例 B：CLI 服务器（nixos-base + cli + CLI HM，无 Hermes）----
+      nixosConfigurations.__HOSTNAME__ = nixpkgs.lib.nixosSystem {
+        system = nixosSystem;
+        specialArgs = {
+          inherit inputs username stateVersion;
+          pkgs-stable = nixosPkgs.stable;
+          vars = import ./hosts/__HOSTNAME__/variables.nix;
+        };
+        modules = [
+          ./hosts/__HOSTNAME__
+          home-manager.nixosModules.home-manager
+          (nixosHome ./home/nixos-cli.nix)
+        ];
+      };
+EOF
+  read -r -p "    已完成上述编辑后回车继续…" _
+  grep -q "nixosConfigurations\.${TARGET}[[:space:]]*=" "$CLONE_DIR/flake.nix" \
+    || die "flake.nix 仍未定义 nixosConfigurations.${TARGET}；粘贴上面样例（已替换为 ${TARGET}）后重跑本脚本（幂等，hosts 目录已就绪会跳过脚手架）。"
+  echo "    脚手架完成：hosts/${TARGET}/ 与 flake 输出均已就绪"
+fi
+
 # ---------------------------------------------------------------------------
 # 4/7 生成硬件配置（install）/ 对齐 stateVersion（adopt）
 # ---------------------------------------------------------------------------
@@ -225,7 +290,7 @@ if [ "$MODE" = install ]; then
   nixos-generate-config --root /mnt
   GEN_HW="$CLONE_DIR/hardware-configuration.nix"
   [ -f "$GEN_HW" ] || die "nixos-generate-config 未生成 $GEN_HW"
-  HW_TRACKED="$CLONE_DIR/hosts/nixos/hardware-configuration.nix"
+  HW_TRACKED="$CLONE_DIR/hosts/$TARGET/hardware-configuration.nix"
   if [ -f "$HW_TRACKED" ]; then
     cp -a "$HW_TRACKED" "$HW_TRACKED.bak-${TS}"
     echo "    原硬件配置备份：$HW_TRACKED.bak-${TS}"
@@ -238,7 +303,7 @@ if [ "$MODE" = install ]; then
     die "新生成的硬件配置缺少 /boot（ESP）挂载点：systemd-boot 需要它。请把 ESP 挂到 /mnt/boot 后重跑本脚本（幂等）。"
   fi
   echo "    硬件配置已更新：$HW_TRACKED"
-  echo "    提示：UUID 变化属重新分区后的正常现象；若目标其实是另一台机器，请改走 AGENTS.md 的新机器流程。"
+  echo "    提示：UUID 变化属重新分区后的正常现象；目标是另一台新机器时请用 --target <新主机名> 重跑（走模板脚手架）。"
 else
   log "4/7 对齐 system.stateVersion"
   # /etc/NIXOS 记录初次安装时的 NixOS 版本，取前两段即当时的 stateVersion
@@ -272,9 +337,9 @@ fi
 #     adopt：系统与集成 Home Manager 一起激活，无需单独运行 home-manager。
 # ---------------------------------------------------------------------------
 if [ "$MODE" = install ]; then
-  log "5/7 安装 NixOS（nixos-install → .#nixos）"
+  log "5/7 安装 NixOS（nixos-install → .#${TARGET}）"
   # 结束时会交互式提示设置 root 密码：保留作 TTY 救急通道，日常登录用目标用户
-  nixos-install --root /mnt --flake "${CLONE_DIR}#nixos"
+  nixos-install --root /mnt --flake "${CLONE_DIR}#${TARGET}"
 else
   log "5/7 切换系统配置（nixos-rebuild switch → .#${TARGET}）"
   nixos-rebuild switch --flake "${CLONE_DIR}#${TARGET}"
@@ -286,7 +351,7 @@ fi
 #     install 实体机不设置则无法登录 GDM；WSL 免密登录、adopt 沿用既有账号，均跳过。
 # ---------------------------------------------------------------------------
 log "6/7 设置用户密码"
-if [ "$MODE" = install ] && [ "$TARGET" = nixos ]; then
+if [ "$MODE" = install ]; then
   nixos-enter --root /mnt -c "passwd ${NIXOS_USER}"
 else
   echo "    当前场景无需设置（WSL 免密登录；adopt 沿用既有账号），跳过"
@@ -302,9 +367,9 @@ if [ "$MODE" = install ]; then
 完成。拔掉安装介质后 reboot 进入新系统。
 
   · ${NIXOS_USER} 的登录密码已设置；root 密码在 nixos-install 结尾设置（TTY 救急用）。
-  · hosts/nixos/hardware-configuration.nix 已按本次磁盘重新生成（原版备份在同目录 *.bak-${TS}），
+  · hosts/${TARGET}/hardware-configuration.nix 已按本次磁盘重新生成（原版备份在同目录 *.bak-${TS}），
     确认无误后请提交回 Gitee，保持仓库可复现构建。
-  · 以后更新配置：cd ${CLONE_DIR} && sudo nixos-rebuild switch --flake .#nixos
+  · 以后更新配置：cd ${CLONE_DIR} && sudo nixos-rebuild switch --flake .#${TARGET}
 EOF
 else
   cat <<EOF
@@ -316,7 +381,8 @@ else
   · 以后更新配置：cd ${CLONE_DIR} && sudo nixos-rebuild switch --flake .#${TARGET}
 EOF
 fi
-if [ "$TARGET" = nixos ]; then
+# 桌面主机（import 了 profiles/desktop.nix）才有 Hermes 模块；CLI/WSL 变体没有
+if grep -q 'profiles/desktop' "$CLONE_DIR/hosts/$TARGET/default.nix" 2>/dev/null; then
   cat <<EOF
 
   · ⚠️ Hermes Agent 需要目标机器自行提供 /etc/hermes/env（API 密钥，见 modules/desktop/agents.nix）；
