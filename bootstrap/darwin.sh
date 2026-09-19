@@ -56,6 +56,13 @@ if [ -z "$REPO_ROOT" ] || [ ! -f "$REPO_ROOT/flake.nix" ]; then
 fi
 cd "$REPO_ROOT"
 
+# --- 运行日志：全程 tee 到带时间戳的文件，事后排查用（token 输入走 stdin 不入日志）---
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/nix-roam"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/darwin-$(date +%Y%m%d-%H%M%S).log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+log "运行日志：$LOG_FILE"
+
 # 默认 target 的用户名读 meta.json 单点定义（与 linux.sh/nixos.sh 同法；显式传参优先）
 FLAKE_USER="$(sed -n 's/.*"username": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
 [ -n "$FLAKE_USER" ] || { echo "错误：无法从 meta.json 解析 username（文件缺失或格式变化）。" >&2; exit 1; }
