@@ -50,14 +50,14 @@ jobs:
         run: nix eval --raw .#nixosConfigurations.wsl.config.system.build.toplevel.drvPath
 
       - name: Evaluate standalone Linux Home Manager (x86_64)
-        run: nix eval --raw .#homeConfigurations.xuqihao.activationPackage.drvPath
+        run: nix eval --raw .#homeConfigurations.x86_64-linux.activationPackage.drvPath
 
       - name: Evaluate standalone Linux Home Manager (aarch64)
-        run: nix eval --raw .#homeConfigurations.xuqihao-aarch64.activationPackage.drvPath
+        run: nix eval --raw .#homeConfigurations.aarch64-linux.activationPackage.drvPath
 
       - name: Evaluate standalone Darwin Home Manager
-        run: nix eval --raw .#homeConfigurations.xuqihao-darwin.activationPackage.drvPath
+        run: nix eval --raw .#homeConfigurations.aarch64-darwin.activationPackage.drvPath
 
       - name: Build standalone Linux activation package (x86_64)
         # 唯一能在 x86_64 runner 上直接构建的产物；aarch64 需 ARM 实机，NixOS toplevel 闭包过大
-        run: nix build --no-link .#homeConfigurations.xuqihao.activationPackage
+        run: nix build --no-link .#homeConfigurations.x86_64-linux.activationPackage

@@ -58,8 +58,8 @@
     }@inputs:
     let
       # 本地用户名单点定义：仓库根 meta.json（bootstrap 脚本在装 Nix 之前也要读，不能只放 Nix 表达式里）。
-      # 换用户名只改 meta.json 一行。NixOS users.users.*、home-manager.users.*、standalone 输出名
-      # （.#xuqihao / .#xuqihao-aarch64 / .#xuqihao-darwin）与 hms 别名目标均由它派生；
+      # 换用户名只改 meta.json 一行。NixOS users.users.*、home-manager.users.*、hms 的用户校验与
+      # bootstrap 目标用户守卫均由它派生；standalone 输出按系统命名（不随用户名变化，见下方输出）；
       # 远程身份（IHEP 账号、git 邮箱）在 home/common.nix，需单独调整。
       username = (builtins.fromJSON (builtins.readFile ./meta.json)).username;
 
@@ -160,21 +160,21 @@
         ];
       };
 
-      # --- 2. 非 NixOS 便携 CLI 环境（Home Manager standalone，Linux 双架构显式输出） ---
-      homeConfigurations.${username} = mkStandaloneHome {
+      # --- 2. 非 NixOS 便携 CLI 环境（HM standalone；输出名=系统名，不随用户名变化） ---
+      homeConfigurations.x86_64-linux = mkStandaloneHome {
         system = "x86_64-linux";
         homeDirectory = "/home/${username}";
       };
 
       # aarch64 Linux（ARM SBC / Asahi 等）：同一入口模块、同一包列表，仅 system 不同。
       # 共享列表的 Linux-only 包已在锁定 rev 上确认 aarch64-linux 可用（root 非 broken、在 platforms 内）。
-      homeConfigurations."${username}-aarch64" = mkStandaloneHome {
+      homeConfigurations.aarch64-linux = mkStandaloneHome {
         system = "aarch64-linux";
         homeDirectory = "/home/${username}";
       };
 
       # --- 3. macOS 预留（aarch64-darwin，仅结构就绪，未实测 build） ---
-      homeConfigurations."${username}-darwin" = mkStandaloneHome {
+      homeConfigurations.aarch64-darwin = mkStandaloneHome {
         system = "aarch64-darwin";
         homeDirectory = "/Users/${username}";
         standaloneModule = ./home/standalone-darwin.nix;

@@ -8,13 +8,13 @@
 
 | 模式 | Flake 输出 | 状态 | 用途 |
 |---|---|---|---|
-| Linux / WSL（x86_64） | `homeConfigurations.xuqihao` | 构建通过；作者的 WSL2 standalone 实机日常在用 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
-| Linux / WSL（aarch64） | `homeConfigurations.xuqihao-aarch64` | 求值通过，未实机构建 | ARM SBC / Asahi 等的纯用户级 CLI 环境 |
+| Linux / WSL（x86_64） | `homeConfigurations.x86_64-linux` | 构建通过；作者的 WSL2 standalone 实机日常在用 | 纯用户级 CLI 环境，不要求宿主机是 NixOS |
+| Linux / WSL（aarch64） | `homeConfigurations.aarch64-linux` | 求值通过，未实机构建 | ARM SBC / Asahi 等的纯用户级 CLI 环境 |
 | NixOS-WSL | `nixosConfigurations.wsl` | 构建与运行时冒烟通过，本次改动未激活 | 共享基础 CLI，另加 NixOS 专用开发运行时 |
 | NixOS | `nixosConfigurations.nixos` | 保留 | x86_64-linux 完整系统、桌面与服务配置 |
-| macOS | `homeConfigurations.xuqihao-darwin` | 结构就绪、未实测 | aarch64-darwin 纯 CLI 环境 |
+| macOS | `homeConfigurations.aarch64-darwin` | 结构就绪、未实测 | aarch64-darwin 纯 CLI 环境 |
 
-> 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。本地用户名在仓库根 `meta.json` 单点定义（`"username": "xuqihao"`），换登录名只改这一行——standalone 输出名（`.#xuqihao` / `.#xuqihao-aarch64` / `.#xuqihao-darwin`）、NixOS 用户创建、`hms` 函数目标与 bootstrap 默认 target 都随之联动；`bootstrap/linux.sh`/`darwin.sh` 会在目标用户与当前登录用户不符时直接拒绝，脚本解析不到 username 时也会明确报错而非回落默认值。远程 IHEP/JUNO 账号与 git 身份在 `home/common.nix`，需单独调整。直接复用前，请先搜索 `xuqihao` 并按自己的环境核对。
+> 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。本地用户名在仓库根 `meta.json` 单点定义（`"username": "xuqihao"`），换登录名只改这一行——NixOS 用户创建、`hms` 的用户校验与 bootstrap 目标用户守卫都随之联动；standalone 输出按系统命名（`.#x86_64-linux` / `.#aarch64-linux` / `.#aarch64-darwin`），不随用户名变化；`bootstrap/linux.sh`/`darwin.sh` 会在目标用户与当前登录用户不符时直接拒绝，脚本解析不到 username 时也会明确报错而非回落默认值。远程 IHEP/JUNO 账号与 git 身份在 `home/common.nix`，需单独调整。直接复用前，请先搜索 `xuqihao` 并按自己的环境核对。
 
 表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；具体验证环境（发行版 / 主机）以各条验证记录为准，状态表不钉住易变的发行版名。macOS 仅支持 Apple Silicon（aarch64-darwin），standalone Linux 提供 x86_64 与 aarch64 两个显式输出（NixOS 输出仍为 x86_64-linux）。
 
@@ -43,7 +43,7 @@
 bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/bootstrap.sh)
 ```
 
-普通 Linux / WSL 上会自动把仓库取到 `~/nix-roam`（`CLONE_DIR` 环境变量可覆盖；无 git 时退到 Gitee 压缩包）再执行；NixOS 链路需要 root，非 root 运行入口会自动 `sudo` 拾起；standalone Linux 的 flake target 按架构自动选择（x86_64 → `xuqihao`，aarch64 → `xuqihao-aarch64`）。有 systemd + sudo 时走多用户 Determinate 安装（镜像信任写 `/etc/nix`）；无 systemd 或无 sudo 时走单用户安装（官方安装器 `--no-daemon`，镜像写用户级 nix.conf；`/nix` 前缀仍需一次性 root 创建，脚本会给出管理员命令）。WSL1 不受支持，会明确报错。
+普通 Linux / WSL 上会自动把仓库取到 `~/nix-roam`（`CLONE_DIR` 环境变量可覆盖；无 git 时退到 Gitee 压缩包）再执行；NixOS 链路需要 root，非 root 运行入口会自动 `sudo` 拾起；standalone Linux 的 flake target 按架构自动选择（x86_64 → `x86_64-linux`，aarch64 → `aarch64-linux`）。有 systemd + sudo 时走多用户 Determinate 安装（镜像信任写 `/etc/nix`）；无 systemd 或无 sudo 时走单用户安装（官方安装器 `--no-daemon`，镜像写用户级 nix.conf；`/nix` 前缀仍需一次性 root 创建，脚本会给出管理员命令）。WSL1 不受支持，会明确报错。
 
 `bash <(...)` 的写法保留终端交互（可直接粘贴 GitHub token，sudo 密码提示同理）；换成 `curl ... | bash` 也能运行，但会跳过 token 提示。刚导入、默认以 root 进入且连 curl 都没有的 NixOS-WSL：
 
@@ -58,7 +58,7 @@ nix-env -f '<nixpkgs>' -iA curl && curl -fsSL https://gitee.com/qihaoxu/nixos-ni
 无需克隆即可激活 Linux / WSL 配置：
 
 ```bash
-home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia.git#xuqihao"
+home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia.git#x86_64-linux"
 ```
 
 从本地仓库激活：
@@ -66,7 +66,7 @@ home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia.g
 ```bash
 git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git nix-roam
 cd nix-roam
-home-manager switch --flake .#xuqihao
+home-manager switch --flake .#x86_64-linux
 ```
 
 ### 全新的 Linux / WSL
@@ -78,7 +78,7 @@ git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git ~/nix-roam
 bash ~/nix-roam/bootstrap/bootstrap.sh
 ```
 
-脚本会依次安装 Nix（systemd + sudo → 多用户 Determinate；否则单用户 `--no-daemon`，见一键安装小节）、配置国内缓存（多用户写 `/etc/nix` daemon 信任，单用户写用户级 nix.conf）、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活按架构选择的 target（x86_64 → `xuqihao`，aarch64 → `xuqihao-aarch64`）。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
+脚本会依次安装 Nix（systemd + sudo → 多用户 Determinate；否则单用户 `--no-daemon`，见一键安装小节）、配置国内缓存（多用户写 `/etc/nix` daemon 信任，单用户写用户级 nix.conf）、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活按架构选择的 target（x86_64 → `x86_64-linux`，aarch64 → `aarch64-linux`）。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
 
 脚本会跳过部分已完成步骤；Home Manager 已接管配置后，日常更新直接使用 `home-manager switch`（或 `hms` 别名，自动选择当前架构的 target）。激活后打开新登录 shell；原 SSH 配置中需要保留的主机请合并到 `home/common.nix`。实际使用 zsh / fish 时（登录 shell 是它，或对应 rc 文件已存在），激活会幂等追加 HM 会话环境加载段（fish 未装 bass 时仅加 PATH）；bash-only 的机器不会凭空创建这些文件。
 
@@ -144,12 +144,12 @@ bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/boots
 已有 Nix + Home Manager 的机器，在仓库根目录手动激活：
 
 ```bash
-home-manager switch --flake .#xuqihao-darwin
+home-manager switch --flake .#aarch64-darwin
 ```
 
 这个入口只管理用户 CLI 环境，不管理 macOS 系统服务和 GUI，也不安装 nix-darwin；不要运行 Linux 引导脚本（统一入口 `bootstrap/bootstrap.sh` 会自动派发，无需手动区分）。flake 仅提供 aarch64-darwin 输出，Intel Mac 不受支持。
 
-该配置尊重 macOS 惯用用法：不改默认 shell，也不接管 `~/.zshrc`——首次激活只会向其追加一段幂等的 Home Manager 环境加载（会话变量与 PATH，可整段删除），zsh 的提示符和其余配置保持原生；starship 提示符和 bash 别名只影响 bash 会话，其中 `hms` 在 macOS 指向 `.#xuqihao-darwin`。与 Homebrew 共存时，PATH 中 nix 提供的工具优先于同名 brew 命令。
+该配置尊重 macOS 惯用用法：不改默认 shell，也不接管 `~/.zshrc`——首次激活只会向其追加一段幂等的 Home Manager 环境加载（会话变量与 PATH，可整段删除），zsh 的提示符和其余配置保持原生；starship 提示符和 bash 别名只影响 bash 会话，其中 `hms` 在 macOS 指向 `.#aarch64-darwin`。与 Homebrew 共存时，PATH 中 nix 提供的工具优先于同名 brew 命令。
 
 ## 更新与验证
 
@@ -168,7 +168,7 @@ bash bootstrap/gc.sh --all            # 清理全部非当前世代，失去这�
 
 ```bash
 git pull --ff-only
-home-manager switch --flake .#xuqihao        # aarch64 机器用 .#xuqihao-aarch64；或直接用 hms 别名自动选择
+home-manager switch --flake .#x86_64-linux   # aarch64 机器用 .#aarch64-linux；或直接用 hms 别名自动选择
 ```
 
 上面的更新使用仓库锁定的依赖版本。需要升级依赖时，运行 `nix flake update`，检查 `flake.lock` 差异并构建验证，再提交锁文件；`nix-channel --update` 不会更新 flake 依赖。
@@ -176,13 +176,13 @@ home-manager switch --flake .#xuqihao        # aarch64 机器用 .#xuqihao-aarch
 只验证构建、不激活：
 
 ```bash
-nix build --no-link .#homeConfigurations.xuqihao.activationPackage
+nix build --no-link .#homeConfigurations.x86_64-linux.activationPackage
 ```
 
 aarch64 输出需在 ARM 实机上构建；x86_64 主机（以及 CI）只做求值验证：
 
 ```bash
-nix eval --raw .#homeConfigurations.xuqihao-aarch64.activationPackage.drvPath
+nix eval --raw .#homeConfigurations.aarch64-linux.activationPackage.drvPath
 ```
 
 验证 NixOS 系统闭包：

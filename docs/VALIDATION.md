@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-24 standalone 输出改按系统名命名（Fedora 44 / WSL2 standalone Nix，本机）
+
+改动：`homeConfigurations` 三个 standalone 输出由 `xuqihao` / `xuqihao-aarch64` / `xuqihao-darwin` 改名为 `x86_64-linux` / `aarch64-linux` / `aarch64-darwin`（输出名不再随用户名变化；`homeDirectory` 与模块内容不变）。联动：`home/common.nix` 的 `hmTarget`（`hms` 目标）改为系统名；`bootstrap/{bootstrap,linux,darwin}.sh` 默认 target 按架构取系统名，显式传参须与本机架构一致（新增 fail-loud 校验），目标用户守卫从「target 剥后缀还原用户名比对 `id -un`」改为「直接比对 meta.json 的 username」——顺带堵上此前「显式传自己的登录名即可绕过守卫、直到激活阶段才失败」的缺口；`bootstrap.sh` 不再为派发读 meta.json；CI `eval.yml` 输出名同步。
+
+验证（本机求值/构建/激活）：五输出求值通过；两 NixOS toplevel drvPath 与改动前逐字节一致（`hms` 不注入 NixOS 侧），三个 standalone 输出 drvPath 如预期变化——构建 x86_64 activation 仅 4 个派生重建（bashrc→home-manager-files→generation 链），证明内容面只有 bashrc。本机激活 `.#x86_64-linux` 成功（gen 14，2026-09-24 00:42），新 bashrc 的 `hms` 指向 `.#x86_64-linux`；激活时 systemd 报 wslg-session.service degraded 为本机宿主既有问题，与本改动无关。另注：本机此前 profile 停在 2026-09-17 的 gen 13（仍含旧 hms 别名文本与 standalone 上早已门控排除的 `nrs='sudo nixos-rebuild'` 别名），本次激活一并追平。三脚本 `bash -n` 通过。
+
+未验证：aarch64 / darwin 输出仅求值（无 ARM/macOS 实机）；darwin.sh 新目标校验与守卫文案未实跑（与 linux.sh 同构改法，经 bash -n + 逐段核对）；bootstrap 全链路未在已激活的本机重跑；CI 在本批提交上的运行。
+
 ## 2026-09-19 nrs/nh 实机首验 + WSL cgroup 用户管理器故障（NixOS-WSL 26.11，本机 wsl）
 
 无代码改动；对 9d4d8e7（多机兼容性五连改）遗留未验项 `nrs` 的实机验证。本机当时代际：gen 7（2026-09-19 13:35，已含 nh 与新别名，由用户经 sudo nixos-rebuild 激活）。

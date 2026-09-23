@@ -6,7 +6,7 @@
 #
 # 统一入口是 bootstrap/bootstrap.sh（自动检测环境后派发到本脚本）；本脚本仍可单独运行。
 #
-# 用法（两种等价入口，默认 flake target = xuqihao-darwin，当前用户需可 sudo）：
+# 用法（两种等价入口，默认 flake target = aarch64-darwin，当前用户需可 sudo）：
 #     bash bootstrap/darwin.sh [flake-target]    # 仓库内运行
 #     bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/darwin.sh)
 #                                                # 仓库外一键运行：先把仓库取到 ~/nix-roam 再重跑本脚本
@@ -63,23 +63,27 @@ LOG_FILE="$LOG_DIR/darwin-$(date +%Y%m%d-%H%M%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 log "运行日志：$LOG_FILE"
 
-# 默认 target 的用户名读 meta.json 单点定义（与 linux.sh/nixos.sh 同法；显式传参优先）
+# 默认 target 即系统名输出（flake.nix 的 homeConfigurations.aarch64-darwin，不随用户名变化）；
+# username 读 meta.json 单点定义（与 linux.sh/nixos.sh 同法），供 0.7 目标用户守卫使用
 FLAKE_USER="$(sed -n 's/.*"username": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
 [ -n "$FLAKE_USER" ] || { echo "错误：无法从 meta.json 解析 username（文件缺失或格式变化）。" >&2; exit 1; }
-FLAKE_TARGET="${1:-${FLAKE_USER}-darwin}"
+FLAKE_TARGET="${1:-aarch64-darwin}"
+if [ "$FLAKE_TARGET" != "aarch64-darwin" ]; then
+  echo "错误：macOS 仅有 aarch64-darwin 一个 standalone 输出（Intel Mac 不受支持）。" >&2
+  exit 1
+fi
 TS="$(date +%Y%m%d-%H%M%S)"
 NIX_CONF="$HOME/.config/nix/nix.conf"
 GITHUB_TOKEN_CONF="$HOME/.config/nix/github-access-tokens.conf"
 
 # --- 0.7 目标用户守卫 ---
-#     standalone HM 只能为当前用户激活：target 用户名与当前登录用户不符时直接中止，
+#     standalone HM 只能为当前用户激活：meta.json 单点定义的用户名与当前登录用户不符时直接中止，
 #     避免出现「先改了系统 nix 配置、激活阶段才写不进他人 HOME」的半配置状态。
-#     换用户名使用本仓库：改 meta.json 的 username 单点定义，再传对应 target。
-TARGET_USER="${FLAKE_TARGET%-darwin}"
-if [ "$(id -un)" != "$TARGET_USER" ]; then
-  echo "错误：当前用户 $(id -un) 与 flake target ${FLAKE_TARGET} 的用户 ${TARGET_USER} 不一致。" >&2
+#     换用户名使用本仓库：改 meta.json 的 username 单点定义后重跑（输出名按系统命名，不受影响）。
+if [ "$(id -un)" != "$FLAKE_USER" ]; then
+  echo "错误：当前用户 $(id -un) 与 meta.json 定义的 username ${FLAKE_USER} 不一致。" >&2
   echo "      如需以 $(id -un) 使用本仓库：编辑 meta.json 的 username 为 \"$(id -un)\"（单点定义），" >&2
-  echo "      然后运行 bash bootstrap/darwin.sh $(id -un)-darwin。" >&2
+  echo "      然后重新运行本脚本（默认 target 即 aarch64-darwin，无需传参）。" >&2
   exit 1
 fi
 
