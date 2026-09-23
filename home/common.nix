@@ -7,12 +7,13 @@
 
 let
   isLinux = pkgs.stdenv.hostPlatform.isLinux;
-  # standalone 输出名按求值目标架构派生：Linux 双架构显式输出 + macOS。
-  # hms 别名据此自动选 target，aarch64 机器上裸敲 hms 同样正确（→ .#xuqihao-aarch64）。
+  # standalone 输出名即系统名（flake.nix 的 homeConfigurations.x86_64-linux / aarch64-linux /
+  # aarch64-darwin），不随用户名变化。hms 别名据此自动选 target，
+  # aarch64 机器上裸敲 hms 同样正确（→ .#aarch64-linux）。
   hmTarget =
     if isLinux
-    then (if pkgs.stdenv.hostPlatform.isAarch64 then "${username}-aarch64" else username)
-    else "${username}-darwin";
+    then (if pkgs.stdenv.hostPlatform.isAarch64 then "aarch64-linux" else "x86_64-linux")
+    else "aarch64-darwin";
 in
 {
   imports = [
@@ -74,8 +75,9 @@ in
     # bash 模块没有 functions 选项（那是 zsh 的），交互式函数走 initExtra。
     # 仅 standalone 模式注入：NixOS（桌面/WSL）走集成 HM + nrs，没有 standalone profile 可切
     # （必须属性集级门控，见上方注释）。
-    # target 由 meta.json 单点定义的 username 派生（Linux .#<user>，macOS .#<user>-darwin，避免误激活另一平台）；
-    # 先校验当前登录用户，不符时明确拒绝，而不是把配置写进别人的 HOME。
+    # target 按求值平台取系统名输出（Linux .#x86_64-linux / .#aarch64-linux，macOS .#aarch64-darwin，
+    # 避免误激活另一平台，也不随用户名变化）；先校验当前登录用户与 meta.json 的 username，
+    # 不符时明确拒绝，而不是把配置写进别人的 HOME。
     initExtra = ''
       hms() {
         if [ "$(id -un)" = "${username}" ]; then

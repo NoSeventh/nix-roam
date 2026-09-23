@@ -5,7 +5,7 @@
 #
 #   macOS             → bootstrap/darwin.sh（aarch64-darwin；Intel Mac 由其守卫拒绝）
 #   NixOS / NixOS-WSL → bootstrap/nixos.sh（install/adopt 与 nixos/wsl 由其自检；需要 root，非 root 自动 sudo 拾起）
-#   普通 Linux / WSL   → bootstrap/linux.sh（架构自动选 target：x86_64 → <user>，aarch64 → <user>-aarch64；
+#   普通 Linux / WSL   → bootstrap/linux.sh（架构自动选 target：x86_64 → x86_64-linux，aarch64 → aarch64-linux；
 #                        systemd + sudo → 多用户 Determinate 安装，否则单用户 --no-daemon）
 #
 # 用法（两种等价入口；参数原样传给子脚本 —— standalone 传 flake target，NixOS 传 install|adopt / --target）：
@@ -73,12 +73,11 @@ case "$(uname -s)" in
         ;;
     esac
 
-    # 架构 → 默认 target（用户名读 meta.json 单点定义；显式传参优先）
-    FLAKE_USER="$(sed -n 's/.*"username": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
-    [ -n "$FLAKE_USER" ] || { echo "错误：无法从 meta.json 解析 username（文件缺失或格式变化）。" >&2; exit 1; }
+    # 架构 → 默认 target（standalone 输出名=系统名，不随用户名变化；显式传参优先，
+    # 由 linux.sh 校验与本机架构一致；目标用户守卫也在 linux.sh，读 meta.json 的 username）
     case "$(uname -m)" in
-      x86_64)        DEFAULT_TARGET="$FLAKE_USER" ;;
-      aarch64|arm64) DEFAULT_TARGET="$FLAKE_USER-aarch64" ;;
+      x86_64)        DEFAULT_TARGET="x86_64-linux" ;;
+      aarch64|arm64) DEFAULT_TARGET="aarch64-linux" ;;
       *)
         echo "错误：架构 $(uname -m) 没有对应的 flake 输出（standalone Linux 仅提供 x86_64-linux / aarch64-linux）。" >&2
         exit 1
