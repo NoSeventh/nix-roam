@@ -95,16 +95,71 @@ NIX_CONF="$HOME/.config/nix/nix.conf"
 GITHUB_TOKEN_CONF="$HOME/.config/nix/github-access-tokens.conf"
 
 # --- 0.7 目标用户守卫 ---
-#     standalone HM 只能为当前用户激活：meta.json 单点定义的用户名与当前登录用户不符时直接中止，
-#     避免出现「先改了系统 nix 配置、激活阶段才写不进他人 HOME」的半配置状态。
-#     换用户名使用本仓库：改 meta.json 的 username 单点定义后重跑（输出名按系统命名，不受影响）。
+#     standalone HM 只能为当前用户激活：meta.json 单点定义的用户名与当前登录用户不符时——
+#       · 目标用户已存在：不改动既有账号，提示直接以它登录重跑，或改 meta.json；
+#       · 交互终端且可 sudo：询问是否创建该系统用户并切换过去继续（useradd -m + 交互设密码
+#         + 加入提权组，仓库复制到新用户家目录后以它重跑本脚本）——与 NixOS 侧
+#         「flake 直接 users.users.<username> 建号」对齐；
+#       · 否则：fail-loud 中止并给出改 meta.json 单点定义的指引，
+#     均发生在改动任何系统 nix 配置之前，避免半配置状态。
 FLAKE_USER="$(sed -n 's/.*"username": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
 [ -n "$FLAKE_USER" ] || { echo "错误：无法从 meta.json 解析 username（文件缺失或格式变化）。" >&2; exit 1; }
-if [ "$(id -un)" != "$FLAKE_USER" ]; then
-  echo "错误：当前用户 $(id -un) 与 meta.json 定义的 username ${FLAKE_USER} 不一致。" >&2
-  echo "      如需以 $(id -un) 使用本仓库：编辑 meta.json 的 username 为 \"$(id -un)\"（单点定义），" >&2
-  echo "      然后重新运行本脚本（target 按架构自动选择，无需传参）。" >&2
-  exit 1
+CURRENT_USER="$(id -un)"
+if [ "$CURRENT_USER" != "$FLAKE_USER" ]; then
+  if id "$FLAKE_USER" >/dev/null 2>&1; then
+    echo "错误：当前用户 ${CURRENT_USER} 与 meta.json 定义的 username ${FLAKE_USER} 不一致，且系统已存在用户 ${FLAKE_USER}（不改动既有账号）。" >&2
+    echo "      请以 ${FLAKE_USER} 登录后重跑本脚本（WSL 可从 Windows 侧 wsl -u ${FLAKE_USER} 进入），" >&2
+    echo "      或编辑 meta.json 的 username 为 \"${CURRENT_USER}\"（单点定义）后重跑。" >&2
+    exit 1
+  fi
+  if [ -t 0 ] && have sudo && sudo -v 2>/dev/null; then
+    read -r -p "当前用户 ${CURRENT_USER} 与 meta.json 定义的 username ${FLAKE_USER} 不一致。创建系统用户 ${FLAKE_USER} 并以它继续安装？[y/N] " GUARD_ANSWER
+    case "$GUARD_ANSWER" in
+      y|Y)
+        echo "    创建用户 ${FLAKE_USER}（useradd -m，shell 用 bash）"
+        sudo useradd -m -s "$(command -v bash)" "$FLAKE_USER" || { echo "错误：useradd ${FLAKE_USER} 失败。" >&2; exit 1; }
+        # 提权组：Debian 系是 sudo 组、RHEL 系是 wheel，两个都尝试（不存在的组跳过）
+        sudo usermod -aG sudo  "$FLAKE_USER" 2>/dev/null || true
+        sudo usermod -aG wheel "$FLAKE_USER" 2>/dev/null || true
+        id -nG "$FLAKE_USER" | tr ' ' '\n' | grep -qx -e sudo -e wheel \
+          || echo "    ⚠️ 未能把 ${FLAKE_USER} 加入 sudo/wheel 提权组（发行版差异）；多用户安装需要提权，请以该用户登录后自行加入再重跑。"
+        sudo passwd "$FLAKE_USER"  # 交互设置登录密码（登录与 sudo 提权都要用）
+        # 仓库复制到新用户家目录（归其所有，日后可 git pull）；失败则退回当前副本（只读使用）
+        NEW_HOME="$(getent passwd "$FLAKE_USER" 2>/dev/null | cut -d: -f6)"
+        [ -n "$NEW_HOME" ] || NEW_HOME="/home/$FLAKE_USER"
+        NEW_REPO=""
+        if sudo -u "$FLAKE_USER" cp -a "$REPO_ROOT" "$NEW_HOME/nix-roam" 2>/dev/null; then
+          NEW_REPO="$NEW_HOME/nix-roam"
+          echo "    仓库已复制到 ${NEW_REPO}（属 ${FLAKE_USER}，日常更新在其中进行）"
+        else
+          echo "    ⚠️ 复制仓库到 ${NEW_HOME} 失败，改用当前副本 ${REPO_ROOT}（只读使用；新用户日后请自行克隆）"
+        fi
+        case "$(uname -r)" in
+          *microsoft-standard*|*Microsoft-standard*)
+            cat <<WSLHINT
+    WSL 提示：要把 ${FLAKE_USER} 设为默认登录用户，请在 /etc/wsl.conf 加入
+        [user]
+        default=${FLAKE_USER}
+      并在 Windows 侧 wsl --shutdown 后重开；本次安装不受影响（下面直接以该用户继续）。
+WSLHINT
+            ;;
+        esac
+        log "以 ${FLAKE_USER} 重跑本脚本（日志将切到该用户名下的新文件）…"
+        exec sudo --login --user "$FLAKE_USER" -- bash "${NEW_REPO:-$REPO_ROOT}/bootstrap/linux.sh" "$@"
+        ;;
+      *)
+        echo "错误：已选择不创建用户。如需以 ${CURRENT_USER} 使用本仓库：" >&2
+        echo "      编辑 meta.json 的 username 为 \"${CURRENT_USER}\"（单点定义），然后重新运行本脚本（target 按架构自动选择，无需传参）。" >&2
+        exit 1
+        ;;
+    esac
+  else
+    echo "错误：当前用户 ${CURRENT_USER} 与 meta.json 定义的 username ${FLAKE_USER} 不一致（非交互终端或无 sudo，无法询问建号）。" >&2
+    echo "      如需以 ${CURRENT_USER} 使用本仓库：编辑 meta.json 的 username 为 \"${CURRENT_USER}\"（单点定义），" >&2
+    echo "      然后重新运行本脚本（target 按架构自动选择，无需传参）；" >&2
+    echo "      或由管理员创建用户 ${FLAKE_USER}（useradd -m）并以其登录重跑。" >&2
+    exit 1
+  fi
 fi
 
 # --- 0.8 安装模式判定 ---

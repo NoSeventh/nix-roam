@@ -14,7 +14,7 @@
 | NixOS | `nixosConfigurations.nixos` | 保留 | x86_64-linux 完整系统、桌面与服务配置 |
 | macOS | `homeConfigurations.aarch64-darwin` | 结构就绪、未实测 | aarch64-darwin 纯 CLI 环境 |
 
-> 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。本地用户名在仓库根 `meta.json` 单点定义（`"username": "xuqihao"`），换登录名只改这一行——NixOS 用户创建、`hms` 的用户校验与 bootstrap 目标用户守卫都随之联动；standalone 输出按系统命名（`.#x86_64-linux` / `.#aarch64-linux` / `.#aarch64-darwin`），不随用户名变化；`bootstrap/linux.sh`/`darwin.sh` 会在目标用户与当前登录用户不符时直接拒绝，脚本解析不到 username 时也会明确报错而非回落默认值。远程 IHEP/JUNO 账号与 git 身份在 `home/common.nix`，需单独调整。直接复用前，请先搜索 `xuqihao` 并按自己的环境核对。
+> 这是带有用户名、Home 路径、Git 身份和个人 SSH 主机等信息的个人配置。本地用户名在仓库根 `meta.json` 单点定义（`"username": "xuqihao"`），换登录名只改这一行——NixOS 用户创建、`hms` 的用户校验与 bootstrap 目标用户守卫都随之联动；standalone 输出按系统命名（`.#x86_64-linux` / `.#aarch64-linux` / `.#aarch64-darwin`），不随用户名变化；`bootstrap/linux.sh`/`darwin.sh` 在目标用户与当前登录用户不符时会先询问是否创建该用户并切换过去继续（交互终端且可 sudo 时；已存在的用户不会被改动），非交互或无 sudo 则直接拒绝；脚本解析不到 username 时也会明确报错而非回落默认值。远程 IHEP/JUNO 账号与 git 身份在 `home/common.nix`，需单独调整。直接复用前，请先搜索 `xuqihao` 并按自己的环境核对。
 
 表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；具体验证环境（发行版 / 主机）以各条验证记录为准，状态表不钉住易变的发行版名。macOS 仅支持 Apple Silicon（aarch64-darwin），standalone Linux 提供 x86_64 与 aarch64 两个显式输出（NixOS 输出仍为 x86_64-linux）。
 
@@ -78,7 +78,7 @@ git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git ~/nix-roam
 bash ~/nix-roam/bootstrap/bootstrap.sh
 ```
 
-脚本会依次安装 Nix（systemd + sudo → 多用户 Determinate；否则单用户 `--no-daemon`，见一键安装小节）、配置国内缓存（多用户写 `/etc/nix` daemon 信任，单用户写用户级 nix.conf）、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活按架构选择的 target（x86_64 → `x86_64-linux`，aarch64 → `aarch64-linux`）。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
+脚本会依次安装 Nix（systemd + sudo → 多用户 Determinate；否则单用户 `--no-daemon`，见一键安装小节）、配置国内缓存（多用户写 `/etc/nix` daemon 信任，单用户写用户级 nix.conf）、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活按架构选择的 target（x86_64 → `x86_64-linux`，aarch64 → `aarch64-linux`）。当前登录用户与 `meta.json` 的 username 不一致时，脚本会在动手前询问是否创建该用户（useradd + 交互设密码 + 复制仓库到其家目录，然后以它重跑全程）；拒绝或非交互则中止并提示改 `meta.json`。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
 
 脚本会跳过部分已完成步骤；Home Manager 已接管配置后，日常更新直接使用 `home-manager switch`（或 `hms` 别名，自动选择当前架构的 target）。激活后打开新登录 shell；原 SSH 配置中需要保留的主机请合并到 `home/common.nix`。实际使用 zsh / fish 时（登录 shell 是它，或对应 rc 文件已存在），激活会幂等追加 HM 会话环境加载段（fish 未装 bass 时仅加 PATH）；bash-only 的机器不会凭空创建这些文件。
 
