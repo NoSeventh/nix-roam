@@ -77,14 +77,51 @@ NIX_CONF="$HOME/.config/nix/nix.conf"
 GITHUB_TOKEN_CONF="$HOME/.config/nix/github-access-tokens.conf"
 
 # --- 0.7 目标用户守卫 ---
-#     standalone HM 只能为当前用户激活：meta.json 单点定义的用户名与当前登录用户不符时直接中止，
-#     避免出现「先改了系统 nix 配置、激活阶段才写不进他人 HOME」的半配置状态。
-#     换用户名使用本仓库：改 meta.json 的 username 单点定义后重跑（输出名按系统命名，不受影响）。
-if [ "$(id -un)" != "$FLAKE_USER" ]; then
-  echo "错误：当前用户 $(id -un) 与 meta.json 定义的 username ${FLAKE_USER} 不一致。" >&2
-  echo "      如需以 $(id -un) 使用本仓库：编辑 meta.json 的 username 为 \"$(id -un)\"（单点定义），" >&2
-  echo "      然后重新运行本脚本（默认 target 即 aarch64-darwin，无需传参）。" >&2
-  exit 1
+#     与 linux.sh 同构：目标用户已存在→不改动既有账号，提示换登；交互终端且可 sudo→
+#     询问是否创建该系统用户并切换过去继续（sysadminctl -addUser -admin 入 admin 组即有 sudo，
+#     密码经 -password prompt 在终端内交互设置；仓库复制到新用户家目录后以它重跑本脚本）；
+#     否则 fail-loud 中止。均发生在改动任何系统 nix 配置之前。
+FLAKE_USER="$(sed -n 's/.*"username": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
+[ -n "$FLAKE_USER" ] || { echo "错误：无法从 meta.json 解析 username（文件缺失或格式变化）。" >&2; exit 1; }
+CURRENT_USER="$(id -un)"
+if [ "$CURRENT_USER" != "$FLAKE_USER" ]; then
+  if id "$FLAKE_USER" >/dev/null 2>&1; then
+    echo "错误：当前用户 ${CURRENT_USER} 与 meta.json 定义的 username ${FLAKE_USER} 不一致，且系统已存在用户 ${FLAKE_USER}（不改动既有账号）。" >&2
+    echo "      请以 ${FLAKE_USER} 登录后重跑本脚本，或编辑 meta.json 的 username 为 \"${CURRENT_USER}\"（单点定义）后重跑。" >&2
+    exit 1
+  fi
+  if [ -t 0 ] && sudo -v 2>/dev/null; then
+    read -r -p "当前用户 ${CURRENT_USER} 与 meta.json 定义的 username ${FLAKE_USER} 不一致。创建系统用户 ${FLAKE_USER} 并以它继续安装？[y/N] " GUARD_ANSWER
+    case "$GUARD_ANSWER" in
+      y|Y)
+        echo "    创建用户 ${FLAKE_USER}（sysadminctl -addUser -admin，密码在终端内交互设置）"
+        sudo sysadminctl -addUser "$FLAKE_USER" -fullName "nix-roam" -admin -password prompt \
+          || { echo "错误：sysadminctl -addUser ${FLAKE_USER} 失败。" >&2; exit 1; }
+        NEW_HOME="$(dscl . -read "/Users/$FLAKE_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+        [ -n "$NEW_HOME" ] || NEW_HOME="/Users/$FLAKE_USER"
+        NEW_REPO=""
+        if sudo -u "$FLAKE_USER" cp -a "$REPO_ROOT" "$NEW_HOME/nix-roam" 2>/dev/null; then
+          NEW_REPO="$NEW_HOME/nix-roam"
+          echo "    仓库已复制到 ${NEW_REPO}（属 ${FLAKE_USER}，日常更新在其中进行）"
+        else
+          echo "    ⚠️ 复制仓库到 ${NEW_HOME} 失败，改用当前副本 ${REPO_ROOT}（只读使用；新用户日后请自行克隆）"
+        fi
+        log "以 ${FLAKE_USER} 重跑本脚本（日志将切到该用户名下的新文件）…"
+        exec sudo --login --user "$FLAKE_USER" -- bash "${NEW_REPO:-$REPO_ROOT}/bootstrap/darwin.sh" "$@"
+        ;;
+      *)
+        echo "错误：已选择不创建用户。如需以 ${CURRENT_USER} 使用本仓库：" >&2
+        echo "      编辑 meta.json 的 username 为 \"${CURRENT_USER}\"（单点定义），然后重新运行本脚本（默认 target 即 aarch64-darwin，无需传参）。" >&2
+        exit 1
+        ;;
+    esac
+  else
+    echo "错误：当前用户 ${CURRENT_USER} 与 meta.json 定义的 username ${FLAKE_USER} 不一致（非交互终端或无 sudo，无法询问建号）。" >&2
+    echo "      如需以 ${CURRENT_USER} 使用本仓库：编辑 meta.json 的 username 为 \"${CURRENT_USER}\"（单点定义），" >&2
+    echo "      然后重新运行本脚本（默认 target 即 aarch64-darwin，无需传参）；" >&2
+    echo "      或由管理员创建用户 ${FLAKE_USER}（sysadminctl -addUser）并以其登录重跑。" >&2
+    exit 1
+  fi
 fi
 
 # ---------------------------------------------------------------------------

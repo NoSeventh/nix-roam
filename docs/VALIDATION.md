@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-24 standalone 用户守卫改为可建号（Fedora 44 / WSL2 standalone Nix，本机）
+
+改动：`bootstrap/linux.sh`/`darwin.sh` 的 0.7 目标用户守卫从「用户名不符即中止」升级：目标用户已存在 → 提示换登重跑（不动既有账号）；交互终端且可 sudo → 询问是否创建 meta.json 定义的系统用户并以它继续——linux 走 `useradd -m` + 交互 `passwd` + best-effort 加入 sudo/wheel 提权组，darwin 走 `sysadminctl -addUser … -admin -password prompt`；随后仓库 `cp -a` 到新用户家目录（失败回退当前副本只读使用），`exec sudo --login --user` 以新用户重跑本脚本（与 NixOS 侧 flake 直接 `users.users.<username>` 建号对齐）；拒绝/非交互/无 sudo 仍 fail-loud 中止并给 meta.json 指引。WSL 下打印 `/etc/wsl.conf` 默认用户设置提示但不自动写。
+
+验证（桩测，本机）：`linux.sh` 分支实跑覆盖——非交互中止 ✓；交互拒绝（改 meta.json 指引）✓；交互同意全链路（useradd/usermod/passwd/getent 经 PATH shim 桩替，真实执行了提权组校验、`cp -a` 复制、WSL 提示、以新用户重跑**复制出的仓库副本**、第二轮守卫再触发）✓；复制失败回退原仓库重跑的兜底分支 ✓；目标用户已存在（root）提示换登 ✓。四脚本 `bash -n` 通过。桩测期间发现并修正的三处均为桩缺陷（sudo shim 漏过滤 `-v`、getent 桩的 passwd 行少 GECOS 字段、useradd 桩未建家目录），非脚本缺陷。
+
+未验证：真实 `useradd`/`passwd`/提权组在实机的执行、以新建用户身份走完七步安装（本机登录名即 xuqihao，无法自然触发真实建号分支）；`darwin.sh` 整条链路含 `sysadminctl -addUser -password prompt` 语法（按官方文档核对，从未实机运行）；CI 在本批提交上的运行。
+
 ## 2026-09-24 standalone 输出改按系统名命名（Fedora 44 / WSL2 standalone Nix，本机）
 
 改动：`homeConfigurations` 三个 standalone 输出由 `xuqihao` / `xuqihao-aarch64` / `xuqihao-darwin` 改名为 `x86_64-linux` / `aarch64-linux` / `aarch64-darwin`（输出名不再随用户名变化；`homeDirectory` 与模块内容不变）。联动：`home/common.nix` 的 `hmTarget`（`hms` 目标）改为系统名；`bootstrap/{bootstrap,linux,darwin}.sh` 默认 target 按架构取系统名，显式传参须与本机架构一致（新增 fail-loud 校验），目标用户守卫从「target 剥后缀还原用户名比对 `id -un`」改为「直接比对 meta.json 的 username」——顺带堵上此前「显式传自己的登录名即可绕过守卫、直到激活阶段才失败」的缺口；`bootstrap.sh` 不再为派发读 meta.json；CI `eval.yml` 输出名同步。
