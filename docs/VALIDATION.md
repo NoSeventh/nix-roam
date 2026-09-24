@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-24 单用户安装激活后 nix 不在 PATH（ArchLinux-WSL 首次 single 全程安装，本机 ArchLinux-WSL）
+
+起因：ArchLinux-WSL（裸机、原本无 xuqihao 用户）经 bootstrap 建号 + `NIX_INSTALL_MODE=single` 七步全程完成安装并激活（当日 18:34–18:50，gen 1），激活本身成功，但此后任何新登录 shell 都找不到 `nix`。根因：单用户安装的 PATH 挂钩由官方安装器写进用户 dotfile（`~/.bash_profile` 尾行 source `~/.nix-profile/etc/profile.d/nix.sh`），而 HM 激活把 bash 登录链三件套（`.bash_profile`/`.profile`/`.bashrc`）整体替换为 store symlink，原文件轮转入 `.bash_profile.backup`/`.bashrc.bak-*`；HM 侧 `home.sessionPath`（common.nix）却不含 `~/.nix-profile/bin`。多用户安装不受影响（钩子在系统侧 `/etc/profile.d/nix-daemon.sh`，经 `/etc/profile` 恒先于用户 dotfile 加载）——single 模式特有缺口；bootstrap 运行全程无感，因为脚本会话继承的是安装时已 source 的旧 dotfile 环境。
+
+改动：`home/standalone-linux.nix` 显式补 `home.sessionPath = [ "${homeDirectory}/.nix-profile/bin" ]`（listOf 合并与 common.nix 五条拼接；多用户机上与 nix-daemon.sh 注入重复无害；NixOS 模式不导入本文件不受影响，彼处无 `~/.nix-profile`）。`bootstrap/linux.sh` 7/7 之后新增 fail-loud 自检：`env -i` 干净环境起 `/bin/bash -lc` 验证 `command -v nix`，失败即报错退出并指向 sessionPath（zsh/fish 的 rc 追加段仅交互会话生效，注释中明确不在该检查范围）。
+
+验证（本机 ArchLinux-WSL / WSL2 / 单用户 Nix 2.35.2，standalone `.#x86_64-linux`）：`bash -n` 与 `nix-instantiate --parse` 通过；`nix build --no-link .#homeConfigurations.x86_64-linux.activationPackage` 构建通过（闭包全缓存，仅重出 profile/activation/files/hm-putter/generation 五个派生）；`home-manager switch` 激活 gen 2（9va1j13…）exit 0；干净登录 shell（`env -i … /bin/bash -lc`）实测修复前复现 `NO-NIX-IN-PATH`、修复后 `nix`→`~/.nix-profile/bin/nix`（2.35.2）且 `home-manager` 同目录可用；交互登录 shell `type -t hms` = function（hms 定义在 `.bashrc` 交互守卫之后，非交互 shell 不可见属预期）；新 `hm-session-vars.sh` 的 `export PATH` 末位含 `~/.nix-profile/bin`；bootstrap 自检代码块原样抽出复跑 PASS。
+
+未验证：aarch64-linux 输出（同模块，需 ARM 机）；自检在真实失败场景下的触发（仅正向复跑）；bootstrap 七步全程带新自检的重跑（本轮机器已装好，脚本幂等重跑属用户侧动作）；darwin 侧同类问题是否存在（macOS 安装器钩子在系统级 `/etc/zshrc`，理论不受影响，且 darwin.sh 从未实机运行）；CI 在本批提交上的运行。
+
 ## 2026-09-24 cachix 社区缓存补入缓存列表（Fedora 44 / WSL2 standalone，本机）
 
 起因：`hms` 在本日 `update flake`（c2e40c3，15:28）后失败——`home/nixvim.nix` 启用的 `rainbow-delimiters` 要 `vimPlugins.rainbow-delimiters-nvim` v0.12.0，其源码 FOD 由 `fetchgit` 从 gitlab.com 取；本机网络下 `getent hosts gitlab.com` 只给被污染的 Cloudflare IPv6（2606:4700:90:…），`git ls-remote` 40s 无响应，构建退化为 reset + 两次 300s 超时后失败，级联 `vimplugin → neovim → nixvim → home-manager-path → home-manager-generation`。查因：该插件在 nixpkgs 中 `meta.license = unfree` → `meta.hydraPlatforms = [ ]`，官方 Hydra 不构建，源码与产物都不在 cache.nixos.org（实测该 FOD `/nix/store/cxyk83xx…-rainbow-delimiters.nvim` 在 cache.nixos.org 与 NJU/TUNA/USTC/SJTU 四个镜像全 404，而同一 store 随机取 3 个 `-source` FOD 均为 200；drv 的 `outputHash` 与社区缓存 narinfo 的 `NarHash: sha256:0zy93xwc…` 一致）。旁证：store 中已存在此前 substitute 来的 `2n5q…-vimplugin-rainbow-delimiters.nvim-0.12.0`，说明 flake 更新换掉 neovim/插件派生路径前并不需要现抓——本次是路径变化与上游不可达同时发生。另注：报错开头的 `options.json` 警告是求值期噪音（`nixosOptionsDoc` 把 nixpkgs 源码路径写进 JSON 字符串，string context 丢失），与本故障无关。
