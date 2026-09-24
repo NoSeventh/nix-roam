@@ -8,6 +8,18 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-24 bootstrap 派发 → nixos.sh adopt 实机首跑 + 幻影 cgroup 二现（NixOS-WSL 26.11，本机 wsl）
+
+无代码改动；`bootstrap/bootstrap.sh`（派发器 → sudo 重 exec → `nixos.sh` adopt）在 NixOS-WSL 实机首跑——此前 install/adopt 两链路均未上过实机，派发器的 NixOS 分支亦为首次实跑。以 xuqihao 启动：派发器正确识别 `/etc/NIXOS` → nixos.sh；模式 adopt、目标 `.#wsl`（WSL 内核标记）、仓库 `/etc/nixos`；日志按设计落 root 侧 `/root/.local/state/nix-roam/nixos-20260924-155717.log`。
+
+验证（实机，1–5/7）：1/7 镜像信任已配置跳过 ✓，且正确识别 `/etc/nix/nix.conf` 为 nix.settings 托管 symlink → 不追加 include、镜像经 `NIX_CONFIG` 生效 ✓；2/7 token 留空沿用旧值 ✓（stdin 交互、未入日志）；3/7 `/etc/nixos` 已是本仓库克隆 → 复用不重拉 ✓；4/7 `/etc/NIXOS` 读不出原系统版本（该文件无版本串）→ 按共享 26.05 继续 ✓（本机 flake 即 26.05，无偏差）；5/7 `nixos-rebuild switch → .#wsl` 构建并激活 gen 4（fm49i01…，与 gen 2 同闭包；gen 3 为 9-19 临时树）✓，`home-manager-xuqihao.service` 15:57:28 激活成功（系统级服务不走用户总线）。
+
+发现一（宿主故障二现，非仓库回归）：stc exit 4——`reloading user units for xuqihao: Failed to open dbus connection (Unable to autolaunch a dbus-daemon without $DISPLAY)`。与 2026-09-19 首现同因：本 boot `user@1000.service` 全程未起、`/run/user/1000/bus` 缺失 → 仅用户单元重载一步失败，系统激活本身成功。恢复：Windows 侧 `wsl --shutdown` 重开 → `user@1000.service` 263ms Ready、用户级 NixOS activation 完成、`systemctl --user is-system-running` = running；fresh boot 直接加载 gen 4 用户单元，本轮未重跑 switch。两现间隔 5 天（kernel 6.6.114.1-microsoft-standard-WSL2 / systemd 261.2），再复现应追 WSL2 内核/systemd upstream。
+
+发现二（脚本边界，待改进项）：`set -euo pipefail` 下 stc exit 4（成功带警告）直接中止脚本，6/7（adopt 场景本为跳过提示）与 7/7（收尾提醒）未执行；激活已成功故无功能损失，但收尾信息被吞——后续可考虑 5/7 对 exit 4 容忍（仅非 4 的非零才中止）。
+
+未验证：install 链路（live ISO）仍无实机；adopt 的外来 `/etc/NIXOS`/`/etc/nixos` 备份分支与 stateVersion 不符确认分支（本机仓库即原生、版本一致未触发）；恢复后重跑 switch 的 exit 0（本轮以 fresh boot 替代，9-19 已单独验过）；CI 在本批提交上的运行。
+
 ## 2026-09-24 WSL 默认用户改为询问后写入 /etc/wsl.conf（Fedora 44 / WSL2 + ArchLinux-WSL 实机）
 
 改动：`linux.sh` 守卫建号分支的 WSL 提示升级为询问（`[Y/n]` 默认 Y）：同意则把 `[user] default=<username>` 合并进 `/etc/wsl.conf`——保留既有段落与键、原文件带时间戳备份、写失败仅警告不中断安装；拒绝则保留原手动提示。合并逻辑为纯 bash 函数 `wsl_conf_merge()`（内建 + 正则，零外部依赖）：实测作者日常 Fedora WSL 未安装 gawk，`awk` 不能假设存在（`darwin.sh` 的 awk 保留——macOS 系统自带 BSD awk）。
