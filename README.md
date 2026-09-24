@@ -78,7 +78,7 @@ git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git ~/nix-roam
 bash ~/nix-roam/bootstrap/bootstrap.sh
 ```
 
-脚本会依次安装 Nix（systemd + sudo → 多用户 Determinate；否则单用户 `--no-daemon`，见一键安装小节）、配置国内缓存（多用户写 `/etc/nix` daemon 信任，单用户写用户级 nix.conf）、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活按架构选择的 target（x86_64 → `x86_64-linux`，aarch64 → `aarch64-linux`）。当前登录用户与 `meta.json` 的 username 不一致时，脚本会在动手前询问是否创建该用户（useradd + 交互设密码 + 复制仓库到其家目录，然后以它重跑全程）；拒绝或非交互则中止并提示改 `meta.json`。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
+脚本会依次安装 Nix（systemd + sudo → 多用户 Determinate；否则单用户 `--no-daemon`，见一键安装小节）、配置国内缓存（多用户写 `/etc/nix` daemon 信任，单用户写用户级 nix.conf）、可选配置 GitHub token、开启 flakes、备份可能冲突的用户文件、安装 Home Manager，并激活按架构选择的 target（x86_64 → `x86_64-linux`，aarch64 → `aarch64-linux`）。当前登录用户与 `meta.json` 的 username 不一致时，脚本会在动手前询问是否创建该用户（useradd + 交互设密码 + 复制仓库到其家目录，然后以它重跑全程）；root 直跑同样支持且无需 sudo（无 sudo 的机器上会预建 `/nix`、自动走单用户安装）；拒绝或非交互则中止并提示改 `meta.json`。token 保存在仓库外的 `~/.config/nix/github-access-tokens.conf`（0600），用来缓解 Nix 获取 GitHub 输入时的 API 限流，与 Git 推送认证及 `gh auth login` 分开。
 
 脚本会跳过部分已完成步骤；Home Manager 已接管配置后，日常更新直接使用 `home-manager switch`（或 `hms` 别名，自动选择当前架构的 target）。激活后打开新登录 shell；原 SSH 配置中需要保留的主机请合并到 `home/common.nix`。实际使用 zsh / fish 时（登录 shell 是它，或对应 rc 文件已存在），激活会幂等追加 HM 会话环境加载段（fish 未装 bass 时仅加 PATH）；bash-only 的机器不会凭空创建这些文件。
 
