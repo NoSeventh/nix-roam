@@ -16,6 +16,16 @@
     !include ${config.home.homeDirectory}/.config/nix/github-access-tokens.conf
   '';
 
+  # 单用户 Nix 安装（bootstrap/linux.sh 的 NIX_INSTALL_MODE=single）没有系统级
+  # /etc/profile.d/nix-daemon.sh 钩子，其 PATH 挂钩由安装器写进用户 dotfile —— 而 bash
+  # 登录链（.profile/.bash_profile/.bashrc）恰由 HM 托管接管，激活即失效（2026-09-24
+  # ArchLinux-WSL 首次 single 模式安装实测踩中）。故在此显式把用户 profile 放进
+  # sessionPath；多用户安装上该目录本就经 nix-daemon.sh 在 PATH 里，重复无害。
+  # NixOS 模式不导入本文件（用户 PATH 由系统 profile 提供，无 ~/.nix-profile）。
+  home.sessionPath = [
+    "${config.home.homeDirectory}/.nix-profile/bin"
+  ];
+
   # 非 bash 登录 shell 的会话环境兜底（与 darwin 入口同款思路，Linux 侧覆盖 zsh 与 fish）：
   # 不启用 programs.zsh / programs.fish、不接管 rc 文件，只在每次激活时幂等地追加带守卫的
   # 加载段（不改其余内容；不需要时删掉该段即可退出）。bash 登录链（.profile/.bash_profile）

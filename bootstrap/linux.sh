@@ -442,6 +442,18 @@ have home-manager || { echo "错误：home-manager 安装失败。" >&2; exit 1;
 log "7/7 激活 flake target: ${FLAKE_TARGET}"
 home-manager switch -b backup --flake ".#${FLAKE_TARGET}"
 
+# 激活后自检（fail-loud）：HM 接管 bash 登录链后，单用户安装在用户 dotfile 里写下的
+# PATH 钩子会随之失效 —— standalone-linux.nix 的 home.sessionPath 负责补上；此处用
+# 干净环境起一个 bash 登录 shell 验证 nix 仍可用，防止同类回归静默通过。
+# （zsh/fish 走 rc 追加段、仅交互会话生效，非交互登录链测不了，不在本检查范围。）
+if ! env -i HOME="$HOME" USER="$(id -un)" LOGNAME="$(id -un)" TERM="${TERM:-xterm}" \
+     /bin/bash -lc 'command -v nix >/dev/null 2>&1'; then
+  echo "错误：激活后新 bash 登录 shell 的 PATH 中找不到 nix。" >&2
+  echo "      检查 home/standalone-linux.nix 的 home.sessionPath 是否包含 ~/.nix-profile/bin。" >&2
+  exit 1
+fi
+echo "    自检通过：干净 bash 登录 shell 中 nix 可用（PATH 钩子在 HM 接管 dotfile 后仍有效）"
+
 cat <<EOF
 
 完成。请打开新 shell（或 exec bash -l）以加载新环境。
