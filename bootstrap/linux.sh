@@ -96,11 +96,13 @@ GITHUB_TOKEN_CONF="$HOME/.config/nix/github-access-tokens.conf"
 
 # --- 0.7 目标用户守卫 ---
 #     standalone HM 只能为当前用户激活：meta.json 单点定义的用户名与当前登录用户不符时——
-#       · 目标用户已存在：不改动既有账号，提示直接以它登录重跑，或改 meta.json；
-#       · 交互终端且可 sudo：询问是否创建该系统用户并切换过去继续（useradd -m + 交互设密码
-#         + 加入提权组，仓库复制到新用户家目录后以它重跑本脚本）——与 NixOS 侧
-#         「flake 直接 users.users.<username> 建号」对齐；
-#       · 否则：fail-loud 中止并给出改 meta.json 单点定义的指引，
+#       · 目标用户已存在：不改动既有账号，提示直接以它登录重跑（root 可 su -l），或改 meta.json；
+#       · 交互终端且有提权能力（root 本身，或非 root 可 sudo）：询问是否创建该系统用户并切换
+#         过去继续（useradd -m + 交互设密码 + best-effort 提权组，仓库复制到新用户家目录后
+#         以它重跑本脚本）——与 NixOS 侧「flake 直接 users.users.<username> 建号」对齐。
+#         root 直跑不加 sudo 前缀、切换用 runuser（缺失退 su -l）；无 sudo 二进制的机器上
+#         预建 /nix 并 chown 给新用户，让重跑落入单用户安装（多用户安装需要提权）。
+#       · 否则：fail-loud 中止并给出改 meta.json 单点定义的指引。
 #     均发生在改动任何系统 nix 配置之前，避免半配置状态。
 FLAKE_USER="$(sed -n 's/.*"username": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
 [ -n "$FLAKE_USER" ] || { echo "错误：无法从 meta.json 解析 username（文件缺失或格式变化）。" >&2; exit 1; }
@@ -108,28 +110,49 @@ CURRENT_USER="$(id -un)"
 if [ "$CURRENT_USER" != "$FLAKE_USER" ]; then
   if id "$FLAKE_USER" >/dev/null 2>&1; then
     echo "错误：当前用户 ${CURRENT_USER} 与 meta.json 定义的 username ${FLAKE_USER} 不一致，且系统已存在用户 ${FLAKE_USER}（不改动既有账号）。" >&2
-    echo "      请以 ${FLAKE_USER} 登录后重跑本脚本（WSL 可从 Windows 侧 wsl -u ${FLAKE_USER} 进入），" >&2
+    echo "      请以 ${FLAKE_USER} 登录后重跑本脚本（root 可直接 su -l ${FLAKE_USER}；WSL 可从 Windows 侧 wsl -u ${FLAKE_USER} 进入），" >&2
     echo "      或编辑 meta.json 的 username 为 \"${CURRENT_USER}\"（单点定义）后重跑。" >&2
     exit 1
   fi
-  if [ -t 0 ] && have sudo && sudo -v 2>/dev/null; then
+  IS_ROOT=0; [ "$(id -u)" -eq 0 ] && IS_ROOT=1
+  PRIV_OK=0
+  if [ "$IS_ROOT" -eq 1 ] || { have sudo && sudo -v 2>/dev/null; }; then PRIV_OK=1; fi
+  if [ -t 0 ] && [ "$PRIV_OK" -eq 1 ]; then
     read -r -p "当前用户 ${CURRENT_USER} 与 meta.json 定义的 username ${FLAKE_USER} 不一致。创建系统用户 ${FLAKE_USER} 并以它继续安装？[y/N] " GUARD_ANSWER
     case "$GUARD_ANSWER" in
       y|Y)
+        # root 直跑不加 sudo 前缀；非 root 借当前会话的 sudo 提权
+        if [ "$IS_ROOT" -eq 1 ]; then SUDO=""; else SUDO="sudo"; fi
         echo "    创建用户 ${FLAKE_USER}（useradd -m，shell 用 bash）"
-        sudo useradd -m -s "$(command -v bash)" "$FLAKE_USER" || { echo "错误：useradd ${FLAKE_USER} 失败。" >&2; exit 1; }
-        # 提权组：Debian 系是 sudo 组、RHEL 系是 wheel，两个都尝试（不存在的组跳过）
-        sudo usermod -aG sudo  "$FLAKE_USER" 2>/dev/null || true
-        sudo usermod -aG wheel "$FLAKE_USER" 2>/dev/null || true
-        id -nG "$FLAKE_USER" | tr ' ' '\n' | grep -qx -e sudo -e wheel \
-          || echo "    ⚠️ 未能把 ${FLAKE_USER} 加入 sudo/wheel 提权组（发行版差异）；多用户安装需要提权，请以该用户登录后自行加入再重跑。"
-        sudo passwd "$FLAKE_USER"  # 交互设置登录密码（登录与 sudo 提权都要用）
+        $SUDO useradd -m -s "$(command -v bash)" "$FLAKE_USER" || { echo "错误：useradd ${FLAKE_USER} 失败。" >&2; exit 1; }
+        # 提权组：Debian 系 sudo 组 / RHEL 系 wheel，都尝试（不存在的组跳过）；
+        # 连 sudo 二进制都没有的机器上加组无意义，跳过并说明（届时走单用户安装）
+        if have sudo; then
+          $SUDO usermod -aG sudo  "$FLAKE_USER" 2>/dev/null || true
+          $SUDO usermod -aG wheel "$FLAKE_USER" 2>/dev/null || true
+          id -nG "$FLAKE_USER" | tr ' ' '\n' | grep -qx -e sudo -e wheel \
+            || echo "    ⚠️ 未能把 ${FLAKE_USER} 加入 sudo/wheel 提权组（发行版差异）；多用户安装需要提权，请以该用户登录后自行加入再重跑。"
+        else
+          echo "    本机未安装 sudo：新用户将走单用户安装（无需提权；日后装 sudo 并加入 wheel/sudo 组可转多用户）"
+        fi
+        $SUDO passwd "$FLAKE_USER"  # 交互设置登录密码（登录与 sudo 提权都要用）
+        # root 且无 sudo：预建 /nix 并属新用户（单用户安装的一次性 root 步骤，重跑时免管理员介入）
+        if [ "$IS_ROOT" -eq 1 ] && ! have sudo && [ ! -d /nix ]; then
+          mkdir -m 0755 /nix && chown "$FLAKE_USER:" /nix \
+            && echo "    已预创建 /nix 并属 ${FLAKE_USER}（单用户安装前提）"
+        fi
         # 仓库复制到新用户家目录（归其所有，日后可 git pull）；失败则退回当前副本（只读使用）
         NEW_HOME="$(getent passwd "$FLAKE_USER" 2>/dev/null | cut -d: -f6)"
         [ -n "$NEW_HOME" ] || NEW_HOME="/home/$FLAKE_USER"
         NEW_REPO=""
-        if sudo -u "$FLAKE_USER" cp -a "$REPO_ROOT" "$NEW_HOME/nix-roam" 2>/dev/null; then
+        if [ "$IS_ROOT" -eq 1 ]; then
+          if cp -a "$REPO_ROOT" "$NEW_HOME/nix-roam" 2>/dev/null && chown -R "$FLAKE_USER:" "$NEW_HOME/nix-roam" 2>/dev/null; then
+            NEW_REPO="$NEW_HOME/nix-roam"
+          fi
+        elif sudo -u "$FLAKE_USER" cp -a "$REPO_ROOT" "$NEW_HOME/nix-roam" 2>/dev/null; then
           NEW_REPO="$NEW_HOME/nix-roam"
+        fi
+        if [ -n "$NEW_REPO" ]; then
           echo "    仓库已复制到 ${NEW_REPO}（属 ${FLAKE_USER}，日常更新在其中进行）"
         else
           echo "    ⚠️ 复制仓库到 ${NEW_HOME} 失败，改用当前副本 ${REPO_ROOT}（只读使用；新用户日后请自行克隆）"
@@ -144,8 +167,21 @@ if [ "$CURRENT_USER" != "$FLAKE_USER" ]; then
 WSLHINT
             ;;
         esac
+        RERUN="${NEW_REPO:-$REPO_ROOT}/bootstrap/linux.sh"
         log "以 ${FLAKE_USER} 重跑本脚本（日志将切到该用户名下的新文件）…"
-        exec sudo --login --user "$FLAKE_USER" -- bash "${NEW_REPO:-$REPO_ROOT}/bootstrap/linux.sh" "$@"
+        if [ "$IS_ROOT" -eq 1 ]; then
+          # root 切换用户。su 为主：PAM 栈是纯 pam_unix，WSL 里 logind/pam_systemd 异常时
+          # 依然可用（实测 ArchLinux-WSL 上 runuser 的 session include system-login 会挂死），
+          # 且 root 用 su 免密；多参数形式有 util-linux 怪癖，统一 -c 单串 + %q 消毒。
+          RERUN_CMD="$(printf 'bash %q %q' "$RERUN" "$FLAKE_TARGET")"
+          if have su; then
+            exec su --login "$FLAKE_USER" -c "$RERUN_CMD"
+          else
+            exec runuser --login "$FLAKE_USER" -c "$RERUN_CMD"
+          fi
+        else
+          exec sudo --login --user "$FLAKE_USER" -- bash "$RERUN" "$@"
+        fi
         ;;
       *)
         echo "错误：已选择不创建用户。如需以 ${CURRENT_USER} 使用本仓库：" >&2
@@ -154,7 +190,7 @@ WSLHINT
         ;;
     esac
   else
-    echo "错误：当前用户 ${CURRENT_USER} 与 meta.json 定义的 username ${FLAKE_USER} 不一致（非交互终端或无 sudo，无法询问建号）。" >&2
+    echo "错误：当前用户 ${CURRENT_USER} 与 meta.json 定义的 username ${FLAKE_USER} 不一致（非交互终端，或既非 root 又无可用 sudo，无法询问建号）。" >&2
     echo "      如需以 ${CURRENT_USER} 使用本仓库：编辑 meta.json 的 username 为 \"${CURRENT_USER}\"（单点定义），" >&2
     echo "      然后重新运行本脚本（target 按架构自动选择，无需传参）；" >&2
     echo "      或由管理员创建用户 ${FLAKE_USER}（useradd -m）并以其登录重跑。" >&2

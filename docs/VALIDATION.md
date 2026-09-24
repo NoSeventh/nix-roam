@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-24 守卫建号支持 root 直跑与无 sudo 环境（Fedora 44 / WSL2 standalone Nix + ArchLinux-WSL 实机）
+
+改动：`bootstrap/linux.sh` 0.7 守卫的提权判定从「非 root 且可 sudo」扩为「root 本身或非 root 可 sudo」；root 分支不加 sudo 前缀执行 `useradd/usermod/passwd`、仓库复制走 `cp -a + chown -R`、切换重跑以 `su --login <user> -c '<单串>'` 为主（`runuser --login -c` 兜底）、root 且无 sudo 二进制时预建 `/nix`（0755，属新用户）使重跑落入单用户安装；已存在目标用户的分支补 `su -l` 提示。起因：在 root-only、未装 sudo 的 ArchLinux-WSL 上，原判定在 `have sudo` 处失败，交互询问从未出现。
+
+验证：**ArchLinux-WSL（root-only / 无 sudo / systemd 开启）实机全链路**——交互询问 → `useradd` 真实建号 → 无 sudo 说明 → `/nix` 预建 → 仓库复制属 xuqihao → WSL 提示 → `su -l` 切换成功 → 第二轮日志落在 `/home/xuqihao/.local/state/` → 模式判定 `single-user（systemd: yes，sudo: no）` → 官方安装器真实下载并安装 Nix 2.35.2 至预建 `/nix`，30s 超时截停（完整七步未跑完，属有界验证；passwd 用桩避免真实设密）。本机（Fedora 44）桩测回归：非 root 拒绝/同意两分支 + root+无 sudo（minbin 模拟）全链路均通过。过程中两个实测发现：① `runuser/su -- CMD ARGS` 多参数形式在 util-linux 上报 `cannot execute binary file`（Fedora/Arch 双现）→ 统一 `-c` 单串 + `printf %q`；② `runuser -c` 在该 Arch 的 logind 异常下挂死（其 PAM `session include system-login` 含 pam_systemd；`su` 为纯 pam_unix 不受影响）→ su 为主、runuser 兜底。Arch 侧终态：用户 xuqihao、`/home/xuqihao/nix-roam` 副本与空 `/nix`（属 xuqihao）保留供完整安装，半装的 store/profile 残留已清。
+
+未验证：七步全程在实机一次跑完（截停于 1/7）；真实 `passwd` 交互（实机用桩）；root+有 sudo 的实机分支（仅桩覆盖）；`darwin.sh` root 路径与整条链路（macOS 必有 sudo，理论经 `sudo -v` 即通过，未实机）；CI 在本批提交上的运行。
+
 ## 2026-09-24 standalone 用户守卫改为可建号（Fedora 44 / WSL2 standalone Nix，本机）
 
 改动：`bootstrap/linux.sh`/`darwin.sh` 的 0.7 目标用户守卫从「用户名不符即中止」升级：目标用户已存在 → 提示换登重跑（不动既有账号）；交互终端且可 sudo → 询问是否创建 meta.json 定义的系统用户并以它继续——linux 走 `useradd -m` + 交互 `passwd` + best-effort 加入 sudo/wheel 提权组，darwin 走 `sysadminctl -addUser … -admin -password prompt`；随后仓库 `cp -a` 到新用户家目录（失败回退当前副本只读使用），`exec sudo --login --user` 以新用户重跑本脚本（与 NixOS 侧 flake 直接 `users.users.<username>` 建号对齐）；拒绝/非交互/无 sudo 仍 fail-loud 中止并给 meta.json 指引。WSL 下打印 `/etc/wsl.conf` 默认用户设置提示但不自动写。
