@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-24 WSL 默认用户改为询问后写入 /etc/wsl.conf（Fedora 44 / WSL2 + ArchLinux-WSL 实机）
+
+改动：`linux.sh` 守卫建号分支的 WSL 提示升级为询问（`[Y/n]` 默认 Y）：同意则把 `[user] default=<username>` 合并进 `/etc/wsl.conf`——保留既有段落与键、原文件带时间戳备份、写失败仅警告不中断安装；拒绝则保留原手动提示。合并逻辑为纯 bash 函数 `wsl_conf_merge()`（内建 + 正则，零外部依赖）：实测作者日常 Fedora WSL 未安装 gawk，`awk` 不能假设存在（`darwin.sh` 的 awk 保留——macOS 系统自带 BSD awk）。
+
+验证：`wsl_conf_merge` 自脚本抽出单测 8/8 通过（文件不存在/空/仅 `[boot]`/已有 default 替换/裸 `[user]`/`[user]`+其他键/多段保留替换/幂等重入）；本机桩测 root+无 sudo 全链路（建号 y → wsl.conf 询问 n 跳过 → su 切换重跑 → 第二轮中止）通过，且本机真实 `/etc/wsl.conf` 未被触碰；**ArchLinux-WSL 实机**：建号 → 询问回车取默认 Y → 写入成功，合并后 `[boot] systemd=true` 原样保留、新增 `[user] default=xuqihao`，备份 `/etc/wsl.conf.bak-20260924-151406`（20 字节原文），随后 su 切换与 1/7 Nix 安装照常（30s 截停于下载中）。途中顺带实测「目标用户已存在」分支输出（含 su -l 提示）。两个环境层发现：① binfmt 的 WSLInterop 注册一度丢失致 `wsl.exe` 无法执行（有界截停互操作进程的副作用），`echo :WSLInterop:M::MZ::/init:PF > /proc/sys/fs/binfmt_misc/register` 恢复；② 此前「有界截停」实际未截住 su 之后的进程树（地下继续跑到 home-manager 步骤），清理时须按用户 `pkill`——本轮起已按此清理。
+
+未验证：七步全程实机跑完；非 root+sudo 路径的 wsl.conf 写入（桩覆盖，写入前缀不同逻辑同构）；`wsl --shutdown` 重开后默认用户实际生效（需 Windows 侧操作）；CI 在本批提交上的运行。
+
 ## 2026-09-24 守卫建号支持 root 直跑与无 sudo 环境（Fedora 44 / WSL2 standalone Nix + ArchLinux-WSL 实机）
 
 改动：`bootstrap/linux.sh` 0.7 守卫的提权判定从「非 root 且可 sudo」扩为「root 本身或非 root 可 sudo」；root 分支不加 sudo 前缀执行 `useradd/usermod/passwd`、仓库复制走 `cp -a + chown -R`、切换重跑以 `su --login <user> -c '<单串>'` 为主（`runuser --login -c` 兜底）、root 且无 sudo 二进制时预建 `/nix`（0755，属新用户）使重跑落入单用户安装；已存在目标用户的分支补 `su -l` 提示。起因：在 root-only、未装 sudo 的 ArchLinux-WSL 上，原判定在 `have sudo` 处失败，交互询问从未出现。

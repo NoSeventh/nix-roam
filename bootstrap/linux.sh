@@ -22,6 +22,33 @@ set -euo pipefail
 log()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# 合并 WSL 默认用户到 /etc/wsl.conf 的 [user] 段（输出到 stdout，不落盘）：
+# 已有 [user] 段 → 在段头下插入/替换 default=<user> 并丢弃旧 default 行（其余段落与键原样保留）；
+# 没有 [user] 段 → 文件末尾（空行分隔）追加；输入为空/不存在 → 只输出 [user] 段。
+# 纯 bash 实现：精简发行版（含作者自己的 Fedora WSL）可能连 gawk 都没装，不假设 awk 存在。
+wsl_conf_merge() {  # $1 = username, $2 = 输入文件（可为 /dev/null）
+  local u="$1" in="$2" line inuser=0 wrote=0 nlines=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    nlines=$((nlines + 1))
+    if [[ "$line" =~ ^[[:space:]]*\[[^]]*\][[:space:]]*$ ]]; then
+      if [ "${line//[[:space:]]/}" = "[user]" ]; then
+        inuser=1; printf '%s\n' "$line"
+        if [ "$wrote" -eq 0 ]; then printf 'default=%s\n' "$u"; wrote=1; fi
+        continue
+      fi
+      inuser=0
+    fi
+    if [ "$inuser" -eq 1 ] && [[ "$line" =~ ^[[:space:]]*default[[:space:]]*= ]]; then
+      continue
+    fi
+    printf '%s\n' "$line"
+  done < "$in"
+  if [ "$wrote" -eq 0 ]; then
+    [ "$nlines" -eq 0 ] || printf '\n'
+    printf '[user]\ndefault=%s\n' "$u"
+  fi
+}
+
 # --- 0. 平台守卫 ---
 [ "$(uname -s)" = "Linux" ] || { echo "错误：此脚本仅用于普通 Linux / WSL；NixOS 请用 bootstrap/nixos.sh，macOS 请用 bootstrap/darwin.sh（或统一入口 bootstrap/bootstrap.sh）。" >&2; exit 1; }
 
@@ -157,14 +184,31 @@ if [ "$CURRENT_USER" != "$FLAKE_USER" ]; then
         else
           echo "    ⚠️ 复制仓库到 ${NEW_HOME} 失败，改用当前副本 ${REPO_ROOT}（只读使用；新用户日后请自行克隆）"
         fi
+        # WSL：询问是否把新用户设为默认登录用户（/etc/wsl.conf 的 [user] 段）。
+        #     合并而非覆盖：保留已有段落与键，仅增/换 default 一行；原文件带时间戳备份；
+        #     写入失败只警告不中断安装（默认用户是便利项，不影响本次以新用户继续）。
         case "$(uname -r)" in
           *microsoft-standard*|*Microsoft-standard*)
-            cat <<WSLHINT
-    WSL 提示：要把 ${FLAKE_USER} 设为默认登录用户，请在 /etc/wsl.conf 加入
-        [user]
-        default=${FLAKE_USER}
-      并在 Windows 侧 wsl --shutdown 后重开；本次安装不受影响（下面直接以该用户继续）。
-WSLHINT
+            WSL_CONF="/etc/wsl.conf"
+            read -r -p "    要把 ${FLAKE_USER} 设为 WSL 默认登录用户吗？（写入 ${WSL_CONF}，Windows 侧 wsl --shutdown 重开后生效）[Y/n] " WSL_ANSWER
+            case "$WSL_ANSWER" in
+              n|N)
+                echo "    跳过。如需手动设置：在 ${WSL_CONF} 的 [user] 段加 default=${FLAKE_USER} 后 wsl --shutdown 重开。"
+                ;;
+              *)
+                WSL_IN="$WSL_CONF"; [ -f "$WSL_CONF" ] || WSL_IN=/dev/null
+                WSL_TMP="$(mktemp)"
+                if wsl_conf_merge "$FLAKE_USER" "$WSL_IN" > "$WSL_TMP" 2>/dev/null \
+                   && { [ ! -f "$WSL_CONF" ] || $SUDO cp -a "$WSL_CONF" "$WSL_CONF.bak-$TS"; } \
+                   && $SUDO cp "$WSL_TMP" "$WSL_CONF"; then
+                  rm -f "$WSL_TMP"
+                  echo "    已写入 ${WSL_CONF}（原文件备份在 ${WSL_CONF}.bak-${TS}）；Windows 侧 wsl --shutdown 重开后默认以 ${FLAKE_USER} 进入。"
+                else
+                  rm -f "$WSL_TMP"
+                  echo "    ⚠️ 写入 ${WSL_CONF} 失败，请手动在 [user] 段加 default=${FLAKE_USER} 后 wsl --shutdown 重开（安装继续）。"
+                fi
+                ;;
+            esac
             ;;
         esac
         RERUN="${NEW_REPO:-$REPO_ROOT}/bootstrap/linux.sh"
