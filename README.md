@@ -290,6 +290,18 @@ git remote add github git@github.com:NoSeventh/nix-roam.git
 - `hosts/<hostname>/hardware-configuration.nix` 是机器专用文件，应与对应主机入口一起提交；只有仓库根目录下误生成的 `/hardware-configuration.nix` 被忽略。
 - NixOS 桌面配置中的 Hermes Agent 需要目标机器自行提供 `/etc/hermes/env`。
 - 多用户 Nix 安装需要让 daemon 信任自定义 substituter，`bootstrap/linux.sh` 会处理新机器的这项配置；无 systemd / 无 sudo 的机器走单用户安装，镜像直接写用户级 nix.conf，无需 daemon 授权（`/nix` 仍需一次性 root 创建）。WSL1 不受支持，请先升级 WSL2。
+- 国内镜像只覆盖官方 Hydra 构建过的东西。unfree 包不在其中——nixvim 用到的 `vimPlugins.rainbow-delimiters-nvim` 源码在 gitlab.com，官方缓存与镜像站都没有，构建时会现抓上游；GitLab 不可达时整条 HM 构建（vimplugin → neovim → nixvim → home-manager-path）直接失败。因此缓存列表末尾补了社区缓存 `nix-community.cachix.org`（公钥：NixOS 侧在 `modules/fix-network.nix`；standalone 侧由 `bootstrap/*.sh` 写入 `/etc/nix/nix.custom.conf`，单用户安装写用户级 nix.conf）。已经装好的机器可手工补上：
+
+  ```bash
+  sudo tee -a /etc/nix/nix.custom.conf >/dev/null <<'EOF'
+
+  extra-substituters = https://nix-community.cachix.org
+  extra-trusted-substituters = https://nix-community.cachix.org
+  extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=
+  EOF
+  ```
+
+  在 HM 把该地址写进用户级 `nix.conf` 之前，可先 `NIX_CONFIG="extra-substituters = https://nix-community.cachix.org" hms`，让这一次构建就走社区缓存；NixOS 侧 `switch` 一次即由 `modules/fix-network.nix` 生效。非受信用户自己写的 `trusted-public-keys` 会被忽略（`trusted-users = root`），公钥必须由 root 写进 daemon 配置。
 - macOS 输出目前尚未完成真实设备构建验证；`bootstrap/nixos.sh` 的两条链路同样尚未实机验证。aarch64 Linux 输出与单用户安装链路当前也仅求值/桩测验证，未在 ARM 或无 root 机器上实测。
 
 ## License

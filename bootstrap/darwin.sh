@@ -144,21 +144,28 @@ have nix || { echo "错误：nix 仍不可用。请打开新 shell 让 nix 进 P
 
 # ---------------------------------------------------------------------------
 # 2/7 配置国内镜像信任（macOS 同为多用户 daemon，用户级 substituters 需要 daemon 信任）
-#     幂等：维护 nix.custom.conf 的镜像列表，并确保 nix.conf 实际 include 它。
+#     幂等：维护 nix.custom.conf 的镜像列表与社区缓存公钥，并确保 nix.conf 实际 include 它。
 #     注意：macOS 自带 BSD sed，原地替换必须写 `sed -i ''`（GNU 写法 `sed -i` 会报错）。
 # ---------------------------------------------------------------------------
 log "2/7 配置国内镜像信任"
 NIX_CUSTOM_CONF="/etc/nix/nix.custom.conf"
 NIX_SYSTEM_CONF="/etc/nix/nix.conf"
-TRUSTED_SUBSTITUTERS="https://mirror.nju.edu.cn/nix-channels/store https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store https://mirrors.ustc.edu.cn/nix-channels/store https://mirror.sjtu.edu.cn/nix-channels/store"
-if [ -f "$NIX_CUSTOM_CONF" ] && sudo grep -q "mirror.nju.edu.cn/nix-channels/store" "$NIX_CUSTOM_CONF"; then
-  echo "    已配置国内镜像信任，跳过"
+# 列表/公钥与 home/nix-cn.nix、modules/fix-network.nix 保持同一份内容（单一事实源是 home/nix-cn.nix）
+# cachix 补官方 Hydra 不构建的 unfree 包（如 vimPlugins.rainbow-delimiters-nvim 的 gitlab 源码）
+TRUSTED_SUBSTITUTERS="https://mirror.nju.edu.cn/nix-channels/store https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store https://mirrors.ustc.edu.cn/nix-channels/store https://mirror.sjtu.edu.cn/nix-channels/store https://nix-community.cachix.org"
+CACHIX_PUBLIC_KEY="nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+if [ -f "$NIX_CUSTOM_CONF" ] && sudo grep -q "nix-community.cachix.org" "$NIX_CUSTOM_CONF"; then
+  echo "    已配置国内镜像与社区缓存信任，跳过"
 else
   sudo mkdir -p /etc/nix
   if [ -f "$NIX_CUSTOM_CONF" ] && sudo grep -q '^trusted-substituters' "$NIX_CUSTOM_CONF"; then
     sudo sed -i '' "s|^trusted-substituters = .*|trusted-substituters = $TRUSTED_SUBSTITUTERS|" "$NIX_CUSTOM_CONF"
   else
     printf 'trusted-substituters = %s\n' "$TRUSTED_SUBSTITUTERS" | sudo tee -a "$NIX_CUSTOM_CONF" > /dev/null
+  fi
+  # extra- 前缀 = 追加，保证内置的 cache.nixos.org-1 与安装器写入的其他 key 不被顶掉
+  if ! sudo grep -q "nix-community.cachix.org-1" "$NIX_CUSTOM_CONF"; then
+    printf 'extra-trusted-public-keys = %s\n' "$CACHIX_PUBLIC_KEY" | sudo tee -a "$NIX_CUSTOM_CONF" > /dev/null
   fi
   echo "    已写入 $NIX_CUSTOM_CONF"
 fi

@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-24 cachix 社区缓存补入缓存列表（Fedora 44 / WSL2 standalone，本机）
+
+起因：`hms` 在本日 `update flake`（c2e40c3，15:28）后失败——`home/nixvim.nix` 启用的 `rainbow-delimiters` 要 `vimPlugins.rainbow-delimiters-nvim` v0.12.0，其源码 FOD 由 `fetchgit` 从 gitlab.com 取；本机网络下 `getent hosts gitlab.com` 只给被污染的 Cloudflare IPv6（2606:4700:90:…），`git ls-remote` 40s 无响应，构建退化为 reset + 两次 300s 超时后失败，级联 `vimplugin → neovim → nixvim → home-manager-path → home-manager-generation`。查因：该插件在 nixpkgs 中 `meta.license = unfree` → `meta.hydraPlatforms = [ ]`，官方 Hydra 不构建，源码与产物都不在 cache.nixos.org（实测该 FOD `/nix/store/cxyk83xx…-rainbow-delimiters.nvim` 在 cache.nixos.org 与 NJU/TUNA/USTC/SJTU 四个镜像全 404，而同一 store 随机取 3 个 `-source` FOD 均为 200；drv 的 `outputHash` 与社区缓存 narinfo 的 `NarHash: sha256:0zy93xwc…` 一致）。旁证：store 中已存在此前 substitute 来的 `2n5q…-vimplugin-rainbow-delimiters.nvim-0.12.0`，说明 flake 更新换掉 neovim/插件派生路径前并不需要现抓——本次是路径变化与上游不可达同时发生。另注：报错开头的 `options.json` 警告是求值期噪音（`nixosOptionsDoc` 把 nixpkgs 源码路径写进 JSON 字符串，string context 丢失），与本故障无关。
+
+改动：`home/nix-cn.nix` 的 `substituters` 末位加 `https://nix-community.cachix.org`；`modules/fix-network.nix` 加 `nix.settings.trusted-public-keys = [ <cachix 公钥> ]`；`bootstrap/{linux,darwin,nixos}.sh` 的缓存变量追加该地址、新增 `CACHIX_PUBLIC_KEY`，以 `extra-trusted-public-keys` 写入（multi 写 daemon 的 `/etc/nix/nix.custom.conf`；linux 单用户写用户级 nix.conf 与 `NIX_CONFIG`；nixos.sh 另入 `NIX_CONFIG`）；三个脚本的幂等跳过标记由 NJU 改为 `nix-community.cachix.org`，使旧配置被重写一次而不是跳过；`AGENTS.md`/`README.md` 同步说明与手工补救命令。公钥刻意不进 `home/nix-cn.nix`：那会落到 standalone 用户 nix.conf，而 `trusted-public-keys` 对非受信用户（本机实测 `trusted-users = root`）是受限设置，每次连 daemon 都会打印 `ignoring the client-specified setting`。
+
+验证（本机 Fedora 44 / WSL2 / Determinate Nix 3.22.2，standalone 目标 `.#x86_64-linux`）：① 公钥经 `nix store verify --store https://nix-community.cachix.org` 实测——`mB9F…` 判定通过、旧引用的 `LwCD…` 报 `path … is untrusted`，故取 `mB9F…`；② `nix config show` 实测 `extra-trusted-public-keys` 为追加语义（内置 cache.nixos.org-1 与安装器的 flakehub 各键均保留）；③ 用锁定的 nixpkgs 26.11 源码 `lib.nixosSystem` 对改后的 `modules/fix-network.nix` 做定向求值，得 `substituters = 四镜像 + cache.nixos.org + cachix`、`trusted-public-keys = cache.nixos.org-1 + cachix`（即 `nix.settings` 的 listOf 合并不会顶掉官方 key）；④ 三个脚本 `bash -n` 通过；把脚本中真实的 2/7（nixos.sh 为 1/7）代码块抽出桩测：multi 旧配置升级只写一次、重跑跳过、无重复行，linux 单用户分支在已有 `substituters` 时只补公钥、二次运行不重复，HM symlink 分支不落盘，nixos.sh 的 `NIX_CONFIG` 在带/不带 token 两种情况下按行正确拼接；⑤ `git diff --check` 干净。
+
+未验证：`hms` 真实 substitute（需 root 先按 README 把 cachix 写进本机 `/etc/nix/nix.custom.conf`，属用户侧动作，本机 `/etc/nix` 未改动）；NixOS 桌面/WSL 与 darwin 目标的构建与激活；flake 五输出的完整求值/构建——本机 flake 输入（home-manager / nixvim tarball）不在 store 且 api.github.com 被污染，`nix eval`/`nix build` 均卡在取输入阶段，故上述③是对受影响模块的定向求值而非整 flake 求值；CI 在本批提交上的运行。
+
 ## 2026-09-24 bootstrap 派发 → nixos.sh adopt 实机首跑 + 幻影 cgroup 二现（NixOS-WSL 26.11，本机 wsl）
 
 无代码改动；`bootstrap/bootstrap.sh`（派发器 → sudo 重 exec → `nixos.sh` adopt）在 NixOS-WSL 实机首跑——此前 install/adopt 两链路均未上过实机，派发器的 NixOS 分支亦为首次实跑。以 xuqihao 启动：派发器正确识别 `/etc/NIXOS` → nixos.sh；模式 adopt、目标 `.#wsl`（WSL 内核标记）、仓库 `/etc/nixos`；日志按设计落 root 侧 `/root/.local/state/nix-roam/nixos-20260924-155717.log`。

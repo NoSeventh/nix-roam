@@ -304,25 +304,32 @@ fi
 have nix || { echo "错误：nix 仍不可用。请打开新 shell 让 nix 进 PATH 后重试。" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
-# 2/7 配置国内镜像
-#     multi ：写 /etc/nix/nix.custom.conf 的 trusted-substituters 并让 nix.conf include（daemon 侧授权，
-#             用户级 substituters 才会被多用户 daemon 接受）
-#     single：无 daemon，用户级 nix.conf 的 substituters 直接生效，无需任何授权
+# 2/7 配置国内镜像 + 社区缓存（cachix）
+#     multi ：写 /etc/nix/nix.custom.conf 的 trusted-substituters / trusted-public-keys
+#             并让 nix.conf include（daemon 侧授权，用户级 substituters 才会被多用户 daemon 接受）
+#     single：无 daemon，用户级 nix.conf 的 substituters + 公钥直接生效，无需任何授权
 #     幂等：两种模式均已配置时跳过；用户 nix.conf 已是 HM 托管 symlink 时不追加（nix-cn.nix 接管同一列表）
 # ---------------------------------------------------------------------------
 log "2/7 配置国内镜像（${NIX_INSTALL_MODE}-user）"
-TRUSTED_SUBSTITUTERS="https://mirror.nju.edu.cn/nix-channels/store https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store https://mirrors.ustc.edu.cn/nix-channels/store https://mirror.sjtu.edu.cn/nix-channels/store"
+# 列表/公钥与 home/nix-cn.nix、modules/fix-network.nix 保持同一份内容（单一事实源是 home/nix-cn.nix）
+# cachix 补官方 Hydra 不构建的 unfree 包（如 vimPlugins.rainbow-delimiters-nvim 的 gitlab 源码）
+TRUSTED_SUBSTITUTERS="https://mirror.nju.edu.cn/nix-channels/store https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store https://mirrors.ustc.edu.cn/nix-channels/store https://mirror.sjtu.edu.cn/nix-channels/store https://nix-community.cachix.org"
+CACHIX_PUBLIC_KEY="nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
 if [ "$NIX_INSTALL_MODE" = "multi" ]; then
   NIX_CUSTOM_CONF="/etc/nix/nix.custom.conf"
   NIX_SYSTEM_CONF="/etc/nix/nix.conf"
-  if [ -f "$NIX_CUSTOM_CONF" ] && sudo grep -q "mirror.nju.edu.cn/nix-channels/store" "$NIX_CUSTOM_CONF"; then
-    echo "    已配置国内镜像信任，跳过"
+  if [ -f "$NIX_CUSTOM_CONF" ] && sudo grep -q "nix-community.cachix.org" "$NIX_CUSTOM_CONF"; then
+    echo "    已配置国内镜像与社区缓存信任，跳过"
   else
     sudo mkdir -p /etc/nix
     if [ -f "$NIX_CUSTOM_CONF" ] && sudo grep -q '^trusted-substituters' "$NIX_CUSTOM_CONF"; then
       sudo sed -i "s|^trusted-substituters = .*|trusted-substituters = $TRUSTED_SUBSTITUTERS|" "$NIX_CUSTOM_CONF"
     else
       printf 'trusted-substituters = %s\n' "$TRUSTED_SUBSTITUTERS" | sudo tee -a "$NIX_CUSTOM_CONF" > /dev/null
+    fi
+    # extra- 前缀 = 追加，保证内置的 cache.nixos.org-1 与安装器写入的其他 key 不被顶掉
+    if ! sudo grep -q "nix-community.cachix.org-1" "$NIX_CUSTOM_CONF"; then
+      printf 'extra-trusted-public-keys = %s\n' "$CACHIX_PUBLIC_KEY" | sudo tee -a "$NIX_CUSTOM_CONF" > /dev/null
     fi
     echo "    已写入 $NIX_CUSTOM_CONF"
   fi
@@ -334,14 +341,22 @@ else
   mkdir -p "$(dirname "$NIX_CONF")"
   if [ -L "$NIX_CONF" ]; then
     echo "    $NIX_CONF 已是 Home Manager 托管 symlink，跳过（nix-cn.nix 管理同一镜像列表）"
-  elif [ -f "$NIX_CONF" ] && grep -q '^substituters' "$NIX_CONF"; then
-    echo "    用户级 substituters 已配置，跳过"
   else
-    echo "substituters = $TRUSTED_SUBSTITUTERS https://cache.nixos.org/" >> "$NIX_CONF"
-    echo "    已写入用户级 substituters（$NIX_CONF）"
+    if [ -f "$NIX_CONF" ] && grep -q '^substituters' "$NIX_CONF"; then
+      echo "    用户级 substituters 已配置，跳过"
+    else
+      echo "substituters = $TRUSTED_SUBSTITUTERS https://cache.nixos.org/" >> "$NIX_CONF"
+      echo "    已写入用户级 substituters（$NIX_CONF）"
+    fi
+    # 单用户无 daemon，公钥写在用户级 nix.conf 里直接生效（不会触发受限设置警告）
+    if ! grep -q "nix-community.cachix.org-1" "$NIX_CONF" 2>/dev/null; then
+      echo "extra-trusted-public-keys = $CACHIX_PUBLIC_KEY" >> "$NIX_CONF"
+      echo "    已写入社区缓存公钥（$NIX_CONF）"
+    fi
   fi
   # 本次会话立即生效（后续 nix profile install / home-manager 拉包直接走国内镜像）
-  export NIX_CONFIG="substituters = $TRUSTED_SUBSTITUTERS https://cache.nixos.org/"
+  export NIX_CONFIG="substituters = $TRUSTED_SUBSTITUTERS https://cache.nixos.org/
+extra-trusted-public-keys = $CACHIX_PUBLIC_KEY"
 fi
 
 # ---------------------------------------------------------------------------

@@ -17,12 +17,20 @@
 
     # 优先使用国内镜像站（均收录于 CERNET 联合镜像站 help.mirrors.cernet.edu.cn）
     # 2026-08 实测延迟：NJU ~106ms < TUNA ~153ms < USTC ~155ms < SJTU ~435ms
+    # 末位补 nix-community.cachix.org：官方 Hydra 不构建 unfree 包
+    # （如 vimPlugins.rainbow-delimiters-nvim 的 fetchgit 源码，meta.hydraPlatforms = [ ]），
+    # 这些东西在 cache.nixos.org 及其国内镜像里都没有，缺了它就只能现场翻 gitlab/github。
+    # 公钥不在这里声明 —— 用户级 nix.conf 里的 trusted-public-keys 对非受信用户是受限设置，
+    # 会触发 "ignoring the client-specified setting" 警告；NixOS 侧见 modules/fix-network.nix，
+    # standalone 侧由 bootstrap 写入 daemon 的 nix.custom.conf。
+    # 本列表有 4 处副本（本文件 + bootstrap/{linux,darwin,nixos}.sh），改动需同步。
     substituters = lib.mkForce [
       "https://mirror.nju.edu.cn/nix-channels/store"
       "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
       "https://mirrors.ustc.edu.cn/nix-channels/store"
       "https://mirror.sjtu.edu.cn/nix-channels/store"
       "https://cache.nixos.org/"
+      "https://nix-community.cachix.org"
     ];
 
     connect-timeout = 5;

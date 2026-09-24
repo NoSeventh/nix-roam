@@ -146,15 +146,22 @@ log "运行日志：$LOG_FILE"
 log "1/7 配置国内镜像信任"
 NIX_CUSTOM_CONF="/etc/nix/nix.custom.conf"
 NIX_SYSTEM_CONF="/etc/nix/nix.conf"
-TRUSTED_SUBSTITUTERS="https://mirror.nju.edu.cn/nix-channels/store https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store https://mirrors.ustc.edu.cn/nix-channels/store https://mirror.sjtu.edu.cn/nix-channels/store"
-if [ -f "$NIX_CUSTOM_CONF" ] && grep -q "mirror.nju.edu.cn/nix-channels/store" "$NIX_CUSTOM_CONF"; then
-  echo "    已配置国内镜像信任，跳过"
+# 列表/公钥与 home/nix-cn.nix、modules/fix-network.nix 保持同一份内容（单一事实源是 home/nix-cn.nix）
+# cachix 补官方 Hydra 不构建的 unfree 包（如 vimPlugins.rainbow-delimiters-nvim 的 gitlab 源码）
+TRUSTED_SUBSTITUTERS="https://mirror.nju.edu.cn/nix-channels/store https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store https://mirrors.ustc.edu.cn/nix-channels/store https://mirror.sjtu.edu.cn/nix-channels/store https://nix-community.cachix.org"
+CACHIX_PUBLIC_KEY="nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+if [ -f "$NIX_CUSTOM_CONF" ] && grep -q "nix-community.cachix.org" "$NIX_CUSTOM_CONF"; then
+  echo "    已配置国内镜像与社区缓存信任，跳过"
 else
   mkdir -p /etc/nix
   if [ -f "$NIX_CUSTOM_CONF" ] && grep -q '^trusted-substituters' "$NIX_CUSTOM_CONF"; then
     sed -i "s|^trusted-substituters = .*|trusted-substituters = $TRUSTED_SUBSTITUTERS|" "$NIX_CUSTOM_CONF"
   else
     printf 'trusted-substituters = %s\n' "$TRUSTED_SUBSTITUTERS" >> "$NIX_CUSTOM_CONF"
+  fi
+  # extra- 前缀 = 追加，保证内置的 cache.nixos.org-1 与安装器写入的其他 key 不被顶掉
+  if ! grep -q "nix-community.cachix.org-1" "$NIX_CUSTOM_CONF"; then
+    printf 'extra-trusted-public-keys = %s\n' "$CACHIX_PUBLIC_KEY" >> "$NIX_CUSTOM_CONF"
   fi
   echo "    已写入 $NIX_CUSTOM_CONF"
 fi
@@ -165,6 +172,8 @@ elif [ ! -f "$NIX_SYSTEM_CONF" ] || ! grep -Eq '^!include[[:space:]]+(nix\.custo
   echo "    已让 $NIX_SYSTEM_CONF 加载 nix.custom.conf"
 fi
 SUBSTITUTERS_LINE="substituters = ${TRUSTED_SUBSTITUTERS} https://cache.nixos.org"
+# root 客户端本身受信，NIX_CONFIG 里的 trusted-public-keys 会被采纳（含 cachix 公钥）
+KEYS_LINE="extra-trusted-public-keys = ${CACHIX_PUBLIC_KEY}"
 
 # ---------------------------------------------------------------------------
 # 2/7 配置 GitHub token（可选）
@@ -203,7 +212,8 @@ if [ -f "$NIX_CUSTOM_CONF" ]; then
 fi
 
 # 本脚本内所有 nix 调用（含 nixos-install / nixos-rebuild 的子进程）立即生效的客户端配置
-export NIX_CONFIG="${SUBSTITUTERS_LINE}${TOKEN_LINE:+
+export NIX_CONFIG="${SUBSTITUTERS_LINE}
+${KEYS_LINE}${TOKEN_LINE:+
 ${TOKEN_LINE}}"
 
 # ---------------------------------------------------------------------------
