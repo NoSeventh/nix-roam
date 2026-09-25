@@ -1,6 +1,7 @@
 # modules/desktop/office.nix
 #
-# 办公与中文软件档：办公套件、邮件/文献、笔记、日历、翻译、即时通信与视频会议。
+# 办公与中文软件档：办公套件、邮件/文献、笔记、日历、翻译、排版（texlive）、
+# 即时通信与视频会议。
 # wechat overlay 必须与本档同行（overlay 只改 wechat 一个包，不 import 本档即不生效）。
 {
   pkgs,
@@ -40,6 +41,9 @@
     pkgs-stable.zoom-us
     # pkgs-stable.mattermost
     pkgs-stable.mattermost-desktop
+
+    # --- 6. 排版（2026-09-26 自 dev.nix 归位：排版属办公域；scheme-full 体积大）---
+    pkgs-stable.texlivePackages.scheme-full
   ];
 
   # Fix wechat AppImage download: web.archive.org URL is dead, use official Tencent source
