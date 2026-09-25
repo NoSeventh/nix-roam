@@ -1,8 +1,13 @@
-# 中国大陆网络适配（Nix 侧共享配置，单一事实源）
+# 中国大陆网络适配（Nix 侧共享配置）
 # 被 modules/fix-network.nix（NixOS daemon）与 home/standalone-{linux,darwin}.nix（用户级）共同 import。
 # 只放各入口都安全生效的设置；daemon 级设置（download-buffer-size / auto-optimise-store）留在 fix-network.nix。
+# substituters 列表本体在仓库根 meta.json（"substituters" 字段，空格分隔）——
+# bootstrap/{linux,darwin,nixos}.sh 在 Nix 安装前用 sed 读同一字段，改动只改 meta.json 一处。
 { lib, pkgs, ... }:
 
+let
+  meta = builtins.fromJSON (builtins.readFile ../meta.json);
+in
 {
   # HM 断言：生成 nix.conf 时必须指定 nix.package
   nix.package = pkgs.nix;
@@ -23,15 +28,8 @@
     # 公钥不在这里声明 —— 用户级 nix.conf 里的 trusted-public-keys 对非受信用户是受限设置，
     # 会触发 "ignoring the client-specified setting" 警告；NixOS 侧见 modules/fix-network.nix，
     # standalone 侧由 bootstrap 写入 daemon 的 nix.custom.conf。
-    # 本列表有 4 处副本（本文件 + bootstrap/{linux,darwin,nixos}.sh），改动需同步。
-    substituters = lib.mkForce [
-      "https://mirror.nju.edu.cn/nix-channels/store"
-      "https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store"
-      "https://mirrors.ustc.edu.cn/nix-channels/store"
-      "https://mirror.sjtu.edu.cn/nix-channels/store"
-      "https://cache.nixos.org/"
-      "https://nix-community.cachix.org"
-    ];
+    # 列表本体在 meta.json（单源），本文件与 bootstrap/{linux,darwin,nixos}.sh 同读一份。
+    substituters = lib.mkForce (lib.splitString " " meta.substituters);
 
     connect-timeout = 5;
     fallback = true;

@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-26 镜像/公钥收敛 meta.json 单源 + locale-zh 反向 import 清理（Fedora 44 / WSL2 standalone，本机）
+
+改动：`meta.json` 从单点 username 扩展为三字段——新增 `substituters`（空格分隔六项：NJU→TUNA→USTC→SJTU→cache.nixos.org→cachix 末位，顺序沿用 nix-cn.nix 旧值）与 `nixCommunityCachixKey`（mB9F… 公钥）。`home/nix-cn.nix` 的 substituters 改 `lib.splitString " "` 读同文件，`modules/fix-network.nix` 的 trusted-public-keys 改读同文件；`bootstrap/{linux,darwin}.sh` 与 `bootstrap/nixos.sh` 的两条硬编码变量改为 sed 提取（与 username 同款模式）+ fail-loud 守卫，`nixos.sh` 补 `SCRIPT_REPO` 自定位（其 1/7 步执行时 CLONE_DIR 尚未克隆）。三处手动追加的 `https://cache.nixos.org` 删除——顺带修复既有漂移：bootstrap 写出的用户级顺序原为「四镜像→cachix→官方」，与 nix-cn.nix 的「四镜像→官方→cachix」不一致，现统一为后者；daemon 侧 trusted-substituters 从此也列官方源（本就默认受信，重复无害）。幂等跳过检查（grep nix-community.cachix.org）未动。另删 `modules/desktop/locale-zh.nix` 对 `profiles/locale.nix` 的冗余反向 import（desktop 链路经 profiles/desktop.nix → nixos-base.nix 已传递导入同一文件，模块系统按路径去重，删除为纯清理）。
+
+验证（本机 Fedora 44 / WSL2 / Determinate Nix 3.22.2，standalone x86_64）：改动前取基线——wsl toplevel 与三个 standalone activationPackage 的 drvPath、wsl 的 `nix.settings.substituters`/`trusted-public-keys`；桌面输出改动前后均因 `modules/desktop/niri.nix` 三个失效 dms-shell 选项（enableAudioWavelength / enableDynamicTheming / enableVPN，上游 nixpkgs 已移除该批选项，与本次改动无关，待另行修复）无法求值，失败选项集合前后一致。改动后：四个可求值输出 drvPath 与基线逐字节一致；两选项 JSON 与基线一致；`x86_64-linux` activationPackage 的 outPath 已在 store（同一 derivation 本机构建过，无需重建）；三脚本 `bash -n` 通过；与脚本同款的两条 sed 对新 meta.json 实测提取值逐字符正确（username 提取不受影响）；`git diff --check` 干净。
+
+未验证：三个 bootstrap 未实机重跑（幂等重跑属用户侧动作，本轮边界为 bash -n + sed 提取实测 + 逐行核对）；新装机器上顺序统一的实际写入效果；darwin/aarch64 实机构建；桌面输出仍被上述无关失效选项挡住（修复后可补 drvPath 对比）；CI 在本批提交上的运行。
+
 ## 2026-09-24 单用户安装激活后 nix 不在 PATH（ArchLinux-WSL 首次 single 全程安装，本机 ArchLinux-WSL）
 
 起因：ArchLinux-WSL（裸机、原本无 xuqihao 用户）经 bootstrap 建号 + `NIX_INSTALL_MODE=single` 七步全程完成安装并激活（当日 18:34–18:50，gen 1），激活本身成功，但此后任何新登录 shell 都找不到 `nix`。根因：单用户安装的 PATH 挂钩由官方安装器写进用户 dotfile（`~/.bash_profile` 尾行 source `~/.nix-profile/etc/profile.d/nix.sh`），而 HM 激活把 bash 登录链三件套（`.bash_profile`/`.profile`/`.bashrc`）整体替换为 store symlink，原文件轮转入 `.bash_profile.backup`/`.bashrc.bak-*`；HM 侧 `home.sessionPath`（common.nix）却不含 `~/.nix-profile/bin`。多用户安装不受影响（钩子在系统侧 `/etc/profile.d/nix-daemon.sh`，经 `/etc/profile` 恒先于用户 dotfile 加载）——single 模式特有缺口；bootstrap 运行全程无感，因为脚本会话继承的是安装时已 source 的旧 dotfile 环境。

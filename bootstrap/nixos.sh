@@ -118,6 +118,10 @@ else
   [ -e /etc/NIXOS ] || die "adopt 需要在已运行的 NixOS / NixOS-WSL 上执行；全新安装请用 install 子命令。"
 fi
 
+# 脚本自身所在的仓库根：1/7 步配置镜像时仓库尚未克隆到 CLONE_DIR，列表/公钥从脚本位置读 meta.json
+SCRIPT_REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")/.." 2>/dev/null && pwd)" || SCRIPT_REPO=""
+[ -n "$SCRIPT_REPO" ] && [ -f "$SCRIPT_REPO/meta.json" ] || die "无法定位脚本所在仓库（缺 meta.json）；请在仓库检出处运行 bootstrap/nixos.sh。"
+
 if [ "$MODE" = install ]; then
   CLONE_DIR="/mnt/etc/nixos"
 else
@@ -146,10 +150,13 @@ log "运行日志：$LOG_FILE"
 log "1/7 配置国内镜像信任"
 NIX_CUSTOM_CONF="/etc/nix/nix.custom.conf"
 NIX_SYSTEM_CONF="/etc/nix/nix.conf"
-# 列表/公钥与 home/nix-cn.nix、modules/fix-network.nix 保持同一份内容（单一事实源是 home/nix-cn.nix）
-# cachix 补官方 Hydra 不构建的 unfree 包（如 vimPlugins.rainbow-delimiters-nvim 的 gitlab 源码）
-TRUSTED_SUBSTITUTERS="https://mirror.nju.edu.cn/nix-channels/store https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store https://mirrors.ustc.edu.cn/nix-channels/store https://mirror.sjtu.edu.cn/nix-channels/store https://nix-community.cachix.org"
-CACHIX_PUBLIC_KEY="nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+# 列表/公钥单源：脚本所在仓库的 meta.json（home/nix-cn.nix 与 modules/fix-network.nix 读同一份；
+# 此刻 CLONE_DIR 尚未克隆，故从 SCRIPT_REPO 读取）
+# cachix 补官方 Hydra 不构建的 unfree 包（如 vimPlugins.rainbow-delimiters-nvim 的 gitlab 源码）；
+# 列表自带 cache.nixos.org（官方源默认已受信，重复列出无害）
+TRUSTED_SUBSTITUTERS="$(sed -n 's/.*"substituters": *"\([^"]*\)".*/\1/p' "$SCRIPT_REPO/meta.json" | head -n 1)"
+CACHIX_PUBLIC_KEY="$(sed -n 's/.*"nixCommunityCachixKey": *"\([^"]*\)".*/\1/p' "$SCRIPT_REPO/meta.json" | head -n 1)"
+[ -n "$TRUSTED_SUBSTITUTERS" ] && [ -n "$CACHIX_PUBLIC_KEY" ] || die "无法从 meta.json 解析 substituters / nixCommunityCachixKey（文件缺失或格式变化）。"
 if [ -f "$NIX_CUSTOM_CONF" ] && grep -q "nix-community.cachix.org" "$NIX_CUSTOM_CONF"; then
   echo "    已配置国内镜像与社区缓存信任，跳过"
 else
@@ -171,7 +178,7 @@ elif [ ! -f "$NIX_SYSTEM_CONF" ] || ! grep -Eq '^!include[[:space:]]+(nix\.custo
   printf '\n!include /etc/nix/nix.custom.conf\n' >> "$NIX_SYSTEM_CONF"
   echo "    已让 $NIX_SYSTEM_CONF 加载 nix.custom.conf"
 fi
-SUBSTITUTERS_LINE="substituters = ${TRUSTED_SUBSTITUTERS} https://cache.nixos.org"
+SUBSTITUTERS_LINE="substituters = ${TRUSTED_SUBSTITUTERS}"
 # root 客户端本身受信，NIX_CONFIG 里的 trusted-public-keys 会被采纳（含 cachix 公钥）
 KEYS_LINE="extra-trusted-public-keys = ${CACHIX_PUBLIC_KEY}"
 

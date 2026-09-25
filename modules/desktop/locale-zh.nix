@@ -1,6 +1,5 @@
 { pkgs-stable, ... }: {
-  imports = [ ../../profiles/locale.nix ];
-
+  # 中文 locale（profiles/locale.nix）已由 profiles/nixos-base.nix 传递导入，此处不重复 import
   # 输入法配置（Fcitx5）
   i18n.inputMethod = {
     enable = true;
