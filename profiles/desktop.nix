@@ -25,7 +25,6 @@
     ../modules/desktop/agents.nix
     ../modules/desktop/mnt.nix
     ../modules/desktop/virtualization.nix
-    ../modules/desktop/automation.nix
   ];
 
   # --- 1. 显示与会话 ---

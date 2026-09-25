@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-26 桌面应用清单按档拆分 + automation 下沉 nixos-base（Fedora 44 / WSL2 standalone，本机）
+
+改动（4342a57）：`programs.nix`（274 行）按档拆为 `modules/desktop/{core,browsers,dev,media,office,proxy,gaming}.nix` —— core 只收开源软件（firefox/chromium 留守，chrome/edge/servo 移 browsers；earlyoom/nix-ld 与 cli-dev 挂载随 core），dev 收编辑器/clang/texlive/distrobox 并接管 mysql（用户决策：mysql 是 dev 的），office 收办公 + 中文软件 + wechat overlay（overlay 随档，不 import 即整体不生效），gaming 收 steam 并归位 `hardware.graphics.enable32Bit`（profiles/desktop.nix 只留 enable）；`services.nix` 解散（earlyoom→core、mysql→dev、rustdesk 注释块→core）；`flatpak-linyaps.nix` 拆为 flatpak.nix（商店 + SJTU 镜像）与 desktop-managers.nix（GNOME/Plasma 备用 DE + 扩展 + dconf）。`profiles/desktop.nix` 改为按档 import 全集，hosts/nixos 行为不变；cli-dev/nixos-base/standalone-linux 中指向 programs.nix / flatpak-linyaps 的注释同步更新。
+
+改动（本条目第二提交）：`automation.nix`（nix.gc / nix.optimise / clean-user-generations）下沉 `profiles/nixos-base.nix` —— 用户决策通过；WSL 从此启用自动 GC（每周 `--delete-older-than 2w` + 每日 optimise + 每周用户世代清理，WSL 下次 switch 首次落地），桌面为同值迁移。
+
+验证（本机 Fedora 44 / WSL2 / standalone x86_64）：拆分为纯重组——desktop 的 `environment.systemPackages` 635 个 outPath 前后完全一致（按 outPath 排序对比，零增零减）；earlyoom / mysql / steam / clash-verge / nix-ld / flatpak / gnome / plasma / gc.automatic 九选项保真 true；wsl toplevel 与三个 standalone activationPackage 的 drvPath 拆分前后逐字节一致；desktop drvPath 因包列表跨模块拼接顺序变化而移动（0bslg44s… ← xgd7r8cd…，属预期：system-path buildEnv 对输入顺序敏感）。automation 下沉后：desktop drvPath 与拆分后一致（同值迁移证明），wsl drvPath 如期变化（9xrn8rvx…）且 `nix.gc.automatic` / `nix.optimise.automatic` / `clean-user-generations.enable` 均 true，standalone 三输出不变；`git diff --check` 干净。
+
+未验证：desktop/wsl toplevel 构建（CI 对 NixOS toplevel 仅求值，闭包含 unfree 大件）；实机 `nrs` / wsl switch 激活（主机侧动作）；lite profile（阶段 2，第二台桌面主机立项时再定边界）；CI 在本批提交上的运行。
+
 ## 2026-09-26 桌面求值修复：dms-shell 失效选项 + electron-41.9.1 允许条目（Fedora 44 / WSL2 standalone，本机）
 
 起因：c2e40c3「update flake」后 `.#nixos` 求值失败（CI eval 层同罪）。两层问题被 dms-shell 断言错误掩盖，逐层剥开：① `modules/desktop/niri.nix` 的 `programs.dms-shell.{enableDynamicTheming,enableAudioWavelength,enableVPN}` 已被上游移除（matugen/cava 入默认环境、网络后端运行时自检）；② 断言修掉后露出 insecure 拒绝——桌面闭包经 flake.nix `nixpkgsConfig` 管辖的实例引用 electron-41.9.1（EOL）。

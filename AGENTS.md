@@ -141,7 +141,6 @@ Key modules (under `modules/desktop/` unless noted) — app tiers split 2026-09-
 - `agents.nix` — `hermes-agent` service + AI tools (cursor, claude-code, codex, opencode…). See "Secrets" below.
 - `mnt.nix` — IHEP juno sshfs user service (work-machine specific; the system-side counterpart of the IHEP identity in `home/common.nix`).
 - `virtualization.nix` — Docker is the container engine (podman commented out; enable one or the other, never both), plus libvirtd/waydroid/wine.
-- `automation.nix` — Nix GC/optimise timers + clean-user-generations; not desktop-specific (slated to sink into `profiles/nixos-base.nix` so WSL gets it too).
 
 ## Two managed nixpkgs channels (plus nixvim's own)
 
@@ -236,7 +235,7 @@ Hard-won — read the header comments in `packages/cli-dev.nix` before editing t
 
 “CLI-only” means shared base tools with standalone Linux, including tools such as mpv and the C++ ROOT application; do not remove packages merely because they can use graphics. Keep one shared CLI list and `home/common.nix`. Node/npm/pnpm and Python/PyROOT/R are an intentional NixOS-only addition through `profiles/nixos-base.nix`, identical on desktop and WSL. WSL uses system-level installation for bare tools and integrated Home Manager for user configuration; do not separately activate standalone Home Manager there.
 
-Default WSL host/user are `wsl` / `xuqihao`. Activate explicitly with `sudo nixos-rebuild switch --flake .#wsl`. A freshly imported distro can be brought under this configuration by running `sudo bash bootstrap/nixos.sh` (auto-detected adopt → `.#wsl`). Shared defaults include `system.stateVersion = "26.05"`; preserve an existing target's original stateVersion when adopting this configuration. Desktop sessions, databases, container services, Hermes and remote mounts are not enabled by this entry; add services only when requested. WSLg integration follows NixOS-WSL defaults.
+Default WSL host/user are `wsl` / `xuqihao`. Activate explicitly with `sudo nixos-rebuild switch --flake .#wsl`. A freshly imported distro can be brought under this configuration by running `sudo bash bootstrap/nixos.sh` (auto-detected adopt → `.#wsl`). Nix maintenance automation (weekly GC `--delete-older-than 2w`, daily optimise, weekly user-generation cleanup) comes with `profiles/nixos-base.nix` — sunk there 2026-09-26 from a former desktop-only module — and is active on WSL too. Shared defaults include `system.stateVersion = "26.05"`; preserve an existing target's original stateVersion when adopting this configuration. Desktop sessions, databases, container services, Hermes and remote mounts are not enabled by this entry; add services only when requested. WSLg integration follows NixOS-WSL defaults.
 
 ## Nix configuration ownership and bootstrap
 
@@ -258,7 +257,7 @@ Use `home.sessionVariables.NPM_CONFIG_REGISTRY` and the Bash `npmr` alias, rathe
 
 ## Garbage collection
 
-`bootstrap/gc.sh` defaults to deleting generations older than 14 days; `--older-than Nd` changes retention, `--all` removes all non-current generations, and `--dry-run` only prints commands. Run as the normal user: it cleans the user first and uses sudo for NixOS system generations; standalone/macOS require `--system` for root/system cleanup. Referenced store paths remain; deleted generations lose rollback availability. The script does not refresh boot menus or configure automatic GC.
+`bootstrap/gc.sh` defaults to deleting generations older than 14 days; `--older-than Nd` changes retention, `--all` removes all non-current generations, and `--dry-run` only prints commands. Run as the normal user: it cleans the user first and uses sudo for NixOS system generations; standalone/macOS require `--system` for root/system cleanup. Referenced store paths remain; deleted generations lose rollback availability. The script does not refresh boot menus. Automatic GC (weekly `--delete-older-than 2w` + daily optimise + weekly user-generation cleanup) is configured on every NixOS host — desktop and WSL — through `profiles/nixos-base.nix` since 2026-09-26; gc.sh stays the on-demand tool and remains the only option on standalone/macOS.
 
 ## Repository hosting and synchronization
 
