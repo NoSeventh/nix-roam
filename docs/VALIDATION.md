@@ -8,6 +8,18 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-26 wsl 实机激活 11b9c69..d8d1ec3 一批 + 发现 nh 不建系统世代（NixOS-WSL 26.11，本机 wsl）
+
+无代码改动；对近期一批提交（meta.json 单源、桌面求值修复、应用按档拆分、automation 下沉、desktop-lite——即 git 11b9c69..d8d1ec3，连同此前 c2e40c3 的 flake.lock 前滚）在 wsl 主机的首次实机激活。以 xuqihao 在 ~/nix-roam 运行 `nh os switch --diff always .`（= `nrs` 别名的实际命令；sudo 免密缓存）。
+
+验证（实机）：构建 11 个派生全走缓存约 47s；nvd 代际 diff 正常（2101→2106 路径、15.9 GiB 持平、+57.8 MiB）；`/run/current-system` 5jr4dsnd…（26.11.20260911.eaad089）→ 1bfraah5…（26.11.20260923.4975466）；`home-manager-xuqihao.service` 重启成功（Result=success / exit 0）——与 9-19、9-24 两次 `user@1000` cgroup 故障不同，本轮用户管理器正常。7d8fdf8 的 WSL 自动维护首次落地：`nix-gc.timer`（OnCalendar=weekly + Persistent=true）、`nix-optimise.timer`（daily + Persistent=true）、`clean-user-generations.timer`（weekly）三新单元启动并排程（周任务次触发 2026-09-28 00:00）。
+
+发现一（exit 4 成因，第三次但与前两现不同）：stc 返回 4（成功带失败单元），唯一失败单元 `autovt@tty1.service`——disabled 的模板实例在切换中被拉起，agetty `--keep-baud tty1` 即被 SIGHUP 杀（start-limit-hit；本 boot 此前无运行记录），系 WSL 无真实 tty1 的固有现象，与仓库改动无关；另有用户单元重载的 dbus `$DISPLAY` 警告（非图形 WSL 会话固有，HM 系统级激活不受影响）。无需 `wsl --shutdown`。
+
+发现二（重要——nh 的 switch 流程与世代语义，9-19 首验未暴露）：本次 nh **未创建系统 profile 世代**——`/nix/var/nix/profiles/system` 仍 `system-7-link`（5jr4dsnd…，9-19 建），无 system-8-link。取证（nh-unwrapped 4.4.2 二进制字符串，`tr` 切串提取；源码与 crate 源均不在 store，GitHub 不可达）：nh 的 switch 流程为「① `switch-to-configuration test` 激活 → ② Setting NixOS profile（`--profile /nix/var/nix/profiles/system` 建世代）→ ③ Bootloader activation」，错误标签 "Activation (test)" 即第①步；二进制内无 WSL 特判（无 wsl/microsoft/osrelease 串），test 是 switch 的固有分解而非 WSL 降级。①因 autovt@tty1 exit 4 中止 → ②被跳过 → 世代未建。nh 自带诊断串 "Profile is out of sync with /run/current-system. This may happen if a previous switch failed during activation."——其自身失败路径本就会留下 profile（旧）与 current-system（新）失同步态，与本轮现场一致（下次跑 nh 应见此警告）。与 nixos-rebuild 顺序相反（`nix-env --set` 建世代**先于** stc），故 9-24 adopt 同为 exit 4 世代仍落盘。而 NixOS-WSL 引导链实证为 `/init → /sbin/init(systemd-shim) → /nix/var/nix/profiles/system/systemd`（shim 二进制内路径字符串）——**下次 `wsl --shutdown` 重开将回到 gen 7（20260911.eaad089），本次激活不跨 WSL 重启持久**。9-19 nrs exit 0「bootloader 步全过」未暴露此问题，因当时闭包与 gen 7 完全相同（不建新代不可分辨）。推论：autovt@tty1 不解决，nh 在本机每次都 exit 4、永不推进 profile——`nrs` 在此主机结构性失效（运行时激活本身每次成功）。补救：`sudo nixos-rebuild switch --flake .#wsl` 建 gen 8 落 profile（本记录时点尚未执行）；根治 autovt@tty1（如 NixOS 侧禁用该模板实例）后 nrs 方可恢复。
+
+未验证：WSL 重开实测回退（基于 shim 路径 + profile 指针的推断，未实际重启）；`wsl --shutdown` 后重跑 nh 是否建代（同因未重启）；desktop 输出的构建与激活（桌面主机侧动作）；CI 在本批提交上的运行。
+
 ## 2026-09-26 桌面分级阶段 2：desktop-lite profile、会话栈抽出与 texlive 归位（Fedora 44 / WSL2 standalone，本机）
 
 改动（lite 边界为用户决策：保留 dev+office+flatpak+browsers+agents，砍除 media/proxy/gaming/virtualization/mnt 与 GNOME/Plasma 备用 DE）：texlive scheme-full 自 dev.nix 归位 office.nix（排版属办公域）；profiles/desktop.nix 的会话栈（GDM/PipeWire/打印/图形/askpass）抽出为 modules/desktop/session.nix 供全量与 lite 共享；新建 profiles/desktop-lite.nix（= nixos-base + session + niri + locale-zh + core + flatpak + browsers + dev + office + agents；mysql 随 dev、texlive 随 office 一并带入 lite）。
