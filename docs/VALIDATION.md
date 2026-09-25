@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-26 wsl 实机复测 ea68434：mask 生效，补 user@1000 前置后 nrs exit 0、gen 8 落地（NixOS-WSL 26.11，本机 wsl）
+
+无代码改动；对上一条（补 mask autovt@tty1）的实机复测，承接其「未验证」清单。
+
+验证（实机，~/nix-roam，`nh os switch --diff always .`）：① **mask 生效**——`unit-autovt-tty1.service-disabled` 入闭包（+4 路径，nvd 1bfraah5…→cwcs4a2j…），`/etc/systemd/system/autovt@tty1.service` → disabled symlink，切换全程 `systemctl --failed` 零单元。② 但首次复测**仍 exit 4、仍不建世代**——stc 输出已无「units failed」尾巴，剩余唯一触发源为 user activation：本 boot（01:42 起）`user@1000.service` 从未启动（journal 零条目、Linger=no）、`/run/user/1000/bus` 缺失 → stc「reloading user units」dbus autolaunch 失败。9-19 fresh boot nrs exit 0 的差异条件即在于彼时 user@1000 在跑。stc 已是 Rust 重写（`.switch-to-configuration-wrapped`，符号 `switch_to_configuration`），退出码不可读源，「user activation 失败 → exit 4」为行为实证（无失败单元 + 仅此警告 = 4）。③ `sudo systemctl start user@1000.service` 后 `/run/user/1000/bus` 立现、用户管理器 running 零失败 → nrs 重跑 **exit 0**，本机首次走完「Activating configuration → Adding configuration to bootloader」全链——**gen 8 建成**（`system → system-8-link → cwcs4a2j…`，26.11.20260923.4975466 含 mask），跨 `wsl --shutdown` 持久自此恢复（shim 从 profile 引导）。HM 服务 active；booted-system 仍指旧代属正常（下次 WSL 重启加载 gen 8）。
+
+遗留（新边界）：`user@1000` 在 WSL boot 时不保证启动（本 boot 未起、9-19 起了，疑与会话建立方式有关）；未起时 nrs 又将 exit 4 于 user-reload 且不建世代（运行时激活仍成功）。可选根治：`sudo loginctl enable-linger xuqihao`（机器态 `/var/lib/systemd/linger/`，不入库），或跑 nrs 前确保用户管理器在跑（`sudo systemctl start user@1000`）。未验证：`wsl --shutdown` 重开后实机进 gen 8（Windows 侧动作）；linger 方案；CI。
+
 ## 2026-09-26 wsl：补 mask autovt@tty1，根治 nrs 不建系统世代（Fedora 44 / WSL2 standalone，本机）
 
 改动：`hosts/wsl/default.nix` 在既有 `getty@tty1.service` mask（9-18，57af69e）之外补 `systemd.units."autovt@tty1.service".enable = false`。承接上条根因链：9-26 事故唯一失败单元 `autovt@tty1.service` 与 `getty@tty1.service` 是同一模板（`getty@.service`，`autovt@.service` 为其别名）的**不同实例名**，mask 互不覆盖——9-18 只 mask 了前者，故未防住。`enable = false` 语义对照所锁 nixpkgs（26.11.20260923.4975466）源码核验：`nixos/lib/systemd-lib.nix` 对 disabled 单元生成 `…-disabled` derivation（内容 `ln -s /dev/null`；选项文档原话即 "prevent specific template instances … from being started"），`generateUnits` 将其装入 /etc/systemd/system——该目录整体生成，`environment.etc` 逐条探针查不到 tty 条目属正常。mask 后单元无法进入 failed 态 → stc 不再 exit 4 → nh（nrs）得以走到「设 profile 建世代」一步。
