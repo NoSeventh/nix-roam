@@ -199,7 +199,7 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 ```text
 .
 ├── flake.nix                   # 双模式 flake 输出与两套 nixpkgs 通道（unstable / stable）
-├── meta.json                   # 本地用户名单点定义（flake 与 bootstrap 脚本共读）
+├── meta.json                   # 单点数据：本地用户名 + substituters 列表 + cachix 公钥（flake 与 bootstrap 脚本共读）
 ├── hosts/
 │   ├── nixos/                  # 当前 NixOS 主机入口（机器专属设置）与硬件配置
 │   └── wsl/                    # NixOS-WSL 主机入口
@@ -211,7 +211,7 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 │   ├── nixos-cli.nix           # NixOS CLI 用户配置入口
 │   ├── standalone-linux.nix    # 普通 Linux / WSL 入口
 │   ├── standalone-darwin.nix   # macOS 入口
-│   └── nix-cn.nix              # Nix binary cache 单一配置源
+│   └── nix-cn.nix              # Nix 镜像/缓存配置（列表与公钥单源于根 meta.json）
 ├── packages/cli-dev.nix        # 各入口共享的 CLI 软件列表
 ├── bootstrap/
 │   ├── bootstrap.sh            # 统一入口：自动检测环境（OS / NixOS / 架构 / sudo）派发到下列脚本
@@ -290,7 +290,7 @@ git remote add github git@github.com:NoSeventh/nix-roam.git
 - `hosts/<hostname>/hardware-configuration.nix` 是机器专用文件，应与对应主机入口一起提交；只有仓库根目录下误生成的 `/hardware-configuration.nix` 被忽略。
 - NixOS 桌面配置中的 Hermes Agent 需要目标机器自行提供 `/etc/hermes/env`。
 - 多用户 Nix 安装需要让 daemon 信任自定义 substituter，`bootstrap/linux.sh` 会处理新机器的这项配置；无 systemd / 无 sudo 的机器走单用户安装，镜像直接写用户级 nix.conf，无需 daemon 授权（`/nix` 仍需一次性 root 创建）。WSL1 不受支持，请先升级 WSL2。
-- 国内镜像只覆盖官方 Hydra 构建过的东西。unfree 包不在其中——nixvim 用到的 `vimPlugins.rainbow-delimiters-nvim` 源码在 gitlab.com，官方缓存与镜像站都没有，构建时会现抓上游；GitLab 不可达时整条 HM 构建（vimplugin → neovim → nixvim → home-manager-path）直接失败。因此缓存列表末尾补了社区缓存 `nix-community.cachix.org`（公钥：NixOS 侧在 `modules/fix-network.nix`；standalone 侧由 `bootstrap/*.sh` 写入 `/etc/nix/nix.custom.conf`，单用户安装写用户级 nix.conf）。已经装好的机器可手工补上：
+- 国内镜像只覆盖官方 Hydra 构建过的东西。unfree 包不在其中——nixvim 用到的 `vimPlugins.rainbow-delimiters-nvim` 源码在 gitlab.com，官方缓存与镜像站都没有，构建时会现抓上游；GitLab 不可达时整条 HM 构建（vimplugin → neovim → nixvim → home-manager-path）直接失败。因此缓存列表末尾补了社区缓存 `nix-community.cachix.org`（公钥：NixOS 侧在 `modules/fix-network.nix`；standalone 侧由 `bootstrap/*.sh` 写入 `/etc/nix/nix.custom.conf`，单用户安装写用户级 nix.conf；列表与公钥本体单源于仓库根 `meta.json`，Nix 模块与脚本同读一份，改动只改这一处）。已经装好的机器可手工补上：
 
   ```bash
   sudo tee -a /etc/nix/nix.custom.conf >/dev/null <<'EOF'

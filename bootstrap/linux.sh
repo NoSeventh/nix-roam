@@ -311,10 +311,12 @@ have nix || { echo "错误：nix 仍不可用。请打开新 shell 让 nix 进 P
 #     幂等：两种模式均已配置时跳过；用户 nix.conf 已是 HM 托管 symlink 时不追加（nix-cn.nix 接管同一列表）
 # ---------------------------------------------------------------------------
 log "2/7 配置国内镜像（${NIX_INSTALL_MODE}-user）"
-# 列表/公钥与 home/nix-cn.nix、modules/fix-network.nix 保持同一份内容（单一事实源是 home/nix-cn.nix）
-# cachix 补官方 Hydra 不构建的 unfree 包（如 vimPlugins.rainbow-delimiters-nvim 的 gitlab 源码）
-TRUSTED_SUBSTITUTERS="https://mirror.nju.edu.cn/nix-channels/store https://mirrors.tuna.tsinghua.edu.cn/nix-channels/store https://mirrors.ustc.edu.cn/nix-channels/store https://mirror.sjtu.edu.cn/nix-channels/store https://nix-community.cachix.org"
-CACHIX_PUBLIC_KEY="nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+# 列表/公钥单源：repo 根 meta.json（home/nix-cn.nix 与 modules/fix-network.nix 读同一份）
+# cachix 补官方 Hydra 不构建的 unfree 包（如 vimPlugins.rainbow-delimiters-nvim 的 gitlab 源码）；
+# 列表自带 cache.nixos.org（官方源默认已受信，trusted-substituters 里重复列出无害）
+TRUSTED_SUBSTITUTERS="$(sed -n 's/.*"substituters": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
+CACHIX_PUBLIC_KEY="$(sed -n 's/.*"nixCommunityCachixKey": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
+[ -n "$TRUSTED_SUBSTITUTERS" ] && [ -n "$CACHIX_PUBLIC_KEY" ] || { echo "错误：无法从 meta.json 解析 substituters / nixCommunityCachixKey（文件缺失或格式变化）。" >&2; exit 1; }
 if [ "$NIX_INSTALL_MODE" = "multi" ]; then
   NIX_CUSTOM_CONF="/etc/nix/nix.custom.conf"
   NIX_SYSTEM_CONF="/etc/nix/nix.conf"
@@ -345,7 +347,7 @@ else
     if [ -f "$NIX_CONF" ] && grep -q '^substituters' "$NIX_CONF"; then
       echo "    用户级 substituters 已配置，跳过"
     else
-      echo "substituters = $TRUSTED_SUBSTITUTERS https://cache.nixos.org/" >> "$NIX_CONF"
+      echo "substituters = $TRUSTED_SUBSTITUTERS" >> "$NIX_CONF"
       echo "    已写入用户级 substituters（$NIX_CONF）"
     fi
     # 单用户无 daemon，公钥写在用户级 nix.conf 里直接生效（不会触发受限设置警告）
@@ -355,7 +357,7 @@ else
     fi
   fi
   # 本次会话立即生效（后续 nix profile install / home-manager 拉包直接走国内镜像）
-  export NIX_CONFIG="substituters = $TRUSTED_SUBSTITUTERS https://cache.nixos.org/
+  export NIX_CONFIG="substituters = $TRUSTED_SUBSTITUTERS
 extra-trusted-public-keys = $CACHIX_PUBLIC_KEY"
 fi
 
