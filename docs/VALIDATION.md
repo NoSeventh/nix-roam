@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-26 wsl：补 mask autovt@tty1，根治 nrs 不建系统世代（Fedora 44 / WSL2 standalone，本机）
+
+改动：`hosts/wsl/default.nix` 在既有 `getty@tty1.service` mask（9-18，57af69e）之外补 `systemd.units."autovt@tty1.service".enable = false`。承接上条根因链：9-26 事故唯一失败单元 `autovt@tty1.service` 与 `getty@tty1.service` 是同一模板（`getty@.service`，`autovt@.service` 为其别名）的**不同实例名**，mask 互不覆盖——9-18 只 mask 了前者，故未防住。`enable = false` 语义对照所锁 nixpkgs（26.11.20260923.4975466）源码核验：`nixos/lib/systemd-lib.nix` 对 disabled 单元生成 `…-disabled` derivation（内容 `ln -s /dev/null`；选项文档原话即 "prevent specific template instances … from being started"），`generateUnits` 将其装入 /etc/systemd/system——该目录整体生成，`environment.etc` 逐条探针查不到 tty 条目属正常。mask 后单元无法进入 failed 态 → stc 不再 exit 4 → nh（nrs）得以走到「设 profile 建世代」一步。
+
+验证（本机 Fedora 44 / WSL2 / standalone x86_64，纯求值）：两单元 `enable` 均为 false，unit derivation 名分别为 `unit-getty-tty1.service-disabled` / `unit-autovt-tty1.service-disabled`（即 /dev/null mask 形态）；wsl toplevel drvPath 9xrn8rvx… → hjp8kpn9…（如期移动，求值通过）；`grep -rn hosts/wsl flake.nix profiles modules home` 证实该文件仅 `.#wsl` 输出可达，standalone x86_64 activationPackage 求值正常（7wqs57fs…，求值路径不经过该文件）。
+
+未验证：wsl 实机激活——须在 wsl 发行版内 `sudo nixos-rebuild switch --flake .#wsl`，同一条命令兼收止血（nixos-rebuild 先设 profile 后 stc，exit 4 不阻碍落世代）与根治（mask 随新世代进系统）；此后 `nrs` 是否恢复建世代、以及跨 `wsl --shutdown` 持久（建议重启前后各跑一次 nrs，核对 `/nix/var/nix/profiles/system` 是否推进）；system-units 目录实机构建产物（本轮以 derivation 名 + 源码推定，未构建）；CI。
+
 ## 2026-09-26 wsl 实机激活 11b9c69..d8d1ec3 一批 + 发现 nh 不建系统世代（NixOS-WSL 26.11，本机 wsl）
 
 无代码改动；对近期一批提交（meta.json 单源、桌面求值修复、应用按档拆分、automation 下沉、desktop-lite——即 git 11b9c69..d8d1ec3，连同此前 c2e40c3 的 flake.lock 前滚）在 wsl 主机的首次实机激活。以 xuqihao 在 ~/nix-roam 运行 `nh os switch --diff always .`（= `nrs` 别名的实际命令；sudo 免密缓存）。
