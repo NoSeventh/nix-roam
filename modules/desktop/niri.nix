@@ -17,9 +17,8 @@
     # quickshell.package = inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.quickshell;
     systemd.enable = true;
     # enableSystemMonitoring 已被 nixpkgs 移除（mkRemovedOptionModule，内置无需额外依赖）
-    enableDynamicTheming = true;
-    enableAudioWavelength = true;
-    enableVPN = true;
+    # enableDynamicTheming / enableAudioWavelength 同理移除（matugen / cava 已入默认环境）
+    # enableVPN 亦移除（网络后端由 DMS 运行时自检）
   };
 
   environment.systemPackages = with pkgs; [
