@@ -114,7 +114,7 @@ Each NixOS host also carries a **`hosts/<hostname>/variables.nix`** knob file (a
 
 Fast path: run `sudo bash bootstrap/nixos.sh adopt --target <hostname>` on the machine itself (or `install --target <hostname>` from the live ISO). When `hosts/<hostname>/` is missing, the script scaffolds it from `hosts/_template/` (replacing the `__HOSTNAME__` placeholder), prints paste-ready desktop/CLI `flake.nix` output blocks, and waits for the manual paste — it never edits `flake.nix` itself. The equivalent manual steps:
 
-1. Copy `hosts/_template/` to `hosts/<hostname>/` and replace `__HOSTNAME__`. The convention is directory name = `networking.hostName` = output attribute name (so `nrs`/`nh` auto-match by hostname). Keep `profiles/desktop.nix` for a desktop or swap to `nixos-base.nix` + `cli.nix` for CLI-only; import one `profiles/hardware/*.nix` GPU/VM profile if the machine needs it.
+1. Copy `hosts/_template/` to `hosts/<hostname>/` and replace `__HOSTNAME__`. The convention is directory name = `networking.hostName` = output attribute name (so `nrs`/`nh` auto-match by hostname). Keep `profiles/desktop.nix` for a full desktop, compose `nixos-base.nix` + selected `modules/desktop/` tiers for a lighter desktop, or `nixos-base.nix` + `cli.nix` for CLI-only; import one `profiles/hardware/*.nix` GPU/VM profile if the machine needs it.
 2. Fill `variables.nix` knobs (`timeZone`, optional `gpuBusIDs`) and provide a real `hardware-configuration.nix` — the install chain regenerates it, adopting an existing system means copying that machine's current file in.
 3. Add the `nixosConfigurations.<hostname>` output in `flake.nix` pointing at `./hosts/<hostname>` (copy the desktop or WSL block as appropriate; the scaffold prints both variants).
 4. If the host needs a different HM user profile, pass a different module to `nixosHome`.
@@ -128,11 +128,20 @@ Module function signatures vary. For new edits, declare the parameters you use a
 
 Match the channel to the param you reference: `pkgs-stable` for stable, `pkgs` (unstable) for everything else. There is no `pkgs-master` — the master channel was removed on 2026-09-16 (it had no consumers); reintroduce it in `flake.nix` (`inputs` + `pkgsFor` + `specialArgs`) if ever needed.
 
-Key modules (under `modules/desktop/` unless noted):
-- `programs.nix` — giant GUI + CLI app list. Ends with `++ (import ../../packages/cli-dev.nix {...})`. Platform-conditional packages use `stdenv.hostPlatform.isLinux` guards. Also defines a **wechat overlay**.
+Key modules (under `modules/desktop/` unless noted) — app tiers split 2026-09-26 out of the former giant `programs.nix` + `services.nix` + `flatpak-linyaps.nix` (pure reorganization: the 635-path `environment.systemPackages` set verified identical before/after; only list concat order changed, so the desktop drvPath moved while WSL/standalone stayed byte-identical):
+- `core.nix` — **open-source-only** desktop base: firefox/chromium (+ `programs.*` wrappers), kitty, shells, monitoring, screenshots, compression, syncthing/localsend, `nix-ld`, earlyoom (the rustdesk-server stub lives here), and the trailing `++ (import ../../packages/cli-dev.nix {...})`. Proprietary software never lands here — a lite host imports just this tier for a usable clean desktop.
+- `browsers.nix` — proprietary/experimental browsers (google-chrome, microsoft-edge, servo), kept out of core by the open-source rule.
+- `dev.nix` — editors (vscode/zed/warp/nvim/neovide/helix/vim/emacs), clang toolchain, rstudio, biome, gitui, texlive scheme-full (the heavyweight a lite host cuts first), distrobox/bubblewrap, and the `services.mysql` dev service.
+- `media.nix` — audio players, image/video editors, CAD suite, obs, qbittorrent, bilibili clients.
+- `office.nix` — office suites, thunderbird/calibre/zotero, siyuan, calendar/translator, CN apps (qq/wemeet/qqmusic/wordbook), zoom/mattermost + the **wechat overlay** (must travel with the CN apps; not importing this tier disables the overlay cleanly).
+- `proxy.nix` — clash stack (mihomo/clash-verge-rev/clash-nyanpasu), sing-box/v2rayn/proxypin + `programs.clash-verge` (tun/service mode).
+- `gaming.nix` — `programs.steam` + `hardware.graphics.enable32Bit` (32-bit GL lives with its consumers; `virtualization.nix` keeps its own same-value declaration for wine).
+- `flatpak.nix` / `desktop-managers.nix` — split from the former flatpak-linyaps.nix: app stores + SJTU flatpak mirror vs GNOME/Plasma6 fallback DEs (GNOME extensions, KDE apps, mutter dconf features).
 - `niri.nix` — Niri (primary) + Hyprland + Sway fallbacks; `dms-shell` enabled as the shell.
 - `agents.nix` — `hermes-agent` service + AI tools (cursor, claude-code, codex, opencode…). See "Secrets" below.
-- `virtualization.nix` — Docker is the container engine (podman commented out; enable one or the other, never both). `services.nix` keeps rustdesk-server disabled until a real relay host replaces the old `example.com` placeholder.
+- `mnt.nix` — IHEP juno sshfs user service (work-machine specific; the system-side counterpart of the IHEP identity in `home/common.nix`).
+- `virtualization.nix` — Docker is the container engine (podman commented out; enable one or the other, never both), plus libvirtd/waydroid/wine.
+- `automation.nix` — Nix GC/optimise timers + clean-user-generations; not desktop-specific (slated to sink into `profiles/nixos-base.nix` so WSL gets it too).
 
 ## Two managed nixpkgs channels (plus nixvim's own)
 

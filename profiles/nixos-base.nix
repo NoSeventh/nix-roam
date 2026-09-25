@@ -55,7 +55,7 @@
   nixpkgs.config.allowUnfree = true;
   nixpkgs.config.permittedInsecurePackages = [
     "electron-40.10.5"
-    # pnpm-10.29.2 仅桌面闭包引用（GNOME 模块链，flatpak-linyaps.nix）；
+    # pnpm-10.29.2 仅桌面闭包引用（GNOME 模块链，desktop-managers.nix）；
     # WSL 不引用但删掉无效也无益——nixpkgs.config 跨模块浅合并，
     # 拆到 profiles/desktop.nix 会遮蔽 electron 条目，只能在共享处单点声明。
     "pnpm-10.29.2"
