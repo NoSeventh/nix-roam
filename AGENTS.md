@@ -188,7 +188,7 @@ Current source values (not a claim that every target builds):
 
 | nixpkgs instance | Location | `permittedInsecurePackages` |
 |---|---|---|
-| Stable **and** standalone unstable (shared) | `flake.nix` → `nixpkgsConfig` (consumed by `pkgsFor` for both channels) | — (none; `electron-38.8.4` removed 2026-09-17 after eval+build verified unreferenced) |
+| Stable **and** standalone unstable (shared) | `flake.nix` → `nixpkgsConfig` (consumed by `pkgsFor` for both channels) | `electron-41.9.1` (added 2026-09-26: the desktop closure references it through this config's instance, probe-verified — removal breaks desktop eval; standalone doesn't reference it, allow-only semantics leave its drvPath unchanged) |
 | NixOS unstable, desktop/WSL | `profiles/nixos-base.nix` | `electron-40.10.5`, `pnpm-10.29.2` |
 
 These lists deliberately differ (per-instance needs). Add an approved exact package/version exception to every affected instance in both files as needed; do not assume one edit covers every output or expand permissions just to make documentation match. Validate the affected package/target after changing exceptions.

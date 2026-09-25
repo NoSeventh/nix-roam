@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-26 桌面求值修复：dms-shell 失效选项 + electron-41.9.1 允许条目（Fedora 44 / WSL2 standalone，本机）
+
+起因：c2e40c3「update flake」后 `.#nixos` 求值失败（CI eval 层同罪）。两层问题被 dms-shell 断言错误掩盖，逐层剥开：① `modules/desktop/niri.nix` 的 `programs.dms-shell.{enableDynamicTheming,enableAudioWavelength,enableVPN}` 已被上游移除（matugen/cava 入默认环境、网络后端运行时自检）；② 断言修掉后露出 insecure 拒绝——桌面闭包经 flake.nix `nixpkgsConfig` 管辖的实例引用 electron-41.9.1（EOL）。
+
+改动：niri.nix 删三个失效选项（沿 enableSystemMonitoring 先例留注释）；flake.nix `nixpkgsConfig` 增 `permittedInsecurePackages = [ "electron-41.9.1" ]`。`profiles/nixos-base.nix` 经探针验证无需改动——系统 unstable 实例仍只引用 electron-40.10.5（原条目原样保留；本轮曾误将其替换为 41.9.1 导致旧版消费者被拒，已回退）。两处探针：移除 flake.nix 条目 → 桌面求值失败（条目必需）；nixos-base 只留 40.10.5 → 桌面求值通过（无需 41.9.1）。
+
+验证（本机 Fedora 44 / WSL2 / standalone）：`.#nixos` toplevel 求值通过（xgd7r8cd…，26.11.20260923.4975466）；wsl toplevel 与三个 standalone activationPackage 的 drvPath 与同日重构基线仍逐字节一致（nixpkgsConfig 允许列表为「允许」语义，standalone 不引用 electron 不受影响）；`git diff --check` 干净。
+
+未验证：桌面 toplevel 构建（闭包含 unfree 大件，历史上 QQ 下载失败中止过，CI 对 NixOS toplevel 也仅求值）；实机 `nrs` 激活（桌面主机侧动作）；electron-41.9.1 的具体引用包归属（求值错误只给实例不给包名，未逐包归因）；CI 在本批提交上的运行。
+
 ## 2026-09-26 镜像/公钥收敛 meta.json 单源 + locale-zh 反向 import 清理（Fedora 44 / WSL2 standalone，本机）
 
 改动：`meta.json` 从单点 username 扩展为三字段——新增 `substituters`（空格分隔六项：NJU→TUNA→USTC→SJTU→cache.nixos.org→cachix 末位，顺序沿用 nix-cn.nix 旧值）与 `nixCommunityCachixKey`（mB9F… 公钥）。`home/nix-cn.nix` 的 substituters 改 `lib.splitString " "` 读同文件，`modules/fix-network.nix` 的 trusted-public-keys 改读同文件；`bootstrap/{linux,darwin}.sh` 与 `bootstrap/nixos.sh` 的两条硬编码变量改为 sed 提取（与 username 同款模式）+ fail-loud 守卫，`nixos.sh` 补 `SCRIPT_REPO` 自定位（其 1/7 步执行时 CLONE_DIR 尚未克隆）。三处手动追加的 `https://cache.nixos.org` 删除——顺带修复既有漂移：bootstrap 写出的用户级顺序原为「四镜像→cachix→官方」，与 nix-cn.nix 的「四镜像→官方→cachix」不一致，现统一为后者；daemon 侧 trusted-substituters 从此也列官方源（本就默认受信，重复无害）。幂等跳过检查（grep nix-community.cachix.org）未动。另删 `modules/desktop/locale-zh.nix` 对 `profiles/locale.nix` 的冗余反向 import（desktop 链路经 profiles/desktop.nix → nixos-base.nix 已传递导入同一文件，模块系统按路径去重，删除为纯清理）。

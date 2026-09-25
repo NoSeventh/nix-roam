@@ -71,8 +71,15 @@
       # profiles/nixos-base.nix 声明 —— 那是另一实例的刻意差异，不做合并扩权。
       # （2026-09-17 验证后移除了此处的 electron-38.8.4：五个输出求值 + standalone 构建均不引用；
       #   若日后 lock 更新再次需要，在此重新添加即可。）
+      # electron-41.9.1（EOL）：2026-09-26 桌面求值需要 —— flake 更新后桌面闭包经本 config
+      # 管辖的 stable 实例（specialArgs pkgs-stable）引用该版本；standalone 不引用，
+      # 列表为「允许」语义，不影响其求值结果（drvPath 前后一致已验证）。
+      # electron-41.9.1（EOL）：2026-09-26 桌面求值需要 —— 桌面闭包经本 config 管辖的实例
+      # 引用该版本（探针验证：移除后桌面求值失败）；standalone 不引用，列表为「允许」语义，
+      # 其 drvPath 不受影响（前后一致已验证）。系统 unstable 实例另见 profiles/nixos-base.nix。
       nixpkgsConfig = {
         allowUnfree = true;
+        permittedInsecurePackages = [ "electron-41.9.1" ];
       };
 
       # 按 system 实例化 unstable 与 stable
