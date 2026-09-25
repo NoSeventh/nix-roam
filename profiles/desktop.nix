@@ -1,5 +1,9 @@
 # Desktop host profile: session stack (display manager, audio, graphics,
 # printing) plus the explicit desktop module list under modules/desktop/.
+# App tiers: core (open-source base, always) plus optional tiers — browsers /
+# dev / media / office / proxy / gaming and the service modules (agents / mnt /
+# virtualization). A lighter desktop host composes nixos-base.nix + a subset
+# of the tier modules in its own profile instead of importing this full list.
 # Host-specific settings (boot, kernel, hostname, power buttons, user groups)
 # belong in hosts/<hostname>/default.nix, not here.
 { pkgs, pkgs-stable, ... }:
@@ -7,15 +11,21 @@
 {
   imports = [
     ./nixos-base.nix
-    ../modules/desktop/agents.nix
-    ../modules/desktop/automation.nix
-    ../modules/desktop/flatpak-linyaps.nix
-    ../modules/desktop/locale-zh.nix
-    ../modules/desktop/mnt.nix
     ../modules/desktop/niri.nix
-    ../modules/desktop/programs.nix
-    ../modules/desktop/services.nix
+    ../modules/desktop/locale-zh.nix
+    ../modules/desktop/core.nix
+    ../modules/desktop/flatpak.nix
+    ../modules/desktop/desktop-managers.nix
+    ../modules/desktop/browsers.nix
+    ../modules/desktop/dev.nix
+    ../modules/desktop/media.nix
+    ../modules/desktop/office.nix
+    ../modules/desktop/proxy.nix
+    ../modules/desktop/gaming.nix
+    ../modules/desktop/agents.nix
+    ../modules/desktop/mnt.nix
     ../modules/desktop/virtualization.nix
+    ../modules/desktop/automation.nix
   ];
 
   # --- 1. 显示与会话 ---
@@ -35,11 +45,8 @@
 
   # --- 2. 硬件与多媒体 ---
   services.printing.enable = true;
-  # 开启图形加速支持
-  hardware.graphics = {
-    enable = true;
-    enable32Bit = true;
-  };
+  # 开启图形加速支持（32 位支持归 gaming.nix / virtualization.nix 的需求方）
+  hardware.graphics.enable = true;
 
   services.pipewire = {
     enable = true;
