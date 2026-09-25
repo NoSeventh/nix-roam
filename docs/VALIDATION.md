@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-26 桌面分级阶段 2：desktop-lite profile、会话栈抽出与 texlive 归位（Fedora 44 / WSL2 standalone，本机）
+
+改动（lite 边界为用户决策：保留 dev+office+flatpak+browsers+agents，砍除 media/proxy/gaming/virtualization/mnt 与 GNOME/Plasma 备用 DE）：texlive scheme-full 自 dev.nix 归位 office.nix（排版属办公域）；profiles/desktop.nix 的会话栈（GDM/PipeWire/打印/图形/askpass）抽出为 modules/desktop/session.nix 供全量与 lite 共享；新建 profiles/desktop-lite.nix（= nixos-base + session + niri + locale-zh + core + flatpak + browsers + dev + office + agents；mysql 随 dev、texlive 随 office 一并带入 lite）。
+
+验证（本机 Fedora 44 / WSL2 / standalone x86_64）：desktop-lite 组合经 flake 内临时 `_litecheck` 输出（带 fileSystems/bootloader 硬件桩；验证后已还原 flake.nix，不入提交）纯求值通过（vsq3r5b…），12 个档位开关核对全对——gdm/pipewire/mysql/hermes-agent/flatpak/nix.gc = true，steam/clash-verge/docker/gnome/plasma6/waydroid = false；texlive 挪档 + session 抽出后 desktop 的 635 个包路径与拆分基线零增零减，桌面求值通过（qn3r7rf…）；wsl drvPath 与 automation 下沉后的值一致（9xrn8rv…，本轮零影响）；standalone 三输出与最初基线仍逐字节一致；`git diff --check` 干净。
+
+未验证：desktop-lite 无真实主机（仓库刻意不为其添加 flake 输出——第二台主机立项时按模板 + `--target` 脚手架接线，hardware-configuration 与 variables.nix 届时为真实值）；任何目标的构建与激活；CI 在本批提交上的运行。
+
 ## 2026-09-26 桌面应用清单按档拆分 + automation 下沉 nixos-base（Fedora 44 / WSL2 standalone，本机）
 
 改动（4342a57）：`programs.nix`（274 行）按档拆为 `modules/desktop/{core,browsers,dev,media,office,proxy,gaming}.nix` —— core 只收开源软件（firefox/chromium 留守，chrome/edge/servo 移 browsers；earlyoom/nix-ld 与 cli-dev 挂载随 core），dev 收编辑器/clang/texlive/distrobox 并接管 mysql（用户决策：mysql 是 dev 的），office 收办公 + 中文软件 + wechat overlay（overlay 随档，不 import 即整体不生效），gaming 收 steam 并归位 `hardware.graphics.enable32Bit`（profiles/desktop.nix 只留 enable）；`services.nix` 解散（earlyoom→core、mysql→dev、rustdesk 注释块→core）；`flatpak-linyaps.nix` 拆为 flatpak.nix（商店 + SJTU 镜像）与 desktop-managers.nix（GNOME/Plasma 备用 DE + 扩展 + dconf）。`profiles/desktop.nix` 改为按档 import 全集，hosts/nixos 行为不变；cli-dev/nixos-base/standalone-linux 中指向 programs.nix / flatpak-linyaps 的注释同步更新。

@@ -107,7 +107,7 @@ sudo bash bootstrap/nixos.sh          # 等价于 adopt 子命令
 
 ### NixOS 桌面
 
-NixOS 桌面模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。当前机器的配置位于 `hosts/nixos/` 并纳入版本控制，以保证 Git Flake 可以纯求值和重复构建；其他机器应建立独立的 `hosts/<hostname>/`（从 `hosts/_template/` 模板复制，或用 bootstrap 的 `--target` 脚手架），不要直接复用现有硬件配置。
+NixOS 桌面模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。当前机器的配置位于 `hosts/nixos/` 并纳入版本控制，以保证 Git Flake 可以纯求值和重复构建；其他机器应建立独立的 `hosts/<hostname>/`（从 `hosts/_template/` 模板复制，或用 bootstrap 的 `--target` 脚手架），不要直接复用现有硬件配置。较轻量的第二台桌面主机可改用 `profiles/desktop-lite.nix`（core + dev + office + flatpak + browsers + agents，不含 media/proxy/gaming/虚拟化/IHEP 挂载与 GNOME/Plasma 备用桌面）。
 
 在已准备好硬件配置的目标机器上：
 
@@ -203,7 +203,7 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 ├── hosts/
 │   ├── nixos/                  # 当前 NixOS 主机入口（机器专属设置）与硬件配置
 │   └── wsl/                    # NixOS-WSL 主机入口
-├── profiles/                   # 显式导入的共享 profiles：基础、桌面、locale、CLI
+├── profiles/                   # 显式导入的共享 profiles：基础、桌面、桌面轻量（desktop-lite）、locale、CLI
 ├── modules/                    # 共享 NixOS 模块；modules/desktop/ 为桌面专属模块
 ├── home/
 │   ├── common.nix              # 两种模式共享的纯 CLI Home Manager 配置

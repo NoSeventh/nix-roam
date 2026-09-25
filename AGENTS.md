@@ -83,7 +83,7 @@ The local username is defined **once** — `username` in the repo-root **`meta.j
 ```
 flake.nix                  # Explicit host/home outputs; pkgsFor instantiates unstable + stable per system (shared nixpkgsConfig)
 meta.json                  # Single-point local username + cache metadata (substituters string, cachix key); read by flake-side modules AND bootstrap scripts before Nix exists — data file, not Nix
-profiles/                  # Explicit shared profiles: nixos-base, desktop, locale, CLI; hardware/ = dormant GPU/VM profiles
+profiles/                  # Explicit shared profiles: nixos-base, desktop, desktop-lite, locale, CLI; hardware/ = dormant GPU/VM profiles
 hosts/wsl/                 # NixOS-WSL entry, no physical hardware config
 hosts/nixos/               # Current machine entry (host-specific settings) + tracked hardware-configuration.nix + variables.nix knobs
 hosts/_template/           # New-host template (default/variables/hardware stub) — bootstrap scaffolds hosts/<hostname>/ from it
@@ -114,7 +114,7 @@ Each NixOS host also carries a **`hosts/<hostname>/variables.nix`** knob file (a
 
 Fast path: run `sudo bash bootstrap/nixos.sh adopt --target <hostname>` on the machine itself (or `install --target <hostname>` from the live ISO). When `hosts/<hostname>/` is missing, the script scaffolds it from `hosts/_template/` (replacing the `__HOSTNAME__` placeholder), prints paste-ready desktop/CLI `flake.nix` output blocks, and waits for the manual paste — it never edits `flake.nix` itself. The equivalent manual steps:
 
-1. Copy `hosts/_template/` to `hosts/<hostname>/` and replace `__HOSTNAME__`. The convention is directory name = `networking.hostName` = output attribute name (so `nrs`/`nh` auto-match by hostname). Keep `profiles/desktop.nix` for a full desktop, compose `nixos-base.nix` + selected `modules/desktop/` tiers for a lighter desktop, or `nixos-base.nix` + `cli.nix` for CLI-only; import one `profiles/hardware/*.nix` GPU/VM profile if the machine needs it.
+1. Copy `hosts/_template/` to `hosts/<hostname>/` and replace `__HOSTNAME__`. The convention is directory name = `networking.hostName` = output attribute name (so `nrs`/`nh` auto-match by hostname). Keep `profiles/desktop.nix` for a full desktop, `profiles/desktop-lite.nix` for the decided light composition (core + dev + office + flatpak + browsers + agents; no media/proxy/gaming/virtualization/mnt/fallback DEs), compose `nixos-base.nix` + selected `modules/desktop/` tiers for anything in between, or `nixos-base.nix` + `cli.nix` for CLI-only; import one `profiles/hardware/*.nix` GPU/VM profile if the machine needs it.
 2. Fill `variables.nix` knobs (`timeZone`, optional `gpuBusIDs`) and provide a real `hardware-configuration.nix` — the install chain regenerates it, adopting an existing system means copying that machine's current file in.
 3. Add the `nixosConfigurations.<hostname>` output in `flake.nix` pointing at `./hosts/<hostname>` (copy the desktop or WSL block as appropriate; the scaffold prints both variants).
 4. If the host needs a different HM user profile, pass a different module to `nixosHome`.
@@ -137,6 +137,7 @@ Key modules (under `modules/desktop/` unless noted) — app tiers split 2026-09-
 - `proxy.nix` — clash stack (mihomo/clash-verge-rev/clash-nyanpasu), sing-box/v2rayn/proxypin + `programs.clash-verge` (tun/service mode).
 - `gaming.nix` — `programs.steam` + `hardware.graphics.enable32Bit` (32-bit GL lives with its consumers; `virtualization.nix` keeps its own same-value declaration for wine).
 - `flatpak.nix` / `desktop-managers.nix` — split from the former flatpak-linyaps.nix: app stores + SJTU flatpak mirror vs GNOME/Plasma6 fallback DEs (GNOME extensions, KDE apps, mutter dconf features).
+- `session.nix` — shared session stack (GDM + niri default session, PipeWire, printing, graphics, ssh askpass), split 2026-09-26 from profiles/desktop.nix so the full and lite desktop profiles compose it identically.
 - `niri.nix` — Niri (primary) + Hyprland + Sway fallbacks; `dms-shell` enabled as the shell.
 - `agents.nix` — `hermes-agent` service + AI tools (cursor, claude-code, codex, opencode…). See "Secrets" below.
 - `mnt.nix` — IHEP juno sshfs user service (work-machine specific; the system-side counterpart of the IHEP identity in `home/common.nix`).

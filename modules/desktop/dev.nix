@@ -1,8 +1,8 @@
 # modules/desktop/dev.nix
 #
-# 开发档：编辑器全家、语言工具链、排版与容器工具，以及开发用服务（mysql）。
+# 开发档：编辑器全家、语言工具链与容器工具，以及开发用服务（mysql）。
 # 基础 CLI 工具链（gcc/rust/go/…）在 packages/cli-dev.nix，随 core.nix 走；
-# 轻量主机不 import 本档即无编辑器与 texlive（多 GB 大件是砍档的主要重量来源）。
+# 轻量主机不 import 本档即无编辑器与系统级 clang（排版 texlive 在 office.nix）。
 {
   pkgs,
   pkgs-stable,
@@ -44,9 +44,6 @@
     pkgs-stable.rstudio
     # → nil 已移至 packages/cli-dev.nix（共享）
     pkgs-stable.biome
-
-    # 排版（scheme-full 体积大，轻本首选砍除项）
-    pkgs-stable.texlivePackages.scheme-full
 
     # 容器工具
     distrobox
