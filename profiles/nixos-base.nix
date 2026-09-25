@@ -52,6 +52,48 @@
     extraGroups = [ "wheel" ];
   };
 
+  # --- 2. Nix 维护自动化（自动 GC / 存储优化；2026-09-26 自 modules/desktop/automation.nix 下沉，
+  #     desktop 与 WSL 共享 —— WSL 虚拟磁盘只增不减，自动回收尤其重要）---
+  nix.gc = {
+    automatic = true;                # 启用自动垃圾回收
+    dates = "weekly";                # 执行频率，可用 "daily", "weekly", "monthly" 或具体时间如 "03:15"
+    options = "--delete-older-than 2w";  # 删除超过 2 周的旧系统世代并回收垃圾
+    # 可选：如果你想保留最近的几个版本，可以改为 "--delete-older-than 30d --keep-last 3"
+  };
+
+  nix.optimise = {
+    automatic = true;                # 启用自动存储优化
+    dates = [ "daily" ];             # 每日运行一次优化（可根据需要调整）
+  };
+
+  # nix.gc 的 --delete-older-than 只清理系统世代；各用户经 nix-env 安装的软件另产生世代，
+  # 由下面的系统级定时任务遍历有 .nix-profile 的用户、以其身份执行清理。
+  systemd.services.clean-user-generations = {
+    description = "Clean old user environment generations";
+    startAt = "weekly";
+    serviceConfig = {
+      Type = "oneshot";
+      User = "root";
+      ExecStart = let
+        cleanCmd = pkgs-stable.writeShellScript "clean-user-generations" ''
+          for user_home in /home/*; do
+            user=$(basename "$user_home")
+            # 跳过没有 .nix-profile 的用户
+            if [ -e "/home/$user/.nix-profile" ]; then
+              echo "Cleaning generations for user: $user"
+              sudo -u "$user" nix-env --delete-generations old || true
+            fi
+          done
+          # 也可以清理 root 自己的 nix-env 世代（如果 root 也用过 nix-env）
+          if [ -e "/root/.nix-profile" ]; then
+            echo "Cleaning generations for root"
+            nix-env --delete-generations old || true
+          fi
+        '';
+      in cleanCmd;
+    };
+  };
+
   nixpkgs.config.allowUnfree = true;
   nixpkgs.config.permittedInsecurePackages = [
     "electron-40.10.5"
