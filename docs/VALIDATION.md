@@ -8,6 +8,10 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-26 AGENTS.md 补记 linger，对齐 95ca45b（docs-only，Fedora 44 / WSL2 standalone，本机）
+
+纯文档：95ca45b 引入 `users.users.<username>.linger = true` 时未同步 AGENTS.md——NixOS-WSL 段的 stc-exit-4 记载补上第二个来源（WSL boot 无登录会话 → user@1000 不自启 → `/run/user/1000/bus` 缺失 → stc 用户单元重载失败）及其根治（声明式 linger）与放置理由（桌面机登录即起用户管理器，故留在 hosts/wsl）。无 Nix 改动，无需重建；`git diff --check` 干净。
+
 ## 2026-09-26 wsl 重开复验：进 gen 9、user@1000 自启、冷启动 nrs exit 0（NixOS-WSL 26.11，本机 wsl）
 
 无代码改动；对上两条（autovt mask + 声明式 linger）的 `wsl --shutdown` 重开终验，闭环其「未验证」清单。
