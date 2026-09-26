@@ -23,6 +23,7 @@
     # GNOME 软件
     gnome-software
     gnome-tweaks
+    gnome-extension-manager # 自 session.nix 移入：管理下面的 GNOME 扩展，随备用桌面走
 
     # GNOME 扩展
     gnomeExtensions.blur-my-shell
