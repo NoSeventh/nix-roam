@@ -14,6 +14,9 @@
   # NixOS-WSL 重启从 profile 引导，不落世代即回旧系统——两个实例都 mask 才能根治。
   systemd.units."getty@tty1.service".enable = false;
   systemd.units."autovt@tty1.service".enable = false;
+  # WSL 开机无登录会话，user@1000 不自启 → /run/user/1000/bus 缺失 → stc 用户单元重载
+  # 失败（exit 4）→ nh（nrs）不建系统世代。linger 让用户管理器开机常驻，bus 随之就绪。
+  users.users.${username}.linger = true;
   wsl = {
     enable = true;
     defaultUser = username;

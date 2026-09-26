@@ -8,6 +8,22 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-26 wsl 重开复验：进 gen 9、user@1000 自启、冷启动 nrs exit 0（NixOS-WSL 26.11，本机 wsl）
+
+无代码改动；对上两条（autovt mask + 声明式 linger）的 `wsl --shutdown` 重开终验，闭环其「未验证」清单。
+
+验证（实机，fresh boot 11:45）：`/run/booted-system` = `/run/current-system` = 0dw0z7a5…（26.11.20260923.4975466，gen 9）——**跨 WSL 重开持久确认**，未回退旧代；`user@1000.service` 开机自启（linger 标记生效）、`/run/user/1000/bus` 随 boot 就绪、`Linger=yes`；HM 服务 active、零失败单元；冷启动直接 `nh os switch --diff always .`（= nrs，无任何手动前置）**exit 0**，「激活 → bootloader」全链通过（闭包相同未建新代，属预期）。至此 wsl 主机 nrs 三层根因（autovt@tty1 失败单元、user@1000 不自启、nh 失败即不建世代）全部闭环。
+
+未验证：desktop 输出构建与激活；CI 在本批提交上的运行。
+
+## 2026-09-26 wsl：user@1000 声明式 linger，nrs 前置条件根治（NixOS-WSL 26.11，本机 wsl）
+
+改动：`hosts/wsl/default.nix` 增 `users.users.${username}.linger = true;`（承上条遗留：WSL boot 无登录会话，user@1000 不自启 → `/run/user/1000/bus` 缺失 → stc 用户单元重载失败 exit 4 → nh 不建世代）。选项为 nixpkgs 原生声明式 linger（`users-groups.nix`，即 `loginctl enable-linger` 的等价物，activation 时落 `/var/lib/systemd/linger/<user>` 标记文件）。放置于 hosts/wsl 而非 nixos-base：桌面机经显示管理器登录即起用户管理器，无此依赖。
+
+验证（实机）：解析通过；`config.users.users.xuqihao.linger` 求值 true；toplevel drvPath hjp8kpn9… → nfblrivv9…（如期移动）；`nh os switch --diff always .`（= nrs，user@1000 由上条手动拉起后在跑）**exit 0**，全链「激活 → bootloader」走完，**gen 9 建成**（system → system-9-link → 0dw0z7a5…，含本改动）；激活即生效：`loginctl show-user xuqihao -p Linger` = yes，标记文件 `/var/lib/systemd/linger/xuqihao`（02:35，activation 所建）；零失败单元。自此后每次 WSL boot：logind 见 linger 标记 → user@1000 常驻 → bus 就绪 → stc 干净 → nrs 恒建世代。
+
+未验证：`wsl --shutdown` 重开后 user@1000 自启 + 实机进 gen 9（Windows 侧动作，机制上 linger 标记由 logind 开机消费，风险低）；linger 常驻的用户级单元内存开销（单用户 WSL，预期可忽略）；desktop 侧不受影响（未改动其链路，求值面 wsl-only）；CI。
+
 ## 2026-09-26 wsl 实机复测 ea68434：mask 生效，补 user@1000 前置后 nrs exit 0、gen 8 落地（NixOS-WSL 26.11，本机 wsl）
 
 无代码改动；对上一条（补 mask autovt@tty1）的实机复测，承接其「未验证」清单。
