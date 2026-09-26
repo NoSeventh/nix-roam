@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-26 gnome-extension-manager 归位 desktop-managers + AGENTS.md texlive 修正（desktop 侧模块 + 文档，Fedora 44 / WSL2 standalone，本机）
+
+改动：① `gnome-extension-manager` 自 `modules/desktop/session.nix` 移至 `modules/desktop/desktop-managers.nix`（GNOME 软件段，与 gnomeExtensions.\* 同居，仍 pkgs-stable 同实例）——该工具管理 GNOME Shell 扩展，lite 档不 import desktop-managers（无 GNOME Shell），留在 session.nix 属闲置；全量桌面包集合不变，lite 实际减此一包。② 修正 d8d1ec3 的 AGENTS.md 遗留 stale 描述：dev.nix bullet 删去 "texlive scheme-full"（实际已在 office.nix），office.nix bullet 补记 texlive 及「lite 含 office 档故仍携带 TeX」。
+
+验证（本机 eval-only，未构建/激活）：求值本身解析了两个被改模块。编辑前后对比——desktop `environment.systemPackages` 长度 635→635、gnome-extension-manager 计数 1→1（改由 desktop-managers.nix 提供）；nixos toplevel drvPath qn3r7rfw… → vi9gysi2…（如期移动，列表拼接顺序变化，与 4342a57 同性质）；wsl toplevel drvPath nfblrivv9… 逐字节不变（桌面模块不进 WSL 闭包）。lite 无 flake 输出、未直接求值：其 import 列表为 profiles/desktop.nix 的严格子集，全部模块已被本次 desktop 求值覆盖。
+
+未验证：desktop/lite toplevel 构建（CI 亦仅 eval）；desktop 实机激活；lite 闭包实际少一包的磁盘收益（数 MB 级，可忽略）。
+
 ## 2026-09-26 AGENTS.md 补记 linger，对齐 95ca45b（docs-only，Fedora 44 / WSL2 standalone，本机）
 
 纯文档：95ca45b 引入 `users.users.<username>.linger = true` 时未同步 AGENTS.md——NixOS-WSL 段的 stc-exit-4 记载补上第二个来源（WSL boot 无登录会话 → user@1000 不自启 → `/run/user/1000/bus` 缺失 → stc 用户单元重载失败）及其根治（声明式 linger）与放置理由（桌面机登录即起用户管理器，故留在 hosts/wsl）。无 Nix 改动，无需重建；`git diff --check` 干净。

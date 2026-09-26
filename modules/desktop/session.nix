@@ -42,7 +42,8 @@
 
   # --- 3. 桌面相关系统软件包 ---
   environment.systemPackages = with pkgs-stable; [
-    gnome-extension-manager
+    # → gnome-extension-manager 移至 desktop-managers.nix（随 GNOME Shell 备用桌面；
+    #   lite 档无 GNOME Shell，该工具原本闲置）
     gst_all_1.gst-plugins-base
     gst_all_1.gst-plugins-good
     gst_all_1.gst-plugins-bad
