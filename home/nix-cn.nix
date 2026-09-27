@@ -22,9 +22,10 @@ in
 
     # 优先使用国内镜像站（均收录于 CERNET 联合镜像站 help.mirrors.cernet.edu.cn）
     # 2026-08 实测延迟：NJU ~106ms < TUNA ~153ms < USTC ~155ms < SJTU ~435ms
-    # 末位补 nix-community.cachix.org：官方 Hydra 不构建 unfree 包
-    # （如 vimPlugins.rainbow-delimiters-nvim 的 fetchgit 源码，meta.hydraPlatforms = [ ]），
-    # 这些东西在 cache.nixos.org 及其国内镜像里都没有，缺了它就只能现场翻 gitlab/github。
+    # 末位补 nix-community.cachix.org：官方 Hydra 常规任务不构建 hydraPlatforms = [ ] 的路径
+    # （2026-09-24 实例：rainbow-delimiters-nvim 的插件产物与 gitlab fetchgit 源码在官方缓存
+    # 与国内镜像全 404，缺了它只能现场翻 gitlab。2026-09-27 复测该路径官方缓存已覆盖、
+    # 许可元数据已改回 Apache-2.0，此项现为保险——lock 更新换出新路径时同类缺口仍可能复发）。
     # 公钥不在这里声明 —— 用户级 nix.conf 里的 trusted-public-keys 对非受信用户是受限设置，
     # 会触发 "ignoring the client-specified setting" 警告；NixOS 侧见 modules/fix-network.nix，
     # standalone 侧由 bootstrap 写入 daemon 的 nix.custom.conf。

@@ -15,7 +15,8 @@ in {
     auto-optimise-store = true;
 
     # cachix 社区缓存公钥，配合 home/nix-cn.nix 里的 substituter 使用
-    # （官方 Hydra 不构建 unfree 包，如 vimPlugins.rainbow-delimiters-nvim 的源码）。
+    # （补 hydraPlatforms = [ ] 这类官方 Hydra 常规任务不构建的路径，
+    #   如 2026-09 曾在官方缓存与镜像全缺的 rainbow-delimiters-nvim）。
     # 只写在 NixOS daemon 侧：用户级 nix.conf 的 trusted-public-keys 是非受信用户的受限设置，
     # standalone 侧改由 bootstrap 写进 /etc/nix/nix.custom.conf（多用户）或用户 nix.conf（单用户）。
     # 列表设置在 NixOS 模块里按 listOf 合并，与默认的 cache.nixos.org-1 并存，不会顶掉官方 key。

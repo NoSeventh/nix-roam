@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-27 rainbow-delimiters 缓存论断修正（文档 + 注释，Fedora 44 / WSL2 standalone，本机）
+
+起因：考证 AGENTS.md「China mirrors」段对 `vimPlugins.rainbow-delimiters-nvim` 的论断，发现两处与当前 lock 不符：① 许可——旧记录为 `meta.license = unfree`，今在两个锁定 nixpkgs rev（unstable `4975466`、nixvim 自带的 `cf9d2fb`）上 `nix eval` 实测均为 Apache-2.0（free=true；nixpkgs overrides.nix 显式 `license = lib.licenses.asl20`；`meta.hydraPlatforms = [ ]` 标记仍在）；② 缓存可得性——对本机闭包内的精确路径 `/nix/store/2n5q…-vimplugin-rainbow-delimiters.nvim-0.12.0` 用 `nix path-info --store` 实测，cache.nixos.org 与 NJU 镜像均命中（205.1 KiB 可替换），nix-community.cachix.org 亦命中。结论：当前 lock 上构建 nixvim 不再需要现抓 gitlab，cachix 由「必需」降级为「保险」——但 hydraPlatforms 标记仍在，lock 更新换出新派生路径时「新路径未被任何缓存收录 + gitlab 不可达」的组合可能复发，故缓存与公钥（meta.json）原样保留。
+
+改动（纯文档/注释，无求值语义变化）：AGENTS.md「China mirrors」段、README.md 注意事项缓存条、`home/nix-cn.nix` 与 `modules/fix-network.nix` 注释、三个 bootstrap 脚本的 cachix 注释——口径从「unfree 包官方不构建」改为「hydraPlatforms = [ ] 路径 + 2026-09-27 复测结论」。
+
+验证：`nix-instantiate --parse` 通过（两个 .nix）；`bash -n` 通过（三个脚本）；全仓 `rg rainbow-delimiters` 复核无 unfree 归因残留；`git diff --check` 干净。未重建/未激活——纯注释改动不参与求值，五个输出的求值结果与 drvPath 不受影响。
+
 ## 2026-09-26 gnome-extension-manager 归位 desktop-managers + AGENTS.md texlive 修正（desktop 侧模块 + 文档，Fedora 44 / WSL2 standalone，本机）
 
 改动：① `gnome-extension-manager` 自 `modules/desktop/session.nix` 移至 `modules/desktop/desktop-managers.nix`（GNOME 软件段，与 gnomeExtensions.\* 同居，仍 pkgs-stable 同实例）——该工具管理 GNOME Shell 扩展，lite 档不 import desktop-managers（无 GNOME Shell），留在 session.nix 属闲置；全量桌面包集合不变，lite 实际减此一包。② 修正 d8d1ec3 的 AGENTS.md 遗留 stale 描述：dev.nix bullet 删去 "texlive scheme-full"（实际已在 office.nix），office.nix bullet 补记 texlive 及「lite 含 office 档故仍携带 TeX」。

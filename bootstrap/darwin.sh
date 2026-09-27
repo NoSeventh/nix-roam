@@ -151,7 +151,7 @@ log "2/7 配置国内镜像信任"
 NIX_CUSTOM_CONF="/etc/nix/nix.custom.conf"
 NIX_SYSTEM_CONF="/etc/nix/nix.conf"
 # 列表/公钥单源：repo 根 meta.json（home/nix-cn.nix 与 modules/fix-network.nix 读同一份）
-# cachix 补官方 Hydra 不构建的 unfree 包（如 vimPlugins.rainbow-delimiters-nvim 的 gitlab 源码）；
+# cachix 补官方 Hydra 常规任务不构建的路径（如 2026-09 曾全缓存 404 的 rainbow-delimiters-nvim）；
 # 列表自带 cache.nixos.org（官方源默认已受信，trusted-substituters 里重复列出无害）
 TRUSTED_SUBSTITUTERS="$(sed -n 's/.*"substituters": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
 CACHIX_PUBLIC_KEY="$(sed -n 's/.*"nixCommunityCachixKey": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
