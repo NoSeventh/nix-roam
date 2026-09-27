@@ -271,6 +271,7 @@ Use `home.sessionVariables.NPM_CONFIG_REGISTRY` and the Bash `npmr` alias, rathe
 - `.github/workflows/sync-from-gitee.yml` runs at minutes 17 and 47 each hour, via manual dispatch, and on pushes changing that workflow on `master`. It fetches public Gitee heads/tags with Git protocol v1 and up to four attempts, then pushes atomically using `GITHUB_TOKEN` with `contents: write`.
 - Normal changes go to Gitee; Actions copies them to GitHub. No forced history updates or remote deletions; divergence and rewritten tags require intervention. This copies Git refs, not Issues, PRs, release assets or LFS objects.
 - Keep workflow changes on both remotes using local credentials; the built-in token cannot push workflow-file changes. For public repositories, scheduled runs may be delayed and are disabled after 60 days without activity. Operational details: [`.github/SYNC.md`](.github/SYNC.md).
+- **Agent auto-commit convention (2026-09-27, user instruction)**: change passes the agent considers reliable — verification complete, checks clean, no open questions — are committed directly at the end of the pass without a separate confirmation round; only unverified, risky or decision-pending changes stay uncommitted with a report. Automatic commits stop at `git commit`: pushing to remotes (`origin` = Gitee first) remains a manual, user-owned step.
 
 ## Validation boundaries
 
