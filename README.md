@@ -160,7 +160,8 @@ roam switch            # NixOS 上等价 nrs（nh），standalone 上等价 hms�
 roam gc --dry-run      # 透传 bootstrap/gc.sh
 roam check             # 求值当前宿主目标（CI 第一层）；--build 时构建（CI 第二层）
 roam check wsl         # 显式核对其它输出：nixos / wsl / 三个系统名（跨主机仅求值）
-roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成
+roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成。
+                       # 可选输入：缺省交互列出（回车=全部），roam update nixpkgs nixvim 只更新指定项，--all 跳过交互
 roam info              # 只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
 ```
 
