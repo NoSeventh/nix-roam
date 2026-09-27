@@ -16,6 +16,8 @@
 
 未验证：本机 `hms` 激活（用户步骤）；aarch64-linux / aarch64-darwin 构建（共享同一 HM 模块，无平台分支，jq/curl 两目标皆有）；NixOS 实机上的渲染（jq 走 systemPackages 的 secure_path 内路径，fastfetch 由用户 shell 调用，PATH 无虞）。
 
+修正（同日，b2d3320 后用户反馈「没对齐」）：首版 Location 行的 `keyIcon` 经 hexdump 复核是**空字符串**（`22 22`，写入时图标字符在透传中丢失），`{icon}` 渲染为空 → 标签格比各行窄一列、整行错位。改用占位符 + `printf '\U000f034e'` 注入 `md-map_marker`（U+F034E，UTF-8 `f3 b0 8d 8e`，与现役 U+F0A79 同 MD 区段族）并 hexdump 校验字节后，重建重渲——各行标签格结构逐字节同构（`│ ` + 4 字节图标 + 2 空格 + 22 宽名称 + `│`），对齐恢复。教训入库：**Nix 文件里的 Nerd Font 图标必须 hexdump 验字节**，渲染缺失不可依赖文本透传；bash `printf '\uXXXX'` 只吃 4 位十六进制，5 位码点须用 `\U000xxxxx`。
+
 
 
 起因：考证 AGENTS.md「China mirrors」段对 `vimPlugins.rainbow-delimiters-nvim` 的论断，发现两处与当前 lock 不符：① 许可——旧记录为 `meta.license = unfree`，今在两个锁定 nixpkgs rev（unstable `4975466`、nixvim 自带的 `cf9d2fb`）上 `nix eval` 实测均为 Apache-2.0（free=true；nixpkgs overrides.nix 显式 `license = lib.licenses.asl20`；`meta.hydraPlatforms = [ ]` 标记仍在）；② 缓存可得性——对本机闭包内的精确路径 `/nix/store/2n5q…-vimplugin-rainbow-delimiters.nvim-0.12.0` 用 `nix path-info --store` 实测，cache.nixos.org 与 NJU 镜像均命中（205.1 KiB 可替换），nix-community.cachix.org 亦命中。结论：当前 lock 上构建 nixvim 不再需要现抓 gitlab，cachix 由「必需」降级为「保险」——但 hydraPlatforms 标记仍在，lock 更新换出新派生路径时「新路径未被任何缓存收录 + gitlab 不可达」的组合可能复发，故缓存与公钥（meta.json）原样保留。
