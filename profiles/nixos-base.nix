@@ -11,8 +11,8 @@
   # 时区是机器级参数，经 hosts/<hostname>/variables.nix → specialArgs.vars 注入
   time.timeZone = vars.timeZone;
 
-  # --- 0. nh：NixOS 重建前端（nrs 别名的后端） ---
-  #     刻意不设 programs.nh.flake：那会硬编码 checkout 路径，nrs 改为按 cwd 传
+  # --- 0. nh：NixOS 重建前端（roam switch 的 NixOS 后端） ---
+  #     刻意不设 programs.nh.flake：那会硬编码 checkout 路径，roam switch 改为按 cwd 传
   #     位置参数（仓库根运行契约不变）；也不启用 nh clean —— GC 仍走 bootstrap/gc.sh。
   programs.nh.enable = true;
 

@@ -267,8 +267,8 @@ cat <<EOF
 
   · 默认 shell 保持 zsh 不变：HM 不接管 ~/.zshrc，激活时已向其追加一段
     hm-session-vars 加载（幂等、可整段删除）；PATH 中 nix 工具优先于 Homebrew 同名命令。
-  · starship 提示符与 ll/hms 等别名只对 bash 会话生效，zsh 保持原生提示符；
-    hms 在 macOS 指向 .#${FLAKE_TARGET}。
+  · starship 提示符与 ll 等别名只对 bash 会话生效，zsh 保持原生提示符；
+    切换入口 roam 是 PATH 二进制、任意 shell 可用，standalone 分支指向 .#${FLAKE_TARGET}。
   · 被接管文件的原版备份在：~/*.bak-${TS} 与 ~/.config/nix/nix.conf.backup
   · ⚠️ programs.ssh 用 enableDefaultConfig=false，新 ~/.ssh/config 只含 HM 定义的 host。
     如果你旧 ssh config（备份在 ~/.ssh/config.bak-${TS}）里还有别的 host，需要手动合并回

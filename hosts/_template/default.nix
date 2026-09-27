@@ -1,7 +1,7 @@
 # 新主机模板：bootstrap/nixos.sh 检测到 hosts/<target>/ 不存在时会复制本目录并替换
 # __HOSTNAME__ 占位符；手工添加机器也照此填写（流程见 AGENTS.md "Adding a new machine"）。
 # 约定：目录名 = networking.hostName = flake 输出属性名 nixosConfigurations.<target>
-# （nrs / nh os switch 的 --hostname 按主机名自动对上输出，不要起不一致的名字）。
+# （roam switch / nh os switch 的 --hostname 按主机名自动对上输出，不要起不一致的名字）。
 { username, ... }:
 
 {

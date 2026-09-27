@@ -3,9 +3,9 @@
 #
 # 与 bootstrap/bootstrap.sh 同款宿主探测约定（入口级重复在本仓库是刻意允许的）：
 # /etc/NIXOS 存在 → NixOS；否则 standalone Home Manager。
-#   roam switch [args...]  NixOS → nh os switch --diff always .（同 nrs；WSL 下失败时
-#                          打印 stc-exit-4 补救提示）；standalone → hms 同款逻辑
-#                          （按求值平台选系统名输出 + meta.json 用户守卫）
+#   roam switch [args...]  NixOS → nh os switch --diff always .（WSL 下失败时打印
+#                          stc-exit-4 补救提示）；standalone → home-manager switch
+#                          .#<系统名输出>（按求值平台选输出 + meta.json 用户守卫）
 #   roam gc [args...]      原样透传 bootstrap/gc.sh
 #   roam check [--build] [目标]
 #                          CI 两层验证的本地等价物：默认 nix eval --raw 当前宿主目标的
@@ -18,7 +18,7 @@
 #                          --all 跳过交互
 #   roam info              只读打印宿主探测结论（环境 / 用户守卫 / 将选中的输出）
 #
-# 需在本仓库检出目录下运行（flake 位置参数 '.' 按 cwd 解析，与 hms/nrs 一致）。
+# 需在本仓库检出目录下运行（flake 位置参数 '.' 按 cwd 解析）。
 # 经 packages/roam.nix（writeShellApplication）挂入 packages/cli-dev.nix 四个安装点，
 # 也可直接 `bash packages/roam.sh` 调试。保持 macOS Bash 3.2 兼容（无关联数组等 bash4 特性）。
 set -euo pipefail
@@ -27,8 +27,8 @@ usage() {
   cat <<'EOF'
 用法：roam <子命令> [参数]（本仓库统一 CLI；需在仓库检出目录下运行）
 
-  switch [args...]   按宿主切换：NixOS → nh os switch --diff always .（同 nrs）
-                     standalone → home-manager switch .#<系统输出>（同 hms，含用户守卫）
+  switch [args...]   按宿主切换：NixOS → nh os switch --diff always .
+                     standalone → home-manager switch .#<系统输出>（含用户守卫）
   gc [args...]       透传 bootstrap/gc.sh（--older-than Nd / --all / --system / --dry-run）
   check [--build] [目标]
                      验证目标：默认求值（nix eval --raw …drvPath，CI 第一层）；
@@ -53,7 +53,7 @@ is_nixos() { [ -f /etc/NIXOS ]; }
 
 repo_check() {
   [ -f flake.nix ] && [ -f meta.json ] \
-    || die "当前目录不是本仓库检出（缺 flake.nix / meta.json）；请 cd 到检出目录（与 hms/nrs 的 cwd '.' 语义一致）"
+    || die "当前目录不是本仓库检出（缺 flake.nix / meta.json）；请 cd 到检出目录（flake 位置参数 '.' 按 cwd 解析）"
 }
 
 # 与 bootstrap 脚本同款 sed（格式由本仓库自持）；解析失败即中止，无硬编码回落。
@@ -82,7 +82,7 @@ standalone_target() {
   esac
 }
 
-# 目录名 = hostname = 输出属性名（本仓库约定，nrs/nh 依赖同一约定）
+# 目录名 = hostname = 输出属性名（本仓库约定，roam switch 的 nh 后端依赖同一约定）
 nixos_output() {
   local h
   h="$(uname -n)"
