@@ -58,7 +58,7 @@
     }@inputs:
     let
       # 本地用户名单点定义：仓库根 meta.json（bootstrap 脚本在装 Nix 之前也要读，不能只放 Nix 表达式里）。
-      # 换用户名只改 meta.json 一行。NixOS users.users.*、home-manager.users.*、hms 的用户校验与
+      # 换用户名只改 meta.json 一行。NixOS users.users.*、home-manager.users.*、roam switch 的用户校验与
       # bootstrap 目标用户守卫均由它派生；standalone 输出按系统命名（不随用户名变化，见下方输出）；
       # 远程身份（IHEP 账号、git 邮箱）在 home/common.nix，需单独调整。
       username = (builtins.fromJSON (builtins.readFile ./meta.json)).username;

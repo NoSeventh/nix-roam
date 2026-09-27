@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 移除 hms/nrs 切换别名，roam switch 成为唯一切换入口（home/common.nix + 全仓引用清理，Fedora 44 / WSL2 standalone，本机）
+
+前置：删除门槛由两条实机验证闭合——roam switch 的 standalone 分支（本机 2026-09-27/28 两次激活）与 NixOS 分支（NixOS-WSL 26.11 实机真 rc=0，含系统级安装位首覆，见上一条记录）。`hms` 为 standalone-only（NixOS 从未注入）、`nrs` 为 NixOS-only，替代命令串逐字一致，别名此时只剩肌肉记忆短写价值。
+
+改动：`home/common.nix` 删除 `hms` 函数（整个属性集级 `isStandalone` 门控块随 `initExtra` 消失）、`nrs` 别名分支与 `hmTarget` let 绑定，函数头收回不再使用的 `username`/`isStandalone` 参数；「显式空串 vs 未设置 initExtra 生成不同 bashrc」的门控教训以注释存档（判断标准一节本就有）。外围引用同步：`packages/roam.sh` 自注释、`flake.nix`、`bootstrap/darwin.sh` 完成提示、`hosts/_template`、`hosts/wsl`、`profiles/nixos-base.nix`、README 六处（L23 带日期历史记录按惯例不动）、AGENTS.md 别名段重写 + 七处散点。过程教训：Edit 重写时凭记忆复打了未删除的相邻行，丢了 distrobox 五行别名末尾的分号（Nix 属性绑定间缺分隔符）——`nix-instantiate --parse` 当场拦截，「解析编辑过的文件」这道闸的即战果。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64）：编辑文件全过 parse / `bash -n`；五输出求值全过（`roam check` 缺省 + 显式 wsl / nixos / aarch64-linux / aarch64-darwin）；activationPackage 构建（真 rc=0，含 roam.sh 注释更新后的新 roam.drv 过 ShellCheck 门）+ `roam switch` 激活（真 rc=0）；激活后交互 bash 中 `type hms` / `type nrs` 均未定义、生成 bashrc 无残留，`ll`/`archbox` 等存留别名与 `~/.nix-profile/bin/roam` 正常。
+
+未验证：NixOS 侧（桌面/WSL）bashrc 里 `nrs` 的消失需该侧下次 `roam switch` 后生效——本改动已进其闭包（求值通过），激活留给用户下次切换；macOS 侧 `hms` 同理（darwin 分支本就桩级）。
+
 ## 2026-09-28 roam switch NixOS 分支（nh 路径）实机首跑通过（packages/roam.sh，NixOS-WSL 26.11 x86_64，本机 wsl）
 
 复验：4e7a8af 落地时记「未验证：NixOS 分支（nh 路径与 WSL 补救提示触发）」——当时本机跑在 Fedora WSL standalone；今日本机为 NixOS-WSL 26.11（hostname `wsl` → `.#wsl` 输出），补上该分支实机首跑，并首次实机覆盖 NixOS 侧安装位（`profiles/cli.nix` → systemPackages → `/run/current-system/sw/bin/roam`）。本机存在多个 WSL 发行版，验证环境以本条为准。
