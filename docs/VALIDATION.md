@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 roam switch NixOS 分支（nh 路径）实机首跑通过（packages/roam.sh，NixOS-WSL 26.11 x86_64，本机 wsl）
+
+复验：4e7a8af 落地时记「未验证：NixOS 分支（nh 路径与 WSL 补救提示触发）」——当时本机跑在 Fedora WSL standalone；今日本机为 NixOS-WSL 26.11（hostname `wsl` → `.#wsl` 输出），补上该分支实机首跑，并首次实机覆盖 NixOS 侧安装位（`profiles/cli.nix` → systemPackages → `/run/current-system/sw/bin/roam`）。本机存在多个 WSL 发行版，验证环境以本条为准。
+
+验证（检出 3a614b4 干净树，用户 xuqihao 非 root）：前置健康——`systemctl is-system-running` = running、`user@1000.service` active（95ca45b linger 生效）、无 failed 单元；`roam info` 只读探测逐项正确（NixOS 26.11 / WSL=是 / x86_64 / 用户守卫通过 meta.json xuqihao / switch 目标 `nh os switch --diff always .` → `nixosConfigurations.wsl`）；实跑 `roam switch` 真 rc=0（`cmd; echo $?` 直取，不经管道）——nh 构建缓存命中（4s），nvd 差异 2108→2108 路径零变更（工作树与当前世代同源，符合预期），激活 + bootloader 登记，`system` profile 指向本次构建的 as55pfmzz… 世代（`system -> system-11-link`，链接 mtime 与运行时刻一致；同路径重建不新增世代号）；全程无 stc exit 4。
+
+未验证：WSL 补救提示分支（仅 nh 失败时打印，成功路径不经过）；`roam switch` 额外参数透传未另测（命令串与 nrs 逐字一致已在 4e7a8af 记录）。
+
 ## 2026-09-28 roam update 支持选择输入（packages/roam.sh，Fedora 44 / WSL2 standalone，本机）
 
 改动：`roam update` 升级为可选输入——缺省交互：从 flake.lock（jq 读 `nodes.root.inputs`，附当前 rev 短哈希与锁定日期）列出顶层输入，回车（或非交互 EOF / 无 jq / 无 flake.lock）=全部（默认全选），编号与名称可混用、逗号空格均可分隔，经白名单校验后 `nix flake update <输入>...` 只更新选中项；显式输入名（可多个）跳过交互；`--all` 跳过选择直接全量，与输入名互斥。AGENTS.md / README 同步。
