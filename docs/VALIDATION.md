@@ -8,7 +8,15 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
-## 2026-09-27 rainbow-delimiters 缓存论断修正（文档 + 注释，Fedora 44 / WSL2 standalone，本机）
+## 2026-09-27 fastfetch 新增 Location 行（home/fastfetch.nix，Fedora 44 / WSL2 standalone，本机）
+
+改动：Status 段 Public IP Address 之后新增 Location 行（`command` 模块），展示公网 IP 的地理定位。端点经本机（北京联通）实测筛选：`myip.ipip.net/json` 为主（HTTPS、中文地名、~0.13s），`ipwho.is` / `ipinfo.io/json` 依次回退（HTTPS、country/region/city 字段同名，jq 表达式复用）；淘汰端点——ip-api.com 明文 HTTP 3s 超时（复证 fastfetch.nix 既有弃用理由）、百度 qifu 404、ipapi.co 403、useragentinfo 空、vore.top 后端故障。关键语义：`jq -re` 在空输入（curl 失败）/无输出时退出 4，`||` 回退得以触发——sh 管道无 pipefail，不能只靠 `curl -f`；ipip 侧 `.data.location` 剔除空串后为空则输出 null（同因触发回退）。依赖 curl + jq，两者均在共享 `packages/cli-dev.nix`（curl:90、jq:69），四个安装位覆盖。
+
+验证（本机）：`nix-instantiate --parse` 通过；standalone `x86_64-linux` activationPackage 构建通过（仅 HM 生成链重建，余走缓存）；用 store 内新 config.jsonc 实跑 fastfetch，Location 行渲染「中国 北京 北京 联通」；回退路径以伪造失效首端点实测落到 ipwho.is 输出；desktop/wsl toplevel 求值通过（HM 共享模块进两闭包，drvPath 如期移动）。
+
+未验证：本机 `hms` 激活（用户步骤）；aarch64-linux / aarch64-darwin 构建（共享同一 HM 模块，无平台分支，jq/curl 两目标皆有）；NixOS 实机上的渲染（jq 走 systemPackages 的 secure_path 内路径，fastfetch 由用户 shell 调用，PATH 无虞）。
+
+
 
 起因：考证 AGENTS.md「China mirrors」段对 `vimPlugins.rainbow-delimiters-nvim` 的论断，发现两处与当前 lock 不符：① 许可——旧记录为 `meta.license = unfree`，今在两个锁定 nixpkgs rev（unstable `4975466`、nixvim 自带的 `cf9d2fb`）上 `nix eval` 实测均为 Apache-2.0（free=true；nixpkgs overrides.nix 显式 `license = lib.licenses.asl20`；`meta.hydraPlatforms = [ ]` 标记仍在）；② 缓存可得性——对本机闭包内的精确路径 `/nix/store/2n5q…-vimplugin-rainbow-delimiters.nvim-0.12.0` 用 `nix path-info --store` 实测，cache.nixos.org 与 NJU 镜像均命中（205.1 KiB 可替换），nix-community.cachix.org 亦命中。结论：当前 lock 上构建 nixvim 不再需要现抓 gitlab，cachix 由「必需」降级为「保险」——但 hydraPlatforms 标记仍在，lock 更新换出新派生路径时「新路径未被任何缓存收录 + gitlab 不可达」的组合可能复发，故缓存与公钥（meta.json）原样保留。
 
