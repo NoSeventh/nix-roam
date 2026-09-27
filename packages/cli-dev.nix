@@ -70,6 +70,11 @@ with pkgs; [
   opencode
   pi-coding-agent
 
+  # --- 本仓库自有工具 ---
+  # roam 统一 CLI（switch/gc/check/update/info，按宿主分发；实现见 packages/roam.sh）。
+  # 放共享列表使四个安装点都有它；纯 bash + 各点本就有的环境工具，闭包无新增依赖。
+  (pkgs.callPackage ./roam.nix { })
+
   # --- Nix 工具 ---
   nil
   nixpkgs-fmt

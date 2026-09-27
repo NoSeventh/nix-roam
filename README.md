@@ -153,6 +153,17 @@ home-manager switch --flake .#aarch64-darwin
 
 ## 更新与验证
 
+日常操作可用本仓库自带的统一 CLI `roam`（随共享工具列表装进四个安装点，按宿主自动分发；需在仓库检出目录下运行，等价命令见下文各节）：
+
+```bash
+roam switch            # NixOS 上等价 nrs（nh），standalone 上等价 hms（含 meta.json 用户守卫）
+roam gc --dry-run      # 透传 bootstrap/gc.sh
+roam check             # 求值当前宿主目标（CI 第一层）；--build 时构建（CI 第二层）
+roam check wsl         # 显式核对其它输出：nixos / wsl / 三个系统名（跨主机仅求值）
+roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成
+roam info              # 只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
+```
+
 手动垃圾回收（自动识别 NixOS、普通 Linux / WSL 和 macOS）：
 
 ```bash
