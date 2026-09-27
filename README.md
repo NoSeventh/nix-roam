@@ -290,7 +290,7 @@ git remote add github git@github.com:NoSeventh/nix-roam.git
 - `hosts/<hostname>/hardware-configuration.nix` 是机器专用文件，应与对应主机入口一起提交；只有仓库根目录下误生成的 `/hardware-configuration.nix` 被忽略。
 - NixOS 桌面配置中的 Hermes Agent 需要目标机器自行提供 `/etc/hermes/env`。
 - 多用户 Nix 安装需要让 daemon 信任自定义 substituter，`bootstrap/linux.sh` 会处理新机器的这项配置；无 systemd / 无 sudo 的机器走单用户安装，镜像直接写用户级 nix.conf，无需 daemon 授权（`/nix` 仍需一次性 root 创建）。WSL1 不受支持，请先升级 WSL2。
-- 国内镜像只覆盖官方 Hydra 构建过的东西。unfree 包不在其中——nixvim 用到的 `vimPlugins.rainbow-delimiters-nvim` 源码在 gitlab.com，官方缓存与镜像站都没有，构建时会现抓上游；GitLab 不可达时整条 HM 构建（vimplugin → neovim → nixvim → home-manager-path）直接失败。因此缓存列表末尾补了社区缓存 `nix-community.cachix.org`（公钥：NixOS 侧在 `modules/fix-network.nix`；standalone 侧由 `bootstrap/*.sh` 写入 `/etc/nix/nix.custom.conf`，单用户安装写用户级 nix.conf；列表与公钥本体单源于仓库根 `meta.json`，Nix 模块与脚本同读一份，改动只改这一处）。已经装好的机器可手工补上：
+- 国内镜像只覆盖官方 Hydra 构建过的东西。nixvim 用到的 `vimPlugins.rainbow-delimiters-nvim` 标着 `meta.hydraPlatforms = [ ]`、源码在 gitlab.com：2026-09-24 一次 flake 更新把它的派生路径换成任何缓存都没建过的新路径，官方缓存与四个国内镜像全部 404，构建被迫现抓上游，GitLab 不可达时整条 HM 构建（vimplugin → neovim → nixvim → home-manager-path）直接失败——因此缓存列表末尾补了社区缓存 `nix-community.cachix.org`。2026-09-27 复测：该插件的许可元数据在当前锁定 rev 已是 Apache-2.0（2026-09-24 时记录的 unfree 不再成立），且当前锁定路径在 cache.nixos.org 与 NJU 镜像均可直接替换，cachix 由「必需」降级为「保险」；但 `hydraPlatforms = [ ]` 仍在，未来 lock 更新换出新路径时同类缺口可能复发，故保留（公钥：NixOS 侧在 `modules/fix-network.nix`；standalone 侧由 `bootstrap/*.sh` 写入 `/etc/nix/nix.custom.conf`，单用户安装写用户级 nix.conf；列表与公钥本体单源于仓库根 `meta.json`，Nix 模块与脚本同读一份，改动只改这一处）。已经装好的机器可手工补上：
 
   ```bash
   sudo tee -a /etc/nix/nix.custom.conf >/dev/null <<'EOF'
