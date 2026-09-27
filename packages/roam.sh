@@ -12,7 +12,10 @@
 #                          drvPath（第一层）；--build 时 nix build --no-link（第二层）。
 #                          目标可显式指定：nixos / wsl / x86_64-linux / aarch64-linux /
 #                          aarch64-darwin（跨主机核对其它输出，仅求值语义）
-#   roam update            nix flake update + flake.lock 差异摘要；提交与切换保持手动
+#   roam update [输入名...|--all]
+#                          nix flake update + flake.lock 差异摘要；提交与切换保持手动。
+#                          缺省交互选择要更新的输入（回车/EOF=全部），显式输入名或
+#                          --all 跳过交互
 #   roam info              只读打印宿主探测结论（环境 / 用户守卫 / 将选中的输出）
 #
 # 需在本仓库检出目录下运行（flake 位置参数 '.' 按 cwd 解析，与 hms/nrs 一致）。
@@ -31,7 +34,10 @@ usage() {
                      验证目标：默认求值（nix eval --raw …drvPath，CI 第一层）；
                      --build 时构建（nix build --no-link，CI 第二层）。
                      目标：nixos wsl x86_64-linux aarch64-linux aarch64-darwin（缺省=当前宿主）
-  update             nix flake update 并显示 flake.lock 差异；提交与切换仍手动完成
+  update [输入名...|--all]
+                     nix flake update 并显示 flake.lock 差异；提交与切换仍手动。
+                     缺省时列出 flake 输入供选择：回车（或非交互 EOF）=全部；
+                     显式输入名可多个只更新它们；--all 跳过选择直接全量
   info               只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
   help               显示本帮助
 EOF
@@ -152,9 +158,94 @@ cmd_check() {
   fi
 }
 
+# 列出 flake.lock 顶层输入供选择（菜单走 stderr，选定的输入名走 stdout，空输出=全部）。
+# EOF / 无 jq / 无 flake.lock 一律回落「全部」（默认全选）；无效输入则中止。
+choose_inputs() {
+  local input_names reply tok name nm n idx picked='' all_names='' rev date
+  command -v jq >/dev/null 2>&1 || { printf 'roam: 无 jq，跳过选择，按全部输入更新\n' >&2; return 0; }
+  [ -f flake.lock ] || { printf 'roam: 无 flake.lock，按全部输入更新\n' >&2; return 0; }
+  input_names="$(jq -r '
+    .nodes as $nodes | $nodes.root.inputs | to_entries[] |
+    .key as $k | .value as $v |
+    (if ($v|type)=="string" then (try ($nodes[$v].locked.rev // "-") catch "-") else "-" end) as $rev |
+    (if ($v|type)=="string" then (try ($nodes[$v].locked.lastModified | localtime | strftime("%Y-%m-%d")) catch "-") else "-" end) as $date |
+    "\($k)\t\(if $rev=="-" then "-" else $rev[0:7] end)\t\($date)"
+  ' flake.lock)" || return 0
+  printf 'flake 输入（flake.lock 当前锁定）:\n' >&2
+  idx=0
+  while IFS=$'\t' read -r name rev date; do
+    [ -n "$name" ] || continue
+    idx=$((idx + 1))
+    printf '  %d) %-16s %s  %s\n' "$idx" "$name" "$rev" "$date" >&2
+    all_names="$all_names $name"
+  done <<EOF
+$input_names
+EOF
+  printf '选择要更新的输入：回车=全部；或输入编号/名称（空格或逗号分隔，如 1 3 / nixpkgs nixvim）: ' >&2
+  read -r reply || return 0
+  [ -n "$reply" ] || return 0
+  # 用户回复里逗号与空格统一当分隔符；输入名本身不含空格（flake 输入名为标识符）
+  # shellcheck disable=SC2086
+  for tok in $(printf '%s' "$reply" | tr ',' ' '); do
+    name=''
+    case "$tok" in
+      '' | *[!0-9]*) name="$tok" ;;
+      *)
+        # 纯数字：按编号取名字
+        n=0
+        # shellcheck disable=SC2086
+        for nm in $all_names; do
+          n=$((n + 1))
+          if [ "$n" = "$tok" ]; then
+            name="$nm"
+            break
+          fi
+        done
+        ;;
+    esac
+    if [ -z "$name" ]; then
+      die "无法识别的选择：$tok"
+    fi
+    case " $all_names " in
+      *" $name "*) : ;;
+      *) die "未知输入：$name（可用：${all_names# }）" ;;
+    esac
+    case " $picked " in
+      *" $name "*) : ;;
+      *) picked="$picked $name" ;;
+    esac
+  done
+  printf '%s' "${picked# }"
+}
+
 cmd_update() {
+  local all=false names='' sel
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -a | --all) all=true ;;
+      -*) die "update: 未知选项：$1" ;;
+      *) names="$names $1" ;;
+    esac
+    shift
+  done
+  names="${names# }"
+  if [ "$all" = true ] && [ -n "$names" ]; then
+    die "update: --all 与输入名不能同时指定"
+  fi
   repo_check
-  nix flake update
+  if [ "$all" = false ] && [ -z "$names" ]; then
+    sel="$(choose_inputs)"
+    names="$sel"
+  fi
+  if [ -n "$names" ]; then
+    printf 'roam update: 更新输入：%s\n' "$names"
+    # 输入名经 flake.lock 白名单或用户显式给出，不含空格与通配
+    # shellcheck disable=SC2086
+    nix flake update $names
+  else
+    printf 'roam update: 更新全部输入\n'
+    nix flake update
+  fi
   if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     git diff --stat -- flake.lock || true
   fi

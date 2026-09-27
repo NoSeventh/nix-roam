@@ -8,7 +8,17 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
-## 2026-09-27 roam 统一 CLI（packages/roam.{nix,sh} + packages/cli-dev.nix，Fedora 44 / WSL2 standalone，本机）
+## 2026-09-28 roam update 支持选择输入（packages/roam.sh，Fedora 44 / WSL2 standalone，本机）
+
+改动：`roam update` 升级为可选输入——缺省交互：从 flake.lock（jq 读 `nodes.root.inputs`，附当前 rev 短哈希与锁定日期）列出顶层输入，回车（或非交互 EOF / 无 jq / 无 flake.lock）=全部（默认全选），编号与名称可混用、逗号空格均可分隔，经白名单校验后 `nix flake update <输入>...` 只更新选中项；显式输入名（可多个）跳过交互；`--all` 跳过选择直接全量，与输入名互斥。AGENTS.md / README 同步。
+
+事故与修复（同日）：首版 3 处刻意词切分未加 shellcheck 白名单注解 → writeShellApplication 的 ShellCheck 门报 SC2086，且 ShellCheck 0.11.0 在打印含中文的告警源码行时自身崩溃（`commitBuffer: cannot encode '\26411'`，无 locale 的构建环境所致）；更糟的是当时以 `cmd | tail` 取输出，把真实 rc 掩盖成 0，误判构建/激活成功，随后用安装位置仍是旧版的 roam 验证时它跑成旧逻辑，把真实仓库 flake.lock 意外全量更新——已 `git checkout flake.lock` 恢复（工作树仅剩本次改动文件）。教训入库：**writeShellApplication 脚本改动先以 `nix shell nixpkgs#shellcheck` 直查到零告警再进构建；验证命令的 rc 不得经管道取**（`cmd | tail; echo $?` 拿到的是 tail 的 rc，本日两次误判同源）。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64）：/tmp 完整副本实测——显式输入名只动该节点（jq 前后比对其余输入 rev 不变）；名称、编号、混合多选（`4, nixvim` → `nixpkgs nixvim`）均正确解析；回车=全部（4 输入 Updated）；`--all` 与无效输入（`bogus`/`x`）正确拒绝并列出可用名。修复后 `nix shell nixpkgs#shellcheck` 零告警、`bash -n` 通过；activationPackage 重建（真 rc=0，新 roam.drv 过 ShellCheck 门）；`roam switch` 激活（真 rc=0，`~/.nix-profile/bin/roam` 换新 store 路径）；安装后二进制实测：菜单渲染正确（六输入带 rev/日期）、无效输入拒绝（真 rc=1）、flake.lock 未被改动。
+
+未验证：安装后二进制的成功更新路径未在真实仓库跑（会动真锁文件）；同一脚本文本已在 /tmp 副本以 `bash packages/roam.sh` 全覆盖，包装差异仅 PATH。NixOS 分支（nh 路径）仍无实机；darwin 桩级。
+
+
 
 改动：新增仓库自有统一 CLI `roam`——`packages/roam.sh`（脚本本体，macOS Bash 3.2 兼容）经 `packages/roam.nix`（writeShellApplication，构建期 bash -n + ShellCheck 门）打包，挂入 `packages/cli-dev.nix` 共享列表进入全部四个安装点。子命令按 `/etc/NIXOS` 探测分发（与 bootstrap/bootstrap.sh 同款约定，入口级重复系本仓库刻意允许）：`switch`（NixOS → `nh os switch --diff always .`，命令串与 nrs 逐字一致，WSL 下失败打印 stc-exit-4 补救提示；standalone → hms 同款逻辑：按求值平台选系统名输出 + meta.json 用户守卫）；`gc` 原样透传 `bootstrap/gc.sh`；`check [--build] [目标]` 复现 CI 两层验证（默认 `nix eval --raw …drvPath`，`--build` 时 `nix build --no-link`；目标可显式 nixos / wsl / x86_64-linux / aarch64-linux / aarch64-darwin，缺省为当前宿主）；`update`（`nix flake update` + flake.lock 差异摘要，不提交不切换）；`info` 只读打印探测结论。不带 runtimeInputs（闭包零新增依赖；nh / home-manager 缺失由脚本按子命令检测并给出出处指引）。AGENTS.md（别名段 + 目录树）与 README「更新与验证」段同步。
 
