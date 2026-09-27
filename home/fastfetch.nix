@@ -146,7 +146,7 @@ in
             # 退出非零, 保证 curl 失败后 || 回退能触发 —— sh 管道无 pipefail, 不能只靠 curl -f
             mkEntry "magenta" "Location" "command"
             // {
-              keyIcon = "";
+              keyIcon = "󰍎";
               text = "curl -fs -m 2 https://myip.ipip.net/json | jq -re '.data.location // [] | map(select(length > 0)) | if length > 0 then join(\" \") else null end' || curl -fs -m 2 https://ipwho.is | jq -re '[.country, .region, .city] | map(select(.!=null)) | join(\" \")' || curl -fs -m 2 https://ipinfo.io/json | jq -re '[.country, .region, .city] | map(select(.!=null)) | join(\" \")'";
             }
           )
