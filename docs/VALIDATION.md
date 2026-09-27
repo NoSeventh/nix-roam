@@ -8,7 +8,15 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
-## 2026-09-27 fastfetch 新增 Location 行（home/fastfetch.nix，Fedora 44 / WSL2 standalone，本机）
+## 2026-09-27 roam 统一 CLI（packages/roam.{nix,sh} + packages/cli-dev.nix，Fedora 44 / WSL2 standalone，本机）
+
+改动：新增仓库自有统一 CLI `roam`——`packages/roam.sh`（脚本本体，macOS Bash 3.2 兼容）经 `packages/roam.nix`（writeShellApplication，构建期 bash -n + ShellCheck 门）打包，挂入 `packages/cli-dev.nix` 共享列表进入全部四个安装点。子命令按 `/etc/NIXOS` 探测分发（与 bootstrap/bootstrap.sh 同款约定，入口级重复系本仓库刻意允许）：`switch`（NixOS → `nh os switch --diff always .`，命令串与 nrs 逐字一致，WSL 下失败打印 stc-exit-4 补救提示；standalone → hms 同款逻辑：按求值平台选系统名输出 + meta.json 用户守卫）；`gc` 原样透传 `bootstrap/gc.sh`；`check [--build] [目标]` 复现 CI 两层验证（默认 `nix eval --raw …drvPath`，`--build` 时 `nix build --no-link`；目标可显式 nixos / wsl / x86_64-linux / aarch64-linux / aarch64-darwin，缺省为当前宿主）；`update`（`nix flake update` + flake.lock 差异摘要，不提交不切换）；`info` 只读打印探测结论。不带 runtimeInputs（闭包零新增依赖；nh / home-manager 缺失由脚本按子命令检测并给出出处指引）。AGENTS.md（别名段 + 目录树）与 README「更新与验证」段同步。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：脚本层 help / info（检出内外）/ 非检出守卫拒绝 / 未知目标拒绝全部实测；五输出求值通过（`roam check` 缺省 + 显式 wsl / nixos / aarch64-linux / aarch64-darwin，跨核对）；`roam check --build` 构建 standalone activationPackage 通过（roam.drv 过 ShellCheck 门，home-manager-path buildEnv 无名字冲突）；`roam gc --dry-run` 透传（gc.sh 自行识别出 Fedora WSL standalone 环境）；`roam update` 在 /tmp 完整副本端到端跑通（nixpkgs 双通道 lock 各升一版、12 行 diff 摘要、手动提交提醒，真 flake.lock 未动）；`roam switch` 实机激活 exit 0，`~/.nix-profile/bin/roam` 安装后 info 输出正常。
+
+未验证：NixOS 分支（nh 路径与 WSL 补救提示触发）——本机无 NixOS，命令串仅与 nrs 逐字比对；darwin 分支（arm64 校验、Bash 3.2 直跑）桩级；aarch64 输出仅求值（与 CI 同界）；NixOS 桌面/WSL 侧安装位（经 profiles/cli.nix / modules/desktop/core.nix 进 systemPackages）未实机激活。
+
+
 
 改动：Status 段 Public IP Address 之后新增 Location 行（`command` 模块），展示公网 IP 的地理定位。端点经本机（北京联通）实测筛选：`myip.ipip.net/json` 为主（HTTPS、中文地名、~0.13s），`ipwho.is` / `ipinfo.io/json` 依次回退（HTTPS、country/region/city 字段同名，jq 表达式复用）；淘汰端点——ip-api.com 明文 HTTP 3s 超时（复证 fastfetch.nix 既有弃用理由）、百度 qifu 404、ipapi.co 403、useragentinfo 空、vore.top 后端故障。关键语义：`jq -re` 在空输入（curl 失败）/无输出时退出 4，`||` 回退得以触发——sh 管道无 pipefail，不能只靠 `curl -f`；ipip 侧 `.data.location` 剔除空串后为空则输出 null（同因触发回退）。依赖 curl + jq，两者均在共享 `packages/cli-dev.nix`（curl:90、jq:69），四个安装位覆盖。
 
