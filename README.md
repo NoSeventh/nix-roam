@@ -37,7 +37,7 @@
 
 ### 一键安装（无需克隆）
 
-所有场景共用一条命令 —— `bootstrap/bootstrap.sh` 是统一入口，自动检测环境（macOS / NixOS / NixOS-WSL / 普通 Linux / WSL、x86_64 / aarch64、有无 systemd 与 sudo、登录 shell）并派发到对应引导链路，参数原样透传：
+所有场景共用一条命令 —— `bootstrap/bootstrap.sh` 是统一入口，自动检测环境（macOS / NixOS / NixOS-WSL / 普通 Linux / WSL、x86_64 / aarch64、有无 systemd 与 sudo、登录 shell）并派发到对应引导链路，参数原样透传（三条链路的分支细节见 [`docs/bootstrap.md`](docs/bootstrap.md)）：
 
 ```bash
 bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/bootstrap.sh)
@@ -153,7 +153,7 @@ home-manager switch --flake .#aarch64-darwin
 
 ## 更新与验证
 
-日常操作可用本仓库自带的统一 CLI `roam`（随共享工具列表装进四个安装点，按宿主自动分发；需在仓库检出目录下运行，等价命令见下文各节）：
+日常操作可用本仓库自带的统一 CLI `roam`（随共享工具列表装进四个安装点，按宿主自动分发；需在仓库检出目录下运行，等价命令见下文各节；机制细节——nh 语义、世代/回滚语义、WSL 陷阱、补全与测试——见 [`docs/roam.md`](docs/roam.md)）：
 
 ```bash
 roam switch            # 按宿主切换：NixOS → nh os switch --diff always .，standalone →
@@ -240,7 +240,7 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 │   ├── nixos.sh                # NixOS 全新安装 / 迁移引导脚本（install / adopt）
 │   └── gc.sh                   # 跨平台手动垃圾回收
 ├── dotfiles/                   # Home Manager 引用的原始配置文件
-├── docs/VALIDATION.md          # 按日期记录的验证边界（验证到求值 / 构建 / 激活哪一层）
+├── docs/                       # 机制与专题页（roam 切换体系 / 国内镜像 / 引导链路）+ VALIDATION 验证记录
 ├── .github/                    # GitHub 同步工作流与操作说明
 └── AGENTS.md                   # 架构决策与维护约定
 ```
@@ -310,7 +310,7 @@ git remote add github git@github.com:NoSeventh/nix-roam.git
 - `hosts/<hostname>/hardware-configuration.nix` 是机器专用文件，应与对应主机入口一起提交；只有仓库根目录下误生成的 `/hardware-configuration.nix` 被忽略。
 - NixOS 桌面配置中的 Hermes Agent 需要目标机器自行提供 `/etc/hermes/env`。
 - 多用户 Nix 安装需要让 daemon 信任自定义 substituter，`bootstrap/linux.sh` 会处理新机器的这项配置；无 systemd / 无 sudo 的机器走单用户安装，镜像直接写用户级 nix.conf，无需 daemon 授权（`/nix` 仍需一次性 root 创建）。WSL1 不受支持，请先升级 WSL2。
-- 国内镜像只覆盖官方 Hydra 构建过的东西。nixvim 用到的 `vimPlugins.rainbow-delimiters-nvim` 标着 `meta.hydraPlatforms = [ ]`、源码在 gitlab.com：2026-09-24 一次 flake 更新把它的派生路径换成任何缓存都没建过的新路径，官方缓存与四个国内镜像全部 404，构建被迫现抓上游，GitLab 不可达时整条 HM 构建（vimplugin → neovim → nixvim → home-manager-path）直接失败——因此缓存列表末尾补了社区缓存 `nix-community.cachix.org`。2026-09-27 复测：该插件的许可元数据在当前锁定 rev 已是 Apache-2.0（2026-09-24 时记录的 unfree 不再成立），且当前锁定路径在 cache.nixos.org 与 NJU 镜像均可直接替换，cachix 由「必需」降级为「保险」；但 `hydraPlatforms = [ ]` 仍在，未来 lock 更新换出新路径时同类缺口可能复发，故保留（公钥：NixOS 侧在 `modules/fix-network.nix`；standalone 侧由 `bootstrap/*.sh` 写入 `/etc/nix/nix.custom.conf`，单用户安装写用户级 nix.conf；列表与公钥本体单源于仓库根 `meta.json`，Nix 模块与脚本同读一份，改动只改这一处）。已经装好的机器可手工补上：
+- 国内镜像只覆盖官方 Hydra 构建过的东西；缓存列表与公钥单源于仓库根 `meta.json`（Nix 模块与 bootstrap 脚本同读一份，改动只改这一处）。列表末位的社区缓存 `nix-community.cachix.org` 是正确性保险而非提速——`hydraPlatforms = [ ]` 的插件在 lock 更新后可能再出现「任何缓存都没建过的新路径」缺口（2026-09-24 实发过一次，始末与复测结论见 [`docs/mirrors.md`](docs/mirrors.md)）。已经装好的机器可手工补上：
 
   ```bash
   sudo tee -a /etc/nix/nix.custom.conf >/dev/null <<'EOF'
