@@ -21,7 +21,9 @@
 #                          确认，--yes 跳过；缺省取上一个内容不同的世代——rollback
 #                          的 activate 会把旧内容登记为新世代号，须跳过同路径重复）；
 #                          NixOS → sudo nixos-rebuild --rollback 或 --switch-generation N。
-#   roam gc [args...]      原样透传 bootstrap/gc.sh
+#   roam gc [选项]         手动清理旧世代与无引用 store 路径（自 bootstrap/gc.sh
+#                          折入，2026-09-28）：先用户后系统，NixOS 自动启用
+#                          --system；--dry-run 只打印命令。机器操作不碰仓库。
 #   roam check [--build] [目标]
 #                          CI 两层验证的本地等价物：默认 nix eval --raw 当前宿主目标的
 #                          drvPath（第一层）；--build 时 nix build --no-link（第二层）。
@@ -33,8 +35,8 @@
 #                          --all 跳过交互
 #   roam info              只读打印宿主探测结论（环境 / 用户守卫 / 将选中的输出）
 #
-# 需在本仓库检出目录下运行（flake 位置参数 '.' 按 cwd 解析；rollback 例外——
-# 只操作既有 store 世代，不查仓库）。
+# 需在本仓库检出目录下运行（flake 位置参数 '.' 按 cwd 解析）；rollback 与 gc 例外
+# ——rollback 只操作既有 store 世代，gc 是机器操作，均不查仓库。
 # 经 packages/roam.nix（writeShellApplication）挂入 packages/cli-dev.nix 四个安装点，
 # 也可直接 `bash packages/roam.sh` 调试。保持 macOS Bash 3.2 兼容（无关联数组等
 # bash4 特性；只用 bash 内建与 sed/grep 解析——目标机器可能没有 awk，见 gc.sh 同款约束）。
@@ -54,7 +56,8 @@ usage() {
                      回滚：standalone 重激活旧世代（缺省=上一个内容不同的世代，
                      y/N 确认、--yes 跳过、--list 只列；更深的回退用显式世代号）；
                      NixOS → sudo nixos-rebuild --rollback / --switch-generation N
-  gc [args...]       透传 bootstrap/gc.sh（--older-than Nd / --all / --system / --dry-run）
+  gc [选项]         清理旧世代与无引用路径（--older-than Nd / --all / --system /
+                    --dry-run；先用户后系统，NixOS 自动 --system；无需检出目录）
   check [--build] [目标]
                      验证目标：默认求值（nix eval --raw …drvPath，CI 第一层）；
                      --build 时构建（nix build --no-link，CI 第二层）。
@@ -539,10 +542,122 @@ cmd_rollback() {
   return "$rc"
 }
 
+# --- gc：手动清理旧世代与无引用 store 路径 ---
+# 2026-09-28 自 bootstrap/gc.sh 折入（该脚本随迁移删除）：gc 是机器操作不碰仓库，
+# 不应因脚本住在检出里而要求检出目录；折入同时消掉它与本文件重复的宿主探测。
+# 语义与原脚本一致：先用户后系统（sudo 自行调用）、NixOS 自动启用 --system、
+# --dry-run 只打印命令、不更新引导菜单、不修改自动清理配置。
+gc_usage() {
+  cat <<'EOF'
+用法：roam gc [选项]
+
+  --older-than Nd  清理超过 N 天的旧世代，默认 14d（N 必须为正整数）
+  --all            清理全部非当前世代
+  --system         在用户清理之后，也以 root 清理系统/root 的旧世代
+  --dry-run        仅打印将运行的命令，不删除世代、不执行垃圾回收
+  -h, --help       显示本帮助
+
+请以普通用户运行，gc 在需要时自行调用 sudo。
+NixOS 自动启用 --system；普通 Linux / WSL / macOS 默认清理用户环境。
+macOS 使用 nix-darwin 时，可加 --system 清理其系统旧世代。
+删除的世代将无法直接回滚；仍被当前环境或其他 GC 根引用的包会保留。
+不更新 NixOS / nix-darwin 的引导菜单，也不修改自动清理配置。
+EOF
+}
+
 cmd_gc() {
-  repo_check
-  [ -f bootstrap/gc.sh ] || die "检出中缺少 bootstrap/gc.sh"
-  exec bash "$PWD/bootstrap/gc.sh" "$@"
+  local period=14d policy=age policy_set=false system_gc=false dry_run=false
+  local os_name environment gc_bin
+  local gc_args
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --older-than)
+        [ "$#" -ge 2 ] || die 'gc: --older-than 需要参数，例如 30d'
+        [ "$policy_set" = false ] || die 'gc: --older-than 与 --all 只能指定一次且不能混用'
+        [[ "$2" =~ ^[1-9][0-9]*d$ ]] || die 'gc: 保留期限必须是正整数天，例如 14d'
+        period="$2"
+        policy_set=true
+        shift 2
+        ;;
+      --all)
+        [ "$policy_set" = false ] || die 'gc: --older-than 与 --all 只能指定一次且不能混用'
+        policy=all
+        policy_set=true
+        shift
+        ;;
+      --system) system_gc=true; shift ;;
+      --dry-run) dry_run=true; shift ;;
+      -h | --help) gc_usage; return 0 ;;
+      *) gc_usage >&2; die "gc: 未知参数：$1" ;;
+    esac
+  done
+
+  # 宿主环境标签与探测沿用本文件既有约定（is_nixos / is_wsl）
+  case "$kernel" in
+    Linux)
+      os_name=Linux
+      if [ -r /etc/os-release ]; then
+        # shellcheck disable=SC1091  # 目标机运行时文件，静态检查无法跟随
+        os_name="$(. /etc/os-release; printf '%s' "${PRETTY_NAME:-Linux}")"
+      fi
+      if is_nixos; then
+        environment=NixOS
+        system_gc=true
+      elif is_wsl; then
+        environment="$os_name / WSL（独立 Nix）"
+      else
+        environment="$os_name（独立 Nix）"
+      fi
+      ;;
+    Darwin) environment='macOS / Darwin' ;;
+    *) die "gc: 不支持的系统：$kernel" ;;
+  esac
+  printf '当前环境：%s\n' "$environment"
+
+  if [ "${SUDO_USER:-root}" != root ] && [ "$EUID" -eq 0 ]; then
+    die 'gc: 请去掉外层 sudo，以便先清理你自己的 Home Manager 世代；需要时 gc 会调用 sudo'
+  fi
+
+  # 不依赖 sudo 的 PATH；也兼容尚未加载 Nix shell 环境的终端。
+  gc_bin="$(type -P nix-collect-garbage || true)"
+  if [ -z "$gc_bin" ]; then
+    for candidate in \
+      "$HOME/.nix-profile/bin/nix-collect-garbage" \
+      /nix/var/nix/profiles/default/bin/nix-collect-garbage \
+      /run/current-system/sw/bin/nix-collect-garbage; do
+      if [ -x "$candidate" ]; then
+        gc_bin="$candidate"
+        break
+      fi
+    done
+  fi
+  [ -n "$gc_bin" ] || die 'gc: 未找到 nix-collect-garbage，请先安装 Nix 或加载 Nix 环境'
+  if [ "$system_gc" = true ] && [ "$EUID" -ne 0 ]; then
+    command -v sudo >/dev/null 2>&1 || die 'gc: 系统清理需要 sudo'
+  fi
+
+  # 先用户、后系统；预览模式不调用任何清理命令
+  gc_args=(--delete-older-than "$period")
+  if [ "$policy" = all ]; then
+    gc_args=(--delete-old)
+  fi
+  gc_run() {
+    printf '执行：'
+    printf ' %q' "$@"
+    printf '\n'
+    if [ "$dry_run" = false ]; then
+      "$@"
+    fi
+  }
+
+  printf '旧世代删除后无法直接回滚；仍被引用的包会保留。\n'
+  if [ "$dry_run" = true ]; then
+    printf '预览模式：仅显示命令，不估算可释放空间。\n'
+  fi
+  gc_run "$gc_bin" "${gc_args[@]}"
+  if [ "$system_gc" = true ] && [ "$EUID" -ne 0 ]; then
+    gc_run sudo -H -- "$gc_bin" "${gc_args[@]}"
+  fi
 }
 
 cmd_check() {

@@ -15,7 +15,7 @@
   #     包自 2026-09-28 起由 packages/cli-dev.nix 单源提供（四个安装点都有），此处不再
   #     设 programs.nh —— 该模块除装包外无额外作用，且我们本就不设 programs.nh.flake
   #     （那会硬编码 checkout 路径，roam switch 按 cwd 传位置参数），也不启用
-  #     nh clean（GC 仍走 bootstrap/gc.sh）。
+  #     nh clean（GC 仍走 roam gc）。
 
   # --- 1. NixOS development runtimes (desktop and WSL) ---
   # Standalone hosts use native/project runtime management instead.
