@@ -71,9 +71,6 @@
       # profiles/nixos-base.nix 声明 —— 那是另一实例的刻意差异，不做合并扩权。
       # （2026-09-17 验证后移除了此处的 electron-38.8.4：五个输出求值 + standalone 构建均不引用；
       #   若日后 lock 更新再次需要，在此重新添加即可。）
-      # electron-41.9.1（EOL）：2026-09-26 桌面求值需要 —— flake 更新后桌面闭包经本 config
-      # 管辖的 stable 实例（specialArgs pkgs-stable）引用该版本；standalone 不引用，
-      # 列表为「允许」语义，不影响其求值结果（drvPath 前后一致已验证）。
       # electron-41.9.1（EOL）：2026-09-26 桌面求值需要 —— 桌面闭包经本 config 管辖的实例
       # 引用该版本（探针验证：移除后桌面求值失败）；standalone 不引用，列表为「允许」语义，
       # 其 drvPath 不受影响（前后一致已验证）。系统 unstable 实例另见 profiles/nixos-base.nix。
@@ -128,6 +125,31 @@
               };
             }
           ];
+        };
+
+      # 仓库自有脚本关卡（nix flake check；CI eval.yml 第三层）：
+      #   shellcheck-scripts —— 补全文件等不经 writeShellApplication 门的脚本静态检查
+      #   roam-unit-tests   —— tests/ 单测（roam.sh 纯函数 source 加载 + 补全 harness）
+      # 两个 Linux 系统显式输出（与 standalone 输出同款惯例，不做 forAllSystems 展开）；
+      # darwin 不提供——tests 只依赖 bash/jq/shellcheck，两侧行为无差。
+      scriptChecks =
+        pkgs':
+        {
+          shellcheck-scripts = pkgs'.runCommand "shellcheck-scripts" {
+            nativeBuildInputs = [ pkgs'.shellcheck ];
+          } ''
+            cd ${self.outPath}
+            shellcheck packages/roam-completion.bash tests/*.sh || exit 1
+            touch $out
+          '';
+          roam-unit-tests = pkgs'.runCommand "roam-unit-tests" {
+            # bashInteractive：沙箱 PATH 上的 bash 是 stdenv 的极简构建（无 progcomp，
+            # compgen 不可用）；补全 harness 需要完整 bash（2026-09-28 沙箱实测发现）。
+            nativeBuildInputs = [ pkgs'.jq pkgs'.bashInteractive ];
+          } ''
+            ROAM_TEST_REPO=${self.outPath} bash ${./tests}/run-all.sh || exit 1
+            touch $out
+          '';
         };
     in
     {
@@ -186,5 +208,9 @@
         homeDirectory = "/Users/${username}";
         standaloneModule = ./home/standalone-darwin.nix;
       };
+
+      # --- 4. 仓库自有脚本关卡（两个 Linux 系统；见上方 scriptChecks 注释）---
+      checks.x86_64-linux = scriptChecks (pkgsFor "x86_64-linux").unstable;
+      checks.aarch64-linux = scriptChecks (pkgsFor "aarch64-linux").unstable;
     };
 }

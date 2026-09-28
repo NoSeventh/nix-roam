@@ -61,3 +61,8 @@ jobs:
       - name: Build standalone Linux activation package (x86_64)
         # 唯一能在 x86_64 runner 上直接构建的产物；aarch64 需 ARM 实机，NixOS toplevel 闭包过大
         run: nix build --no-link .#homeConfigurations.x86_64-linux.activationPackage
+
+      - name: Script checks (shellcheck + roam unit tests)
+        # 第三层：仓库脚本关卡。构建 checks（shellcheck-scripts + roam-unit-tests，
+        # 即补全文件静态检查与 tests/ 单测）并对全部输出求值。
+        run: nix flake check

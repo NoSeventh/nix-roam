@@ -191,9 +191,11 @@ EOF
 # 不走 nix-env --list-generations：它需取 profile 锁，非 root 因
 # /nix/var/nix/profiles/system.lock 无权限而列空（2026-09-28 wsl 实测）；
 # profiles 目录与各 system-N-link 链接全局可读，glob 直读即得。
+# 目录可用 ROAM_SYSTEM_PROFILES_DIR 重定向（tests/roam-functions.sh 以临时目录打桩）。
 system_generation_ids() {
-  local l n
-  for l in /nix/var/nix/profiles/system-*-link; do
+  local l n dir
+  dir="${ROAM_SYSTEM_PROFILES_DIR:-/nix/var/nix/profiles}"
+  for l in "$dir"/system-*-link; do
     n="${l##*/system-}"
     n="${n%-link}"
     case "$n" in
@@ -250,7 +252,7 @@ cmd_switch() {
   repo_check
   if is_nixos; then
     command -v nh >/dev/null 2>&1 \
-      || die "未找到 nh（NixOS 侧由 profiles/nixos-base.nix 的 programs.nh.enable 提供）"
+      || die "未找到 nh（NixOS 侧经 packages/cli-dev.nix 共享列表落系统位；首次进入闭包前可先 sudo nixos-rebuild switch --flake .#<主机名> 自举一次）"
     if run_logged switch nh os switch --diff always . "$@"; then
       return 0
     else
@@ -706,23 +708,27 @@ cmd_info() {
 }
 
 # --- 4. 分发 ---
-cmd="${1:-help}"
-if [ "$#" -gt 0 ]; then
-  shift
+# 执行守卫：被 source 时不分发（tests/roam-functions.sh 加载纯函数做单测）；
+# 直接执行（bin/roam、bash packages/roam.sh）时 $0 与 BASH_SOURCE 一致，照常分发。
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  cmd="${1:-help}"
+  if [ "$#" -gt 0 ]; then
+    shift
+  fi
+  case "$cmd" in
+    switch) cmd_switch "$@" ;;
+    status) cmd_status "$@" ;;
+    doctor) cmd_doctor "$@" ;;
+    rollback) cmd_rollback "$@" ;;
+    gc) cmd_gc "$@" ;;
+    check) cmd_check "$@" ;;
+    update) cmd_update "$@" ;;
+    info) cmd_info "$@" ;;
+    help | -h | --help) usage ;;
+    *)
+      printf 'roam: 未知子命令：%s\n\n' "$cmd" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
 fi
-case "$cmd" in
-  switch) cmd_switch "$@" ;;
-  status) cmd_status "$@" ;;
-  doctor) cmd_doctor "$@" ;;
-  rollback) cmd_rollback "$@" ;;
-  gc) cmd_gc "$@" ;;
-  check) cmd_check "$@" ;;
-  update) cmd_update "$@" ;;
-  info) cmd_info "$@" ;;
-  help | -h | --help) usage ;;
-  *)
-    printf 'roam: 未知子命令：%s\n\n' "$cmd" >&2
-    usage >&2
-    exit 1
-    ;;
-esac

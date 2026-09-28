@@ -1,0 +1,5 @@
+2026-09-28 01:17 : id 23 -> /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-home-manager-generation (current)
+2026-09-28 00:52 : id 22 -> /nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-home-manager-generation
+2026-09-27 23:40 : id 21 -> /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-home-manager-generation
+2026-09-27 08:12 : id 20 -> /nix/store/cccccccccccccccccccccccccccccccc-home-manager-generation
+2026-09-17 19:03 : id 19 -> /nix/store/dddddddddddddddddddddddddddddddd-home-manager-generation

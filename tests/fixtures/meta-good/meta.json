@@ -1,0 +1,5 @@
+{
+  "username": "tester",
+  "substituters": "https://cache.example.org/store",
+  "nixCommunityCachixKey": "cache.example.org-1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+}
