@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 P3 hostname 约定双重守卫（flake.nix + packages/roam.sh + bootstrap/nixos.sh + tests/ + AGENTS/README/docs/roam，Fedora 44 / WSL2 standalone，本机）
+
+改动：①flake 侧新增 `hostnameGuard "<输出属性名>"` 内联模块（let 内与 `nixosHome` 同款风格）——「目录名 = networking.hostName = 输出属性名」由隐性约定改为 NixOS assertion，两个 NixOS 输出的 modules 列表各带一份；`bootstrap/nixos.sh` 脚手架打印的两块样例输出同步自带该守卫，新主机复制即得。②roam 侧新增 `nixos_preflight`：`roam switch` NixOS 分支在派发 nh 前求值 `.#nixosConfigurations.<短主机名>.config.networking.hostName`——求值失败（无对应输出）或值不等（hostName 脱节）分别 die，报错指向约定/脚手架与两侧对齐修法，替换 nix/nh 难懂的属性缺失原始报错。③tests 补 3 个桩例（PATH 注入假 nix + uname -n 函数桩：一致 rc0 / 无输出 rc1 / 不一致 rc1），51 例。AGENTS（加机步骤 3 + Quick rules）、docs/roam.md、README 约定句同步。
+
+实测纠偏（注释层）：初稿把 assertions 写成「构建期拦截、求值 drvPath 不触发」——读锁定 nixpkgs 源码 `lib.asserts.checkAssertWarn`（top-level.nix:78 消费 `config.assertions`）并负例实测后确认其在 **toplevel 求值期 throw**；flake/roam/docs 三处注释已按事实改写：断言覆盖 nix eval drvPath（含 CI 第一层）、任何构建与切换全部路径，预检的价值是「早一步 + 报错直接给修法」。编辑过程另有一次注释替换把函数头复打成两行，`nix-instantiate --parse` 当场拦截。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` / `--parse` / shellcheck 零告警 / `run-all` 51/51（rc 直取）；五输出求值全过（两侧 toplevel 求值即过 checkAssertWarn 断言路径）；两侧 hostName 求值 = "nixos" / "wsl"（预检求值的同一属性路径）；**负例**：/tmp 完整副本改 hosts/wsl hostName 为 wrongname → `nix eval …toplevel.drvPath` rc=1，报错逐字显示 hostnameGuard 断言文本；`nix flake check` rc=0；activationPackage 构建 rc=0（新 roam.drv 过 writeShellApplication 门）；`bash packages/roam.sh switch` 实机 rc=0 落世代、`roam status` 终态一致。
+
+未验证：`nixos_preflight` 实机执行（本机 standalone，NixOS 分支仅 3 桩例 + 其求值属性路径的实机求值间接覆盖；NixOS 侧下次 `roam switch` 顺手跑一次即闭合）；脚手架打印效果（nixos.sh 仅改 heredoc 样例文本，无逻辑改动）；hostname 错配下 `roam status`/`check` 的行为（走 nix 原始报错，已知边界）。
+
 ## 2026-09-28 文档拆分 P2：机制细节出 AGENTS/README 落 docs/ 三页（docs/{roam,mirrors,bootstrap}.md + AGENTS.md + README.md，纯文档改动）
 
 改动：结构原则 = README 用法 / AGENTS.md 规则 / docs/ 原因与机制。新增 `docs/roam.md`（roam 打包与安装位、宿主探测与用户守卫、nh 双侧后端语义、世代/漂移/回滚、子命令速查、补全机制、WSL stc-exit-4 两来源、测试与沙箱发现）——吞 AGENTS.md「Build & activate commands」的切换长段与「NixOS-WSL」的 getty-mask/linger 两段；`docs/mirrors.md`（CERNET 聚合器、substituter 单源、rainbow-delimiters 事件、cachix 公钥归属、npm registry、bootstrap 写入机制、已死镜像考古）——吞 AGENTS.md「China mirrors」整节与 README 注意事项的镜像长注；`docs/bootstrap.md`（统一入口、linux.sh 七步与两种安装模式/建号交互/wsl.conf 合并、darwin.sh、nixos.sh install/adopt）——吞 AGENTS.md 引导节四条巨弹。AGENTS.md 对应位置改短规则 + 链接（保留的规则含：无切换别名、检出目录约束、目录名=hostname=输出名、镜像单源与公钥归属、bootstrap 写入机制两侧同步、flake inputs 不指向死镜像、BASH_SOURCE 守卫勿删）；README 镜像注压缩为结论 + 手工补缓存命令块（用户侧操作保留）+ 链接，roam/bootstrap 两处加 docs 指针；两处目录树改 docs/ 行。措辞以机械搬运为主，仅连接句与标题新写。
