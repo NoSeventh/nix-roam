@@ -9,6 +9,16 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 NixOS 侧 roam switch 实机首跑——预检/安装位/断言三项遗留关闭（检出 ≥b9c3cea 的 roam 变更实机激活，NixOS-WSL 26.11 x86_64，主机 wsl；记录自用户实跑输出转记）
+
+范围：NixOS-WSL 主机对含 hostname 预检（a1401d0）与 gc 折入（200e441）的检出执行 `roam switch`。实跑 rc=0（run_logged 的「完成」仅在 rc=0 打印）：19 个派生构建、12 路径经 NJU 镜像替换、激活与 bootloader 登记完成、全程无 stc exit 4（getty mask 与 linger 在位——闭包可见 `unit-console-getty.service-disabled`）；dix 差异 2110→2110 路径（+12/-12、+4.69 KiB，与 standalone 侧同批切换同幅 = 同一 roam 包内容）；`ShellCheck-0.11.0` 被取入构建环境——writeShellApplication 门在 NixOS 侧真实执行（三个 roam.drv：文本装配 + 检查 + symlinkJoin 外壳）。
+
+就此关闭的未验证项：①`nixos_preflight` 实机执行（P3 遗留——cmd_switch NixOS 分支必经预检方到 nh，rc=0 即通过）；②NixOS 侧安装位的 roam 变更激活（自 P1 批起多笔「该侧下次 switch 生效」——WSL 侧安装的 roam 自此含守卫分发、gc 折入、预检全部内容）；③hostnameGuard 断言过真实 NixOS toplevel 构建（此前仅 /tmp 负例与求值层证据）。
+
+观察一条（既有、非本批引入）：system-path 构建期 buildEnv 报 `python3-3.13.15-env/bin/ninja` 与 `ninja-1.13.2/bin/ninja` 碰撞（ignored）——系统级碰撞仅告警不失败（与 HM 用户级致命冲突不同，见 AGENTS buildEnv gotchas），源于 Python 科学环境携带 ninja；良性留观，日后收拾 nixos-base 时可从 python env 摘除。
+
+未验证（全局剩余）：`--system` 真清理与 sudo 实际执行（破坏性操作，桩级为止）；macOS / aarch64 实机（等硬件）；桌面机（hosts/nixos）实机——与 WSL 同一 NixOS 分支，无独立代码路径。
+
 ## 2026-09-28 NixOS 侧复验 gc 折入 + gc 用例宿主漂移修复（tests/roam-functions.sh，NixOS-WSL 26.11 / wsl，本机）
 
 背景：gc 折入（200e441）的验证在 Fedora/WSL standalone 完成，上条记录留了「NixOS 分支的 gc（NixOS 自动 --system 的真机行为）——NixOS 侧下次顺手」未验证项；本次在 NixOS-WSL 主机上复验即补此层。
