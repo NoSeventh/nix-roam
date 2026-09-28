@@ -54,7 +54,7 @@ The core pattern. `packages/cli-dev.nix` is a **pure function** returning a cros
 ```
 packages/cli-dev.nix         ({ pkgs, pkgs-stable, ... }: [ ... ])  cross-platform (platform-conditional inside)
         ├── profiles/cli.nix              → environment.systemPackages  (NixOS-WSL)
-        ├── modules/desktop/programs.nix  → environment.systemPackages  (system-level, sudo-visible)
+        ├── modules/desktop/core.nix      → environment.systemPackages  (system-level, sudo-visible)
         ├── home/standalone-linux.nix     → home.packages               (user-level, non-NixOS Linux)
         └── home/standalone-darwin.nix    → home.packages               (user-level, macOS)
 ```
