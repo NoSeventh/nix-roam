@@ -103,7 +103,7 @@ sudo bash bootstrap/nixos.sh          # 等价于 adopt 子命令
 
 迁移链路会整体备份旧的 `/etc/nixos` 再克隆本仓库；若目标系统原有 `system.stateVersion` 与仓库共享值不同，脚本会要求先在主机入口用 `lib.mkForce` 保留原值。两条链路都要求 root，且可安全重复运行。
 
-新 NixOS 机器（第三台起）：在目标机上直接 `sudo bash bootstrap/nixos.sh adopt --target <新主机名>`（实体机全新安装同理加 `install`）。`hosts/<主机名>/` 不存在时，脚本从 `hosts/_template/` 复制出主机目录（自动替换主机名占位符），打印桌面/CLI 两种 flake 输出样例块，等你完成 `variables.nix` 旋钮、GPU profile（`profiles/hardware/`，可不选）和输出块粘贴后校验继续——脚本不自动改 `flake.nix`。约定主机目录名 = `networking.hostName` = flake 输出属性名。`adopt` 已有系统时把原机 `hardware-configuration.nix` 拷进新目录；`install` 链路会自动重新生成。
+新 NixOS 机器（第三台起）：在目标机上直接 `sudo bash bootstrap/nixos.sh adopt --target <新主机名>`（实体机全新安装同理加 `install`）。`hosts/<主机名>/` 不存在时，脚本从 `hosts/_template/` 复制出主机目录（自动替换主机名占位符），打印桌面/CLI 两种 flake 输出样例块，等你完成 `variables.nix` 旋钮、GPU profile（`profiles/hardware/`，可不选）和输出块粘贴后校验继续——脚本不自动改 `flake.nix`。约定主机目录名 = `networking.hostName` = flake 输出属性名——flake 内的 `hostnameGuard` 断言与 `roam switch` 切换前预检双重守卫这一约定。`adopt` 已有系统时把原机 `hardware-configuration.nix` 拷进新目录；`install` 链路会自动重新生成。
 
 ### NixOS 桌面
 
