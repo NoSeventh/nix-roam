@@ -58,6 +58,7 @@ case "$kernel" in
   Linux)
     os_name=Linux
     if [ -r /etc/os-release ]; then
+      # shellcheck disable=SC1091  # 目标机运行时文件，静态检查无法跟随
       os_name="$(. /etc/os-release; printf '%s' "${PRETTY_NAME:-Linux}")"
     fi
     if [ -e /etc/NIXOS ]; then

@@ -288,7 +288,7 @@ EOF
     fi
     curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon
     # 单用户安装后加载 nix 环境
-    # shellcheck disable=SC1090  # 加载已知 nix profile 路径
+    # shellcheck disable=SC1091  # 运行时才存在的已知 nix profile 路径，静态检查无法跟随
     [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ] && . "$HOME/.nix-profile/etc/profile.d/nix.sh"
   else
     curl -fsSL https://install.determinate.systems/nix | sh -s -- install

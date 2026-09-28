@@ -139,7 +139,7 @@
             nativeBuildInputs = [ pkgs'.shellcheck ];
           } ''
             cd ${self.outPath}
-            shellcheck packages/roam-completion.bash tests/*.sh || exit 1
+            shellcheck packages/roam-completion.bash tests/*.sh bootstrap/*.sh || exit 1
             touch $out
           '';
           roam-unit-tests = pkgs'.runCommand "roam-unit-tests" {
