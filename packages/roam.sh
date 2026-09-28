@@ -24,11 +24,13 @@
 #   roam gc [选项]         手动清理旧世代与无引用 store 路径（自 bootstrap/gc.sh
 #                          折入，2026-09-28）：先用户后系统，NixOS 自动启用
 #                          --system；--dry-run 只打印命令。机器操作不碰仓库。
-#   roam check [--build] [目标]
+#   roam check [--build] [目标...]
 #                          CI 两层验证的本地等价物：默认 nix eval --raw 当前宿主目标的
 #                          drvPath（第一层）；--build 时 nix build --no-link（第二层）。
-#                          目标可显式指定：nixos / wsl / x86_64-linux / aarch64-linux /
-#                          aarch64-darwin（跨主机核对其它输出，仅求值语义）
+#                          目标可显式指定多个：nixos / wsl / x86_64-linux / aarch64-linux /
+#                          aarch64-darwin（跨主机核对其它输出，仅求值语义）。多目标逐个
+#                          跑完再退出、rc 汇总（不在第一个失败处中断）——.githooks/
+#                          pre-push 的 push 前五输出求值门槛即本命令一条全量调用
 #   roam update [输入名...|--all]
 #                          nix flake update + flake.lock 差异摘要；提交与切换保持手动。
 #                          缺省交互选择要更新的输入（回车/EOF=全部），显式输入名或
@@ -58,10 +60,11 @@ usage() {
                      NixOS → sudo nixos-rebuild --rollback / --switch-generation N
   gc [选项]         清理旧世代与无引用路径（--older-than Nd / --all / --system /
                     --dry-run；先用户后系统，NixOS 自动 --system；无需检出目录）
-  check [--build] [目标]
+  check [--build] [目标...]
                      验证目标：默认求值（nix eval --raw …drvPath，CI 第一层）；
                      --build 时构建（nix build --no-link，CI 第二层）。
-                     目标：nixos wsl x86_64-linux aarch64-linux aarch64-darwin（缺省=当前宿主）
+                     目标：nixos wsl x86_64-linux aarch64-linux aarch64-darwin（缺省=当前宿主），
+                     可给多个依次执行（重复去重；任一失败 rc=1，但全部跑完）
   update [输入名...|--all]
                      nix flake update 并显示 flake.lock 差异；提交与切换仍手动。
                      缺省时列出 flake 输入供选择：回车（或非交互 EOF）=全部；
@@ -660,39 +663,67 @@ cmd_gc() {
   fi
 }
 
+# 目标名 → flake 属性路径（check 显式目标专用；host_attr 是「当前宿主」的同一
+# 映射。未知目标即 die——cmd_check 解析期借它做即时校验）
+check_attr() {
+  case "$1" in
+    nixos | wsl) printf 'nixosConfigurations.%s.config.system.build.toplevel' "$1" ;;
+    x86_64-linux | aarch64-linux | aarch64-darwin)
+      printf 'homeConfigurations.%s.activationPackage' "$1"
+      ;;
+    *) die "未知目标：$1（可用：nixos wsl x86_64-linux aarch64-linux aarch64-darwin，缺省=当前宿主）" ;;
+  esac
+}
+
 cmd_check() {
-  local build=false target='' attr=''
+  local build=false targets='' attrs='' t a rc=0 total=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --build) build=true ;;
       -*) die "check: 未知选项：$1" ;;
       *)
-        [ -z "$target" ] || die "check: 目标只能指定一个"
-        target="$1"
+        # 目标名解析期即校验（未知名 die）；重复目标静默去重（保首现次序）
+        check_attr "$1" >/dev/null
+        case " $targets " in
+          *" $1 "*) : ;;
+          *) targets="$targets $1" ;;
+        esac
         ;;
     esac
     shift
   done
   repo_check
-  if [ -n "$target" ]; then
-    case "$target" in
-      nixos | wsl) attr="nixosConfigurations.${target}.config.system.build.toplevel" ;;
-      x86_64-linux | aarch64-linux | aarch64-darwin)
-        attr="homeConfigurations.${target}.activationPackage"
-        ;;
-      *) die "未知目标：$target（可用：nixos wsl x86_64-linux aarch64-linux aarch64-darwin，缺省=当前宿主）" ;;
-    esac
+  if [ -z "$targets" ]; then
+    attrs="$(host_attr)" # 缺省：当前宿主单目标（与旧版语义一致）
   else
-    attr="$(host_attr)"
+    # 目标名均为经校验的标识符（无空格/通配），展开安全
+    # shellcheck disable=SC2086
+    for t in $targets; do
+      attrs="$attrs $(check_attr "$t")"
+    done
+    attrs="${attrs# }"
   fi
-  if [ "$build" = true ]; then
-    printf 'roam check: 构建 .#%s\n' "$attr"
-    nix build --no-link ".#${attr}"
-  else
-    printf 'roam check: 求值 .#%s\n' "$attr"
-    nix eval --raw ".#${attr}.drvPath"
-    printf '\n'
+  # 多目标逐个跑完再退出：一次 push 前核对应看到全部失败，而非停在第一个
+  # shellcheck disable=SC2086
+  for a in $attrs; do
+    total=$((total + 1))
+    if [ "$build" = true ]; then
+      printf 'roam check: 构建 .#%s\n' "$a"
+      nix build --no-link ".#${a}" || rc=1
+    else
+      printf 'roam check: 求值 .#%s\n' "$a"
+      nix eval --raw ".#${a}.drvPath" || rc=1
+      printf '\n'
+    fi
+  done
+  if [ "$total" -gt 1 ]; then
+    if [ "$rc" -eq 0 ]; then
+      printf 'roam check: %s 个目标全部通过\n' "$total"
+    else
+      printf 'roam check: 存在失败目标（见上），共 %s 个\n' "$total" >&2
+    fi
   fi
+  return "$rc"
 }
 
 # 列出 flake.lock 顶层输入供选择（菜单走 stderr，选定的输入名走 stdout，空输出=全部）。

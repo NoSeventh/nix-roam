@@ -8,7 +8,7 @@
 #
 # 用法（两种等价入口，默认 flake target = aarch64-darwin，当前用户需可 sudo）：
 #     bash bootstrap/darwin.sh [flake-target]    # 仓库内运行
-#     bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/darwin.sh)
+#     bash <(curl -fsSL https://gitee.com/qihaoxu/nix-roam/raw/master/bootstrap/darwin.sh)
 #                                                # 仓库外一键运行：先把仓库取到 ~/nix-roam 再重跑本脚本
 #
 # 安装器会请求管理员密码并在 macOS 上创建合成 /nix 卷，耗时数分钟。
@@ -41,11 +41,11 @@ if [ -z "$REPO_ROOT" ] || [ ! -f "$REPO_ROOT/flake.nix" ]; then
       exit 1
     fi
     if have git; then
-      git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git "$CLONE_DIR"
+      git clone https://gitee.com/qihaoxu/nix-roam.git "$CLONE_DIR"
     elif have curl; then
       log "无 git，改用 Gitee 压缩包获取仓库"
       mkdir -p "$CLONE_DIR"
-      curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/repository/archive/master.tar.gz \
+      curl -fsSL https://gitee.com/qihaoxu/nix-roam/repository/archive/master.tar.gz \
         | tar -xz -C "$CLONE_DIR" --strip-components=1
     else
       echo "错误：仓库外运行需要 git 或 curl，请先安装其一后重试。" >&2

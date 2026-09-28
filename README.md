@@ -40,7 +40,7 @@
 所有场景共用一条命令 —— `bootstrap/bootstrap.sh` 是统一入口，自动检测环境（macOS / NixOS / NixOS-WSL / 普通 Linux / WSL、x86_64 / aarch64、有无 systemd 与 sudo、登录 shell）并派发到对应引导链路，参数原样透传（三条链路的分支细节见 [`docs/bootstrap.md`](docs/bootstrap.md)）：
 
 ```bash
-bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/bootstrap.sh)
+bash <(curl -fsSL https://gitee.com/qihaoxu/nix-roam/raw/master/bootstrap/bootstrap.sh)
 ```
 
 普通 Linux / WSL 上会自动把仓库取到 `~/nix-roam`（`CLONE_DIR` 环境变量可覆盖；无 git 时退到 Gitee 压缩包）再执行；NixOS 链路需要 root，非 root 运行入口会自动 `sudo` 拾起；standalone Linux 的 flake target 按架构自动选择（x86_64 → `x86_64-linux`，aarch64 → `aarch64-linux`）。有 systemd + sudo 时走多用户 Determinate 安装（镜像信任写 `/etc/nix`）；无 systemd 或无 sudo 时走单用户安装（官方安装器 `--no-daemon`，镜像写用户级 nix.conf；`/nix` 前缀仍需一次性 root 创建，脚本会给出管理员命令）。WSL1 不受支持，会明确报错。
@@ -48,7 +48,7 @@ bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/boots
 `bash <(...)` 的写法保留终端交互（可直接粘贴 GitHub token，sudo 密码提示同理）；换成 `curl ... | bash` 也能运行，但会跳过 token 提示。刚导入、默认以 root 进入且连 curl 都没有的 NixOS-WSL：
 
 ```bash
-nix-env -f '<nixpkgs>' -iA curl && curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/bootstrap.sh -o /tmp/bootstrap.sh && bash /tmp/bootstrap.sh
+nix-env -f '<nixpkgs>' -iA curl && curl -fsSL https://gitee.com/qihaoxu/nix-roam/raw/master/bootstrap/bootstrap.sh -o /tmp/bootstrap.sh && bash /tmp/bootstrap.sh
 ```
 
 （下载后再运行而不是 `sudo bash <(curl ...)`，是因为 sudo 会关闭继承的文件描述符。）
@@ -58,13 +58,13 @@ nix-env -f '<nixpkgs>' -iA curl && curl -fsSL https://gitee.com/qihaoxu/nixos-ni
 无需克隆即可激活 Linux / WSL 配置：
 
 ```bash
-home-manager switch --flake "git+https://gitee.com/qihaoxu/nixos-niri-noctalia.git#x86_64-linux"
+home-manager switch --flake "git+https://gitee.com/qihaoxu/nix-roam.git#x86_64-linux"
 ```
 
 从本地仓库激活：
 
 ```bash
-git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git nix-roam
+git clone https://gitee.com/qihaoxu/nix-roam.git nix-roam
 cd nix-roam
 home-manager switch --flake .#x86_64-linux
 ```
@@ -74,7 +74,7 @@ home-manager switch --flake .#x86_64-linux
 一键命令会自动把仓库取到 `~/nix-roam`（`CLONE_DIR` 环境变量可覆盖；无 git 时退到 Gitee 压缩包）再执行；等价的手动流程：
 
 ```bash
-git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git ~/nix-roam
+git clone https://gitee.com/qihaoxu/nix-roam.git ~/nix-roam
 bash ~/nix-roam/bootstrap/bootstrap.sh
 ```
 
@@ -89,7 +89,7 @@ bash ~/nix-roam/bootstrap/bootstrap.sh
 实体机全新安装：从 NixOS 安装 ISO 启动后，手动分区并把目标盘挂载到 `/mnt`（ESP 挂 `/mnt/boot`，参考命令见脚本头部注释），再以 root 运行：
 
 ```bash
-curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/nixos.sh -o nixos.sh
+curl -fsSL https://gitee.com/qihaoxu/nix-roam/raw/master/bootstrap/nixos.sh -o nixos.sh
 bash nixos.sh install
 ```
 
@@ -136,7 +136,7 @@ sudo nixos-rebuild switch --flake .#wsl
 全新 Apple Silicon 机器一键安装（装 Nix → 配镜像 → 配 token → 开 flakes → 备份冲突文件 → 装 HM → 激活）：
 
 ```bash
-bash <(curl -fsSL https://gitee.com/qihaoxu/nixos-niri-noctalia/raw/master/bootstrap/darwin.sh)
+bash <(curl -fsSL https://gitee.com/qihaoxu/nix-roam/raw/master/bootstrap/darwin.sh)
 ```
 
 与先 `git clone` 到本地再运行 `bash bootstrap/darwin.sh` 等价。
@@ -165,7 +165,8 @@ roam doctor            # 只读体检：磁盘/世代/镜像可达/守卫/漂移
 roam rollback          # 回滚上一内容世代（--list 查看，N 跳转；NixOS 走 nixos-rebuild）
 roam gc --dry-run      # 清理旧世代与无引用路径（--older-than/--all/--system；无需检出目录）
 roam check             # 求值当前宿主目标（CI 第一层）；--build 时构建（CI 第二层）
-roam check wsl         # 显式核对其它输出：nixos / wsl / 三个系统名（跨主机仅求值）
+roam check wsl nixos   # 显式核对其它输出，可给多个：nixos / wsl / 三个系统名
+                       #（跨主机仅求值；多目标逐个跑完再退出，任一失败 rc=1）
 roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成。
                        # 可选输入：缺省交互列出（回车=全部），roam update nixpkgs nixvim 只更新指定项，--all 跳过交互
 roam info              # 只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
@@ -214,7 +215,7 @@ nix build --no-link .#nixosConfigurations.nixos.config.system.build.toplevel
 nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 ```
 
-GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五条求值之外，还会实际构建 x86_64 standalone activation package——求值拦不住的 Home Manager buildEnv 冲突（如 gcc+clang、双 `python3.withPackages`）在这一层才会暴露。最后一步 `nix flake check` 构建仓库自有 checks：`shellcheck-scripts`（补全文件等 writeShellApplication 门之外脚本的静态检查）与 `roam-unit-tests`（`tests/` 的 roam.sh 纯函数单测 + 补全 harness）。它在 Gitee 同步之后运行，属于事后报警而非 push 前拦截；NixOS toplevel 与 aarch64 仍只做求值。按日期的验证记录见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
+GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五条求值之外，还会实际构建 x86_64 standalone activation package——求值拦不住的 Home Manager buildEnv 冲突（如 gcc+clang、双 `python3.withPackages`）在这一层才会暴露。最后一步 `nix flake check` 构建仓库自有 checks：`shellcheck-scripts`（补全文件、tests/bootstrap 脚本与 git 钩子等 writeShellApplication 门之外脚本的静态检查）与 `roam-unit-tests`（`tests/` 的 roam.sh 纯函数单测 + 补全 harness + 脚手架样例块与旧名残留检查）。它在 Gitee 同步之后运行，属事后报警；push 前本地拦截可启用仓库内钩子（`git config core.hooksPath .githooks`——pre-push 五输出求值，等价 CI 第一层，见 [同步说明](.github/SYNC.md)）。NixOS toplevel 与 aarch64 仍只做求值。按日期的验证记录见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
 ## 目录结构
 
@@ -224,7 +225,8 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 ├── meta.json                   # 单点数据：本地用户名 + substituters 列表 + cachix 公钥（flake 与 bootstrap 脚本共读）
 ├── hosts/
 │   ├── nixos/                  # 当前 NixOS 主机入口（机器专属设置）与硬件配置
-│   └── wsl/                    # NixOS-WSL 主机入口
+│   ├── wsl/                    # NixOS-WSL 主机入口
+│   └── _template/              # 新主机模板（bootstrap 脚手架由此复制）
 ├── profiles/                   # 显式导入的共享 profiles：基础、桌面、桌面轻量（desktop-lite）、locale、CLI
 ├── modules/                    # 共享 NixOS 模块；modules/desktop/ 为桌面专属模块
 ├── home/
@@ -235,13 +237,13 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 │   ├── standalone-darwin.nix   # macOS 入口
 │   └── nix-cn.nix              # Nix 镜像/缓存配置（列表与公钥单源于根 meta.json）
 ├── packages/cli-dev.nix        # 各入口共享的 CLI 软件列表
-├── tests/                      # 脚本级测试：roam.sh 纯函数单测 + 补全 harness（flake checks / CI）
+├── tests/                      # 脚本级测试：roam.sh 单测 + 补全 harness + 脚手架样例块/旧名残留检查（flake checks / CI）
+├── .githooks/                  # pre-push 钩子：五输出求值门槛（core.hooksPath 启用，见 .github/SYNC.md）
 ├── bootstrap/
 │   ├── bootstrap.sh            # 统一入口：自动检测环境（OS / NixOS / 架构 / sudo）派发到下列脚本
 │   ├── linux.sh                # 全新普通 Linux / WSL 引导脚本（多用户 / 单用户两种安装模式）
 │   ├── darwin.sh               # 全新 macOS（Apple Silicon）引导脚本
-│   ├── nixos.sh                # NixOS 全新安装 / 迁移引导脚本（install / adopt）
-│   └── gc.sh                   # 跨平台手动垃圾回收
+│   └── nixos.sh                # NixOS 全新安装 / 迁移引导脚本（install / adopt）
 ├── dotfiles/                   # Home Manager 引用的原始配置文件
 ├── docs/                       # 机制与专题页（roam 切换体系 / 国内镜像 / 引导链路）+ VALIDATION 验证记录
 ├── .github/                    # GitHub 同步工作流与操作说明
@@ -288,7 +290,7 @@ npm/npx 默认使用 npmmirror，Bash 中可用 `npmr install <pkg>` 临时改�
 
 ## Gitee 与 GitHub 同步
 
-主仓库是 [Gitee](https://gitee.com/qihaoxu/nixos-niri-noctalia)，镜像是 [GitHub](https://github.com/NoSeventh/nix-roam)。项目名为 nix-roam，Gitee 路径仍为 nixos-niri-noctalia。
+主仓库是 [Gitee](https://gitee.com/qihaoxu/nix-roam)，镜像是 [GitHub](https://github.com/NoSeventh/nix-roam)。Gitee 仓库已更名为 nix-roam，旧名 nixos-niri-noctalia 经 Gitee 改名重定向仍可达——重定向不保证持久（旧名被他人注册即失效），一切新引用一律用新名；既有检出的 remote 若仍指旧名，建议顺手 `git remote set-url origin git@gitee.com:qihaoxu/nix-roam.git`（bootstrap 脚本对旧名 remote 仍能识别，不改也不影响引导）。
 
 从 Gitee 克隆后，日常提交只需推送 Gitee：
 

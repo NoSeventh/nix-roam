@@ -5,6 +5,22 @@ Gitee 是主仓库，GitHub Actions 在每小时第 17、47 分钟拉取所有�
 `Sync from Gitee` 页面点击 `Run workflow` 手动同步。定时运行可能延迟。
 拉取使用 Git 协议 v1，并在失败后间隔重试，最多尝试四次。
 
+## push 前本地拦截（可选钩子）
+
+GitHub 侧 `eval` workflow 在同步之后运行，属事后报警。仓库自带 pre-push 钩子
+把 CI 第一层（五输出求值）前移到 push 时，一次性启用：
+
+```bash
+git config core.hooksPath .githooks
+```
+
+钩子即一条 `roam check nixos wsl x86_64-linux aarch64-linux aarch64-darwin`
+（多目标求值，秒级；任一输出求值失败即拦下本次 push，全部跑完才退出）。
+`core.hooksPath` 是本机配置，不随提交同步，每台推送机各自启用一次；
+`git push --no-verify` 跳过一次。`.githooks/` 现仅含 pre-push（仓库原本不用
+其它本地钩子）。注意：双推工作流文件变更（本文件所在目录的改动）也过同一
+钩子——钩子只拦不改推送目标，双推流程不变。
+
 Gitee 仓库必须保持公开。工作流使用 GitHub 自动提供的 `GITHUB_TOKEN`，
 无需设置个人令牌或 SSH 密钥。同步只更新 Git 分支和标签，不包含 Issues、
 Pull Requests、Release 附件或 Git LFS 对象。

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# pre-push：push 前五输出求值门槛（本地前移 CI 第一层；eval.yml 属 Gitee 同步后
+# 的事后报警，见 .github/SYNC.md）。经 packages/roam.sh 的 check 多目标一条完成：
+# 五输出 drvPath 逐个求值，全部跑完才退出，任一失败即拦下本次 push。
+#
+# 启用（一次性，本机配置不随提交同步）：git config core.hooksPath .githooks
+# 跳过一次：git push --no-verify（慎用——跳过的正是全输出求值拦截）。
+# 只求值不构建：standalone 构建闭包 6-8GB，push 级别太重；需要时手动
+# roam check --build <目标>。钩子在仓库根执行，检出内任意目录 push 均可。
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+exec bash packages/roam.sh check nixos wsl x86_64-linux aarch64-linux aarch64-darwin
