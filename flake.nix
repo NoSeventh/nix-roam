@@ -154,7 +154,9 @@
             nativeBuildInputs = [ pkgs'.shellcheck ];
           } ''
             cd ${self.outPath}
-            shellcheck packages/roam-completion.bash tests/*.sh bootstrap/*.sh || exit 1
+            # packages/roam.sh 另有 writeShellApplication 构建期门，此处重复纳入：
+            # nix flake check 单独跑时也能拦住它（双重覆盖，非冗余失误）
+            shellcheck packages/roam.sh packages/roam-completion.bash tests/*.sh bootstrap/*.sh || exit 1
             touch $out
           '';
           roam-unit-tests = pkgs'.runCommand "roam-unit-tests" {
