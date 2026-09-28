@@ -8,6 +8,18 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 gc 折入 roam + 脚手架样例块检查（packages/roam.sh + tests/ + bootstrap/gc.sh 删除 + 六处文档，Fedora 44 / WSL2 standalone，本机）
+
+背景：`bootstrap/gc.sh` 是 day-2 运维工具混在 day-0 安装器里——P2 拆分时其文档已留在 AGENTS「Garbage collection」而非 docs/bootstrap.md（无意识承认非引导链），且它是唯一被闭包内 roam 依赖的 bootstrap 脚本，迫使 `roam gc` 这个机器操作要求检出目录；其自带宿主探测与 roam.sh 重复且不承重（安装脚本的重复有 curl 单文件刚需撑着，gc 没有）。
+
+改动：①gc 逻辑（~120 行）折入 `packages/roam.sh` 的 `cmd_gc`（参数解析、宿主标签复用既有 is_nixos/is_wsl、SUDO_USER 守卫、gc_bin 三级 PATH 兜底、先用户后系统、dry-run），`--older-than Nd/--all/--system/--dry-run/-h` 语义逐项保留；`roam gc` 不再 repo_check（与 rollback/info 同族的「机器操作」）；`bootstrap/gc.sh` 删除，等价直跑 `bash packages/roam.sh gc`。README（roam gc 行 + 手动垃圾回收节）、AGENTS（目录树 + GC 节）、docs/roam.md 三处、补全头注释、profiles/nixos-base.nix 注释同步。②新增 `tests/scaffold-blocks.sh`：grep 级断言 bootstrap/nixos.sh 打印的两块样例各含 `hostnameGuard "__HOSTNAME__"`、桌面/CLI 的 nixHome 分野、Hermes 只在桌面块、hosts 接线计数——挡「改 flake 忘改脚手架」类漂移（hostnameGuard 就漏过一次）。③tests 补 gc 桩例 13 个（假 nix-collect-garbage/sudo 经 PATH 打桩、参数落 GC_LOG：dry-run 只打不执行、缺省 14d、--older-than 30d、--all→--delete-old、--system 两段调用序、--help、五组拒绝路径），合计 77 例。
+
+过程教训一条：从补全 harness 复制的 `expect_contains` 是空格定界匹配，gc 的「执行：」行 gc_bin 为完整路径（前邻 `/`），断言假失败——补无边界 `expect_sub` 助手区分两种语义。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` / shellcheck（roam.sh 增至 ~860 行）零告警；run-all 77/77；**检出目录外**实跑 `bash packages/roam.sh gc --dry-run` rc=0（当前环境标签正确、PATH 兜底真实生效——本 shell 即经 `/nix/var/nix/profiles/default/bin` 找到 gc_bin）、`--dry-run --system` 打印用户+sudo 两行不执行、`--older-than 0d` 拒绝 rc=1；五输出求值全过（roam.sh 变更移动全部含它闭包的 drvPath）；`nix flake check` rc=0——中途红一次系新文件 `tests/scaffold-blocks.sh` 未 `git add -N`、Git Flake store 副本缺该文件（本文件早有记载的老坑复发，沙箱层比本地直跑多拦一道，正是关卡意义）；activationPackage 构建过 writeShellApplication 门；`roam switch` 实机 rc=0、终态一致；安装版 `~/.nix-profile/bin/roam gc --dry-run` 检出外无管道 rc=0（管道接 head 的 rc=141 系 SIGPIPE，验证手法问题非缺陷）。
+
+未验证：`--system` 真清理路径与 sudo 实际调用（桩级覆盖调用序，真机执行属破坏性操作不跑）；NixOS 分支的 gc（NixOS 自动 --system 的真机行为——NixOS 侧下次顺手）；macOS 侧（同前桩级）。
+
 ## 2026-09-28 双推后自查：四处修正 + 脚手架端到端模拟（AGENTS.md + packages/roam-completion.bash + flake.nix + README.md，Fedora 44 / WSL2 standalone，本机）
 
 自查发现并修正：①AGENTS.md 架构图四安装点之一的 `modules/desktop/programs.nix` 系 2026-09-26 拆档（4342a57）前的残留，实际导入点是 `modules/desktop/core.nix`——P2 搬运未扫到该节，属前史问题非当日引入；②roam-completion.bash 头注释「改动后手动自查」在 fc18a739 建关卡后已失准——当日只改了 roam.nix 的同义注释，漏了补全文件自身头部，改指 shellcheck-scripts 关卡；③shellcheck-scripts 命令行补入 `packages/roam.sh`（writeShellApplication 构建门之外的第二重覆盖，`nix flake check` 单独跑也能拦住）；④README `roam switch` 说明补 NixOS 预检一句。
