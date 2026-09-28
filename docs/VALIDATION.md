@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 双推后自查：四处修正 + 脚手架端到端模拟（AGENTS.md + packages/roam-completion.bash + flake.nix + README.md，Fedora 44 / WSL2 standalone，本机）
+
+自查发现并修正：①AGENTS.md 架构图四安装点之一的 `modules/desktop/programs.nix` 系 2026-09-26 拆档（4342a57）前的残留，实际导入点是 `modules/desktop/core.nix`——P2 搬运未扫到该节，属前史问题非当日引入；②roam-completion.bash 头注释「改动后手动自查」在 fc18a739 建关卡后已失准——当日只改了 roam.nix 的同义注释，漏了补全文件自身头部，改指 shellcheck-scripts 关卡；③shellcheck-scripts 命令行补入 `packages/roam.sh`（writeShellApplication 构建门之外的第二重覆盖，`nix flake check` 单独跑也能拦住）；④README `roam switch` 说明补 NixOS 预检一句。
+
+脚手架端到端模拟（补 P3「未验证」里最近的一层）：/tmp 完整副本 + `cp -r hosts/_template hosts/newhost` + sed 替换占位符 + 把 bootstrap/nixos.sh heredoc 打印的样例块 A（hostnameGuard 随 sed 变为 newhost）按用户粘贴路径插入 flake.nix → `.#nixosConfigurations.newhost.config.networking.hostName` 求值 = "newhost"、toplevel drvPath 求值 OK（hostnameGuard 断言通过）——「新主机脚手架 → 粘贴样例 → 求值」整链实证。过程两次踩到已知/新知：Git Flake 纯度要求对新 hosts/ 目录 `git add -N`（VALIDATION 早有记载）；本机 nix-instantiate `--parse`（Determinate Nix 3.22.2）实际做变量解析而非纯语法解析——样例块单独解析须完整绑定 outputs 函数头变量，改为真插 flake 求值，验证反而更强。
+
+验证：`actionlint` 对两个 workflow 通过（eval.yml 改动的 YAML/模式有效）；shellcheck-scripts（新命令行含 roam.sh）构建 rc=0；`nix flake check` rc=0；run-all 51/51；陈旧引用扫描（programs.nix 等，剔除历史记述行）零残留。
+
+未验证：**CI 实跑**——本机 gh 未登录、GitHub API 出口 IP 限流无法侧读，需在 Actions 页人工确认（eval.yml 第三步 `nix flake check` 的首次实跑即在本批之后）；其余同前（NixOS 侧预检实机、darwin/aarch64 实机）。
+
 ## 2026-09-28 P3 hostname 约定双重守卫（flake.nix + packages/roam.sh + bootstrap/nixos.sh + tests/ + AGENTS/README/docs/roam，Fedora 44 / WSL2 standalone，本机）
 
 改动：①flake 侧新增 `hostnameGuard "<输出属性名>"` 内联模块（let 内与 `nixosHome` 同款风格）——「目录名 = networking.hostName = 输出属性名」由隐性约定改为 NixOS assertion，两个 NixOS 输出的 modules 列表各带一份；`bootstrap/nixos.sh` 脚手架打印的两块样例输出同步自带该守卫，新主机复制即得。②roam 侧新增 `nixos_preflight`：`roam switch` NixOS 分支在派发 nh 前求值 `.#nixosConfigurations.<短主机名>.config.networking.hostName`——求值失败（无对应输出）或值不等（hostName 脱节）分别 die，报错指向约定/脚手架与两侧对齐修法，替换 nix/nh 难懂的属性缺失原始报错。③tests 补 3 个桩例（PATH 注入假 nix + uname -n 函数桩：一致 rc0 / 无输出 rc1 / 不一致 rc1），51 例。AGENTS（加机步骤 3 + Quick rules）、docs/roam.md、README 约定句同步。
