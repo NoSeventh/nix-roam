@@ -1,0 +1,37 @@
+{
+  "nodes": {
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "nixpkgs-stable": "nixpkgs-stable",
+        "home-manager": "home-manager",
+        "nixvim": "nixvim"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1750000000,
+        "rev": "1111111111111111111111111111111111111111"
+      }
+    },
+    "nixpkgs-stable": {
+      "locked": {
+        "lastModified": 1750000001,
+        "rev": "2222222222222222222222222222222222222222"
+      }
+    },
+    "home-manager": {
+      "locked": {
+        "lastModified": 1750000002,
+        "rev": "3333333333333333333333333333333333333333"
+      }
+    },
+    "nixvim": {
+      "locked": {
+        "lastModified": 1750000003,
+        "rev": "4444444444444444444444444444444444444444"
+      }
+    }
+  },
+  "version": 7
+}

@@ -211,7 +211,7 @@ nix build --no-link .#nixosConfigurations.nixos.config.system.build.toplevel
 nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 ```
 
-GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五条求值之外，还会实际构建 x86_64 standalone activation package——求值拦不住的 Home Manager buildEnv 冲突（如 gcc+clang、双 `python3.withPackages`）在这一层才会暴露。它在 Gitee 同步之后运行，属于事后报警而非 push 前拦截；NixOS toplevel 与 aarch64 仍只做求值。按日期的验证记录见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
+GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五条求值之外，还会实际构建 x86_64 standalone activation package——求值拦不住的 Home Manager buildEnv 冲突（如 gcc+clang、双 `python3.withPackages`）在这一层才会暴露。最后一步 `nix flake check` 构建仓库自有 checks：`shellcheck-scripts`（补全文件等 writeShellApplication 门之外脚本的静态检查）与 `roam-unit-tests`（`tests/` 的 roam.sh 纯函数单测 + 补全 harness）。它在 Gitee 同步之后运行，属于事后报警而非 push 前拦截；NixOS toplevel 与 aarch64 仍只做求值。按日期的验证记录见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
 ## 目录结构
 
@@ -232,6 +232,7 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 │   ├── standalone-darwin.nix   # macOS 入口
 │   └── nix-cn.nix              # Nix 镜像/缓存配置（列表与公钥单源于根 meta.json）
 ├── packages/cli-dev.nix        # 各入口共享的 CLI 软件列表
+├── tests/                      # 脚本级测试：roam.sh 纯函数单测 + 补全 harness（flake checks / CI）
 ├── bootstrap/
 │   ├── bootstrap.sh            # 统一入口：自动检测环境（OS / NixOS / 架构 / sudo）派发到下列脚本
 │   ├── linux.sh                # 全新普通 Linux / WSL 引导脚本（多用户 / 单用户两种安装模式）
