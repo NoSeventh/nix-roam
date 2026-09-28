@@ -281,10 +281,16 @@ ckr() {
 }
 out="$(ckr wsl nixos)"; rc=$?
 expect_rc 'check：多目标 rc=0' 0 "$rc"
-expect_eq 'check：多目标逐个求值（次序=输入次序）' "$(cat "$CHECK_LOG")" \
-  'eval --raw .#nixosConfigurations.wsl.config.system.build.toplevel.drvPath
-eval --raw .#nixosConfigurations.nixos.config.system.build.toplevel.drvPath'
+# 并行求值：nix 桩在后台子壳里竞争写日志，完成次序不定——排序比对
+expect_eq 'check：多目标都求值（并行次序不定，排序比对）' "$(sort "$CHECK_LOG")" \
+  'eval --raw .#nixosConfigurations.nixos.config.system.build.toplevel.drvPath
+eval --raw .#nixosConfigurations.wsl.config.system.build.toplevel.drvPath'
+# 汇报在全部完成后按输入次序打印（稳定可测），头行次序即输入次序
+expect_eq 'check：汇报次序=输入次序' "$(printf '%s\n' "$out" | grep '^roam check: 求值')" \
+  'roam check: 求值 .#nixosConfigurations.wsl.config.system.build.toplevel
+roam check: 求值 .#nixosConfigurations.nixos.config.system.build.toplevel'
 expect_sub 'check：多目标通过汇总行' "$out" '2 个目标全部通过'
+expect_sub 'check：多目标并行预告行' "$out" '并行求值 2 个目标'
 out="$(ckr wsl wsl)"; rc=$?
 expect_rc 'check：重复目标去重 rc=0' 0 "$rc"
 expect_eq 'check：重复目标只跑一次' "$(grep -c . "$CHECK_LOG" || true)" 1

@@ -28,9 +28,10 @@
 #                          CI 两层验证的本地等价物：默认 nix eval --raw 当前宿主目标的
 #                          drvPath（第一层）；--build 时 nix build --no-link（第二层）。
 #                          目标可显式指定多个：nixos / wsl / x86_64-linux / aarch64-linux /
-#                          aarch64-darwin（跨主机核对其它输出，仅求值语义）。多目标逐个
-#                          跑完再退出、rc 汇总（不在第一个失败处中断）——.githooks/
-#                          pre-push 的 push 前五输出求值门槛即本命令一条全量调用
+#                          aarch64-darwin（跨主机核对其它输出，仅求值语义）。多目标求值
+#                          并行跑、全部跑完才退出、按输入次序汇报、rc 汇总（不在第一个
+#                          失败处中断）——.githooks/pre-push 的 push 前五输出求值门槛即
+#                          本命令一条全量调用（该钩子先做差异门控，纯文档增量直接放行）
 #   roam update [输入名...|--all]
 #                          nix flake update + flake.lock 差异摘要；提交与切换保持手动。
 #                          缺省交互选择要更新的输入（回车/EOF=全部），显式输入名或
@@ -64,7 +65,8 @@ usage() {
                      验证目标：默认求值（nix eval --raw …drvPath，CI 第一层）；
                      --build 时构建（nix build --no-link，CI 第二层）。
                      目标：nixos wsl x86_64-linux aarch64-linux aarch64-darwin（缺省=当前宿主），
-                     可给多个依次执行（重复去重；任一失败 rc=1，但全部跑完）
+                     可给多个（重复去重）：求值并行、按输入次序汇报、全部跑完才退出
+                     （任一失败 rc=1）；--build 串行逐个构建
   update [输入名...|--all]
                      nix flake update 并显示 flake.lock 差异；提交与切换仍手动。
                      缺省时列出 flake 输入供选择：回车（或非交互 EOF）=全部；
@@ -676,7 +678,7 @@ check_attr() {
 }
 
 cmd_check() {
-  local build=false targets='' attrs='' t a rc=0 total=0
+  local build=false targets='' attrs='' t a rc=0 total=0 i cktmp
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --build) build=true ;;
@@ -703,19 +705,51 @@ cmd_check() {
     done
     attrs="${attrs# }"
   fi
-  # 多目标逐个跑完再退出：一次 push 前核对应看到全部失败，而非停在第一个
-  # shellcheck disable=SC2086
-  for a in $attrs; do
-    total=$((total + 1))
-    if [ "$build" = true ]; then
+  # 全部目标跑完再退出：一次 push 前核对应看到全部失败，而非停在第一个；汇报
+  # 按输入次序（并行完成次序不定，汇报次序必须稳定可测）。求值并行——各输出
+  # 相互独立且只读，墙钟≈最慢单个而非总和（实测收益见 VALIDATION.md 当日记录）；
+  # --build 保持串行——并发 nix build 各自按 max-jobs 展开构建进程，内存/CPU 会
+  # 成倍叠加，只读求值没有这个问题。
+  if [ "$build" = true ]; then
+    # shellcheck disable=SC2086
+    for a in $attrs; do
+      total=$((total + 1))
       printf 'roam check: 构建 .#%s\n' "$a"
       nix build --no-link ".#${a}" || rc=1
-    else
-      printf 'roam check: 求值 .#%s\n' "$a"
-      nix eval --raw ".#${a}.drvPath" || rc=1
-      printf '\n'
+    done
+  else
+    # 目标名均为经校验的标识符（无空格/通配），展开安全
+    # shellcheck disable=SC2086
+    set -- $attrs
+    total=$#
+    if [ "$total" -gt 1 ]; then
+      printf 'roam check: 并行求值 %s 个目标\n' "$total"
     fi
-  done
+    cktmp="$(mktemp -d)"
+    i=0
+    for a in "$@"; do
+      i=$((i + 1))
+      (
+        # 子壳双分支显式写 rc：nix 失败时若不接住，set -e 会在写 rc 前中止子壳
+        if nix eval --raw ".#${a}.drvPath" >"$cktmp/$i.out" 2>"$cktmp/$i.err"; then
+          printf '0\n' >"$cktmp/$i.rc"
+        else
+          printf '%s\n' "$?" >"$cktmp/$i.rc"
+        fi
+      ) &
+    done
+    wait
+    i=0
+    for a in "$@"; do
+      i=$((i + 1))
+      printf 'roam check: 求值 .#%s\n' "$a"
+      cat "$cktmp/$i.out"
+      if [ -s "$cktmp/$i.out" ]; then printf '\n'; fi
+      cat "$cktmp/$i.err" >&2
+      if [ "$(cat "$cktmp/$i.rc")" -ne 0 ]; then rc=1; fi
+    done
+    rm -rf "$cktmp"
+  fi
   if [ "$total" -gt 1 ]; then
     if [ "$rc" -eq 0 ]; then
       printf 'roam check: %s 个目标全部通过\n' "$total"
