@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 bootstrap 纳入 shellcheck 关卡 + 上批 flake check 结论更正（bootstrap/{linux,gc}.sh + tests/roam-functions.sh + flake.nix + AGENTS.md，Fedora 44 / WSL2 standalone，本机）
+
+改动：`bootstrap/*.sh` 纳入 `shellcheck-scripts` 关卡（flake.nix 命令行补入，AGENTS CI 段措辞同步）。两处告警均为 SC1091「无法跟随运行时才存在的 source 路径」的固有误报：linux.sh 原有豁免注解把代码写错（SC1090 ≠ SC1091，警告正是由 SC1091 报出），改对并注明理由；gc.sh 的 `/etc/os-release` 读取处新补同款豁免。
+
+更正（上一条记录的验证结论）：上批「`nix flake check` 全过」对**提交后的树**不成立——$BASH shebang 的 `printf` 单引号内字面 `$HM_STUB_FILE` 触发 SC2016（info 级），而我复验时用 `nix flake check | tail && echo OK` 取 rc，拿到的是 tail 的退出码——本文件 2026-09-28 早些时候刚记载过的同款教训（「验证命令的 rc 不得经管道取」）当场重犯。影响范围仅此一项：activationPackage 构建（writeShellApplication 门只查 roam.sh）与 roam-unit-tests（沙箱跑测试不跑 shellcheck）两结论不受影响；已激活的世代 id 33 其 roam.sh 文本不涉 SC2016，无需回滚处理。本批补 SC2016 豁免（字面量系 stub 本体需要，其运行期才展开）。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64）：`nix shell nixpkgs#shellcheck` 对 roam.sh / 补全 / tests/*.sh / bootstrap/*.sh 零告警；改动脚本 `bash -n` 过；`bash tests/run-all.sh` 48/48（rc 直取）；`nix flake check` rc=0（输出落临时文件、rc 不经管道——手法本身即本条教训的落实；该命令已含新 glob 的 shellcheck-scripts 沙箱构建）。
+
+未验证：CI 在本批提交上的运行（同上批：Gitee 同步后事后跑，eval.yml 变更需手动双推生效）；bootstrap 脚本行为未动（仅注释行），引导链路无需重跑。
+
 ## 2026-09-28 编辑残留清理 + roam 单测/补全 harness 进仓（packages/roam.{nix,sh} + tests/ + flake.nix + eval.yml，Fedora 44 / WSL2 standalone，本机）
 
 改动：两部分。①残留——roam.sh NixOS 分支的 nh 缺失提示改指 cli-dev 共享列表（原提示仍指向 2026-09-28 已退役的 `programs.nh.enable`，standalone 分支此前已改对）；flake.nix 删除 electron-41.9.1 近逐字重复的注释块（保留带探针验证细节与 nixos-base 指针的一份）；VALIDATION.md 复原 4e7a8af 条目失落的 `##` 标题行（与 git 历史逐字比对确认仅缺该行）。②测试基建——roam.sh 分发段加 `${BASH_SOURCE[0]} = $0` 执行守卫（source 加载不分发、直跑照旧），`system_generation_ids` 的 profile 目录可用 `ROAM_SYSTEM_PROFILES_DIR` 重定向；新增 `tests/`：roam-functions.sh（纯函数单测 29 例——meta_username 好坏样本、standalone_target 架构矩阵（uname 打桩、kernel 捕获期重 source）、nixos_output、load_hm_generations（PATH 注入假 home-manager 喂 fixture，含 rollback 同路径重复世代语义）、system_generation_ids（临时目录 + 噪声过滤）、choose_inputs（fixture flake.lock + stdin 管道，编号/名称/逗号混用/越界拒绝））+ completion-harness.sh（模拟 COMP_WORDS/COMP_CWORD 直调 `_roam` 19 例；世代号宿主相关只断言旗标，update 输入名读真 flake.lock 只做成员断言）+ run-all.sh 汇总 + fixtures/；flake 新增 `checks.{x86_64,aarch64}-linux`（显式两系统，不做 forAllSystems）：`shellcheck-scripts`（补全文件与 tests/*.sh 静态关卡——堵上 writeShellApplication 门外的洞）与 `roam-unit-tests`（`ROAM_TEST_REPO` 指向 store 副本跑 run-all）；CI eval.yml 加第三步 `nix flake check`。AGENTS/README/roam.nix 注释同步。

@@ -92,6 +92,7 @@ expect_eq 'nixos_output：FQDN 取短名' "$out" 'nixosConfigurations.wsl'
 # stub 的 shebang 取 $BASH（当前 bash 的绝对路径）：构建沙箱没有 /usr/bin/env，
 # 固定 #!/usr/bin/env bash 会让 stub 在 flake checks 里跑不起来（2026-09-28 实测）。
 STUBBIN="$(mktemp -d)"
+# shellcheck disable=SC2016  # 单引号里的 $HM_STUB_FILE 是刻意的：stub 本体需字面量、其运行期才展开
 printf '#!%s\ncat "$HM_STUB_FILE"\n' "$BASH" > "$STUBBIN/home-manager"
 chmod +x "$STUBBIN/home-manager"
 out="$(
