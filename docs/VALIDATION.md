@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 roam switch standalone 后端迁移至 nh home（packages/cli-dev.nix + profiles/nixos-base.nix + packages/roam.sh，Fedora 44 / WSL2 standalone，本机）
+
+改动：standalone 侧切换后端由 `home-manager switch --flake .#<系统>` 换为 `nh home switch --diff always --configuration <系统> .`（NixOS 侧 nh os 路径不变），双侧统一同一 nh 前端（nom 构建 + dix 世代差异）。nh 自 `profiles/nixos-base.nix` 的 `programs.nh.enable` 移入共享 `packages/cli-dev.nix` 单源（该模块除装包外无作用；四安装点同包，当前锁定 nixpkgs 为 nh 4.4.2）。语义边界（读 nh 4.4.2 上游源码确认）：nh home 不 exec home-manager CLI——自建 activationPackage 再直接跑其 `activate`，世代登记语义与 hm switch 相同，`roam status`/`rollback`/`doctor`（`home-manager generations` 枚举）不受影响；代价：HM news 不再显示、激活日志缺省隐藏（排障加 `--show-activation-logs`）。home-manager CLI 保留（bootstrap 安装位），`home-manager switch` 仍是有效手工回退/自举路径。
+
+实测纠偏一点（已固化进代码注释）：nh 4.4.2 把裸 `.#attr` 安装目标解析成 `packages.<system>.<attr>` 简写而非 homeConfigurations 属性——首跑 `roam switch` 即栽在此（nix 报 does not provide attribute 'packages.x86_64-linux.x86_64-linux'）；改用 `--configuration <系统名>` + 位置参数 `.` 后通过（nh 上游 master 已重写该解析，nixpkgs 升 nh 后需复验命令形式）。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64）：`bash -n`；五输出求值全过（含 darwin 输出确认 nh 在 darwin 求值无碍、nixos/wsl toplevel 在移除 programs.nh.enable 后求值通过）；activationPackage 构建真 rc=0（nh 4.4.2 与新 roam.drv 进闭包，roam.sh 过 ShellCheck 门）；实机激活三步——① `home-manager switch --flake .#x86_64-linux` 自举把 nh 装进 profile（顺带实证该路径显示的 "406 unread news items" 正是 nh 路径不再展示的输出）；② `nh home switch --diff always --configuration x86_64-linux .` 直跑真 rc=0（nom 构建、dix 差异 +3/-3 路径即修正版 roam.sh 的变化、激活落世代）；③ 安装后的 `roam switch` 入口真 rc=0（run_logged「完成」仅 rc=0 打印；dix 差异 0=树未再动、同内容重登记新世代号——与同日 rollback 条目同一已知语义）。终态 `roam status`=一致（运行世代 id 30 = 检出求值）、`roam info` 新目标行正确（nh 可用 / home-manager 标注为世代枚举用）、`roam doctor` 世代枚举正常（18 世代，最老 2026-09-17）。
+
+未验证：NixOS 侧（桌面/WSL）nh 经 cli-dev 列表落地（替代原 programs.nh.enable）——两 toplevel 求值通过，nh 随 profiles/cli.nix / modules/desktop/core.nix 必然进 systemPackages，实机激活留给该侧下次 `roam switch`（切换前后世代均另有 nh，无自举缺口）；darwin/aarch64 实机同前（桩级 / 仅求值）。
+
 ## 2026-09-28 roam 新增 status/doctor/rollback 与切换日志（packages/roam.sh，Fedora 44 / WSL2 standalone，本机）
 
 改动（借鉴 omarchy 的 version/debug 意识与日志习惯，映射到 Nix 语义）：`roam status` 漂移检测——检出求值（activationPackage/toplevel 的 outPath）对比运行世代（standalone 取 `home-manager generations` 的 `(current)` 世代、NixOS 取 `/run/current-system`），三态结论 一致 / 已回滚或检出已回退 / 漂移，附 git 提交与脏标记；`roam doctor` 只读体检（用户守卫、/nix 余量、世代数与最老年代、meta.json 的 substituters 逐个 curl 可达性、漂移、NixOS failed units），结果落 `~/.local/state/nix-roam/doctor-*.log`，仅 ✗ 致退出 1；`roam rollback [N|--list]` standalone 经 `<gen>/activate` 重激活旧世代（y/N 确认、--yes 跳过）、NixOS 走 `sudo nixos-rebuild --rollback / --switch-generation N`（nh 无回滚入口）；switch/rollback 全程 tee 到同目录 `switch-*.log`/`rollback-*.log`（与 bootstrap 链同源）。抽出 host_attr / compute_drift / run_logged / load_hm_generations 复用；解析只用 bash 内建与 sed/grep（目标机可能无 awk，与 gc.sh 同款约束）。
