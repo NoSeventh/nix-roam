@@ -14,7 +14,7 @@
 
 _roam()
 {
-    local cur prev sub i w list
+    local cur prev sub i w list n cgen l
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [ "$COMP_CWORD" -gt 0 ]; then
         prev="${COMP_WORDS[$((COMP_CWORD - 1))]}"
@@ -45,10 +45,25 @@ _roam()
                 return 0
                 ;;
             rollback)
-                # 世代号按宿主取（只读本地 profile，排除当前世代），失败静默为空
+                # 世代号按宿主取（只读本地 profile，排除当前世代），失败静默为空。
+                # NixOS 侧不走 nix-env --list-generations：它需取 profile 锁，
+                # 非 root 因 system.lock 无权限而列空；改为 glob profile 目录
+                # + 参数展开取号（目录与 system-N-link 链接全局可读，纯 bash
+                # 内建；当前世代以 system 链接目标为准）。2026-09-28 wsl 实测
+                # 纠偏：原 sed 锚 ^[0-9] 也永远不匹配（nix-env 输出前导空格）。
                 if [ -f /etc/NIXOS ]; then
-                    list="$(nix-env -p /nix/var/nix/profiles/system --list-generations 2>/dev/null \
-                        | grep -v 'current' | sed -n 's/^\([0-9][0-9]*\).*/\1/p' | tr '\n' ' ')"
+                    cgen="$(readlink /nix/var/nix/profiles/system 2>/dev/null)"
+                    cgen="${cgen##*/}"
+                    list=""
+                    for l in /nix/var/nix/profiles/system-*-link; do
+                        n="${l##*/system-}"
+                        n="${n%-link}"
+                        case "$n" in
+                            '' | *[!0-9]*) continue ;;
+                        esac
+                        [ "system-${n}-link" = "$cgen" ] && continue
+                        list="$list$n "
+                    done
                 elif command -v home-manager >/dev/null 2>&1; then
                     list="$(home-manager generations 2>/dev/null | grep -v '(current)' \
                         | sed -n 's/.* : id \([0-9][0-9]*\) ->.*/\1/p' | tr '\n' ' ')"

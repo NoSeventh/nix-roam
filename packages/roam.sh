@@ -187,6 +187,22 @@ EOF
   [ -n "$GEN_CURRENT" ] || return 1
 }
 
+# NixOS 系统世代号枚举（升序，每行一个；doctor 计数与 rollback --list 共用）。
+# 不走 nix-env --list-generations：它需取 profile 锁，非 root 因
+# /nix/var/nix/profiles/system.lock 无权限而列空（2026-09-28 wsl 实测）；
+# profiles 目录与各 system-N-link 链接全局可读，glob 直读即得。
+system_generation_ids() {
+  local l n
+  for l in /nix/var/nix/profiles/system-*-link; do
+    n="${l##*/system-}"
+    n="${n%-link}"
+    case "$n" in
+      '' | *[!0-9]*) continue ;;
+    esac
+    printf '%s\n' "$n"
+  done | sort -n
+}
+
 # 漂移检测核心（status 展示、doctor 复用）：检出求值 outPath vs 运行世代。
 # 填 DRIFT_EXPECTED / DRIFT_CURRENT / DRIFT_VERDICT，standalone 另附 DRIFT_DETAIL。
 compute_drift() {
@@ -333,7 +349,7 @@ cmd_doctor() {
 
   # 3. 世代健康（数量与最老年代，不做日期运算——macOS BSD date 无 -d）
   if is_nixos; then
-    gens="$(nix-env -p /nix/var/nix/profiles/system --list-generations 2>/dev/null | grep -c . || true)"
+    gens="$(system_generation_ids | grep -c . || true)"
     if [ -n "$gens" ] && [ "$gens" -gt 0 ]; then
       if [ "$gens" -gt 30 ]; then
         warn "系统世代 ${gens} 个（>30，建议 roam gc）"
@@ -399,7 +415,7 @@ cmd_doctor() {
 }
 
 cmd_rollback() {
-  local want='' list=false yes=false i target_idx total seg_cur seg_tgt log rc answer
+  local want='' list=false yes=false i target_idx total seg_cur seg_tgt log rc answer n d cur_link
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --list) list=true ;;
@@ -412,7 +428,19 @@ cmd_rollback() {
   done
   if is_nixos; then
     if [ "$list" = true ]; then
-      nix-env -p /nix/var/nix/profiles/system --list-generations 2>/dev/null || true
+      # 非 root 也能列（nix-env 需 profile 锁，见 system_generation_ids 注释）；
+      # 日期取链接自身 mtime（GNU stat 不跟随符号链接，与 nix-env 同源），
+      # 当前世代以 system 链接目标为准。
+      cur_link="$(readlink /nix/var/nix/profiles/system 2>/dev/null)"
+      system_generation_ids | while read -r n; do
+        d="$(stat -c '%y' "/nix/var/nix/profiles/system-${n}-link" 2>/dev/null)"
+        d="${d%%.*}"
+        if [ "system-${n}-link" = "${cur_link##*/}" ]; then
+          printf 'id %-4s %s  （当前）\n' "$n" "$d"
+        else
+          printf 'id %-4s %s\n' "$n" "$d"
+        fi
+      done
       return 0
     fi
     printf 'roam: NixOS 回滚走 nixos-rebuild（nh 无回滚入口；sudo 自行提权）\n'
