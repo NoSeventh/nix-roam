@@ -193,10 +193,22 @@ printf '#!%s\nprintf "%%s\\n" "$*" >> "$GC_LOG"\n' "$BASH" > "$STUBGC/nix-collec
 # shellcheck disable=SC2016  # 同上
 printf '#!%s\nprintf "sudo %%s\\n" "$*" >> "$GC_LOG"\n' "$BASH" > "$STUBGC/sudo"
 chmod +x "$STUBGC/nix-collect-garbage" "$STUBGC/sudo"
-gcr() { # 桩环境里跑 cmd_gc，调用记录落 GCLOG_FILE
+# is_nixos 桩：宿主探测必须固定，否则用例语义随真机漂移（在真 NixOS 上跑
+# standalone 断言会假失败——无旗标也自动 --system 调 sudo）
+gcr() { # standalone 语义跑 cmd_gc，调用记录落 GCLOG_FILE
   (
     PATH="$STUBGC:$PATH"
     export GC_LOG="$GCLOG_FILE"
+    is_nixos() { return 1; }
+    : >"$GC_LOG"
+    cmd_gc "$@"
+  )
+}
+gcr_nixos() { # NixOS 语义（自动 --system）：无旗标也须先用户后 sudo 系统侧
+  (
+    PATH="$STUBGC:$PATH"
+    export GC_LOG="$GCLOG_FILE"
+    is_nixos() { return 0; }
     : >"$GC_LOG"
     cmd_gc "$@"
   )
@@ -219,6 +231,13 @@ out="$(gcr --system)"; rc=$?
 expect_rc 'gc：--system rc=0' 0 "$rc"
 expect_contains 'gc：--system 用户侧先清' "$(head -n 1 "$GCLOG_FILE")" '--delete-older-than 14d'
 expect_contains 'gc：--system sudo 侧后清' "$(tail -n 1 "$GCLOG_FILE")" 'sudo -H --'
+out="$(gcr_nixos)"; rc=$?
+expect_rc 'gc：NixOS 无旗标 rc=0' 0 "$rc"
+expect_contains 'gc：NixOS 自动 --system：用户侧先清' "$(head -n 1 "$GCLOG_FILE")" '--delete-older-than 14d'
+expect_contains 'gc：NixOS 自动 --system：sudo 侧后清' "$(tail -n 1 "$GCLOG_FILE")" 'sudo -H --'
+out="$(gcr_nixos --dry-run)"; rc=$?
+expect_rc 'gc：NixOS dry-run rc=0' 0 "$rc"
+expect_eq 'gc：NixOS dry-run 不执行（含 sudo 侧）' "$(cat "$GCLOG_FILE")" ''
 out="$(gcr --help)"; rc=$?
 expect_rc 'gc：--help rc=0' 0 "$rc"
 expect_contains 'gc：--help 出用法' "$out" '用法：roam gc'

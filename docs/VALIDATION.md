@@ -8,6 +8,18 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 NixOS 侧复验 gc 折入 + gc 用例宿主漂移修复（tests/roam-functions.sh，NixOS-WSL 26.11 / wsl，本机）
+
+背景：gc 折入（200e441）的验证在 Fedora/WSL standalone 完成，上条记录留了「NixOS 分支的 gc（NixOS 自动 --system 的真机行为）——NixOS 侧下次顺手」未验证项；本次在 NixOS-WSL 主机上复验即补此层。
+
+发现：真机复跑 run-all 77 例中 1 例**假失败**——`gc：无 --system 不调 sudo` 隐含假设宿主非 NixOS：`cmd_gc` 经 `is_nixos()`（探测 `/etc/NIXOS`）在 NixOS 上自动 `system_gc=true`，桩 sudo 被真实调用。用例语义随运行宿主漂移，属测试缺陷非 roam 缺陷（roam.sh 侧行为完全符合设计）。
+
+修复：`gcr` 桩内固定 `is_nixos() { return 1; }`——既有 13 例钉死 standalone 语义，真机是 NixOS 也不再漂移（SC2329 豁免文件头已有）；新增 `gcr_nixos`（桩 return 0）3 例：NixOS 无旗标自动 --system（先用户后 `sudo -H --`）、NixOS dry-run 含 sudo 侧零执行——roam-functions 57 例，合计 82。
+
+验证（本机 NixOS-WSL 26.11 x86_64，主机 wsl，用户 xuqihao）：run-all 82/82；`nix flake check` rc=0（含 shellcheck-scripts 对改动文件 + store 副本单测）；真机 NixOS 侧 `bash packages/roam.sh gc --dry-run` 于**检出目录外**跑 rc=0——环境标签正确判 NixOS（is_nixos 优先于 is_wsl）、自动 --system 打出两段命令（用户侧先、`sudo -H --` 系统侧后）、gc_bin 经真 PATH 解析为 `/run/current-system/sw/bin/nix-collect-garbage`、dry-run 零执行。上条「NixOS 分支的 gc（真机 dry-run 层）」未验证项就此关闭。
+
+未验证：`--system` 真清理路径与 sudo 实际执行（破坏性操作，同前桩级覆盖为止）；macOS 侧（同前）；桌面机（hosts/nixos）实机——行为同 NixOS 分支，无独立代码路径。
+
 ## 2026-09-28 gc 折入 roam + 脚手架样例块检查（packages/roam.sh + tests/ + bootstrap/gc.sh 删除 + 六处文档，Fedora 44 / WSL2 standalone，本机）
 
 背景：`bootstrap/gc.sh` 是 day-2 运维工具混在 day-0 安装器里——P2 拆分时其文档已留在 AGENTS「Garbage collection」而非 docs/bootstrap.md（无意识承认非引导链），且它是唯一被闭包内 roam 依赖的 bootstrap 脚本，迫使 `roam gc` 这个机器操作要求检出目录；其自带宿主探测与 roam.sh 重复且不承重（安装脚本的重复有 curl 单文件刚需撑着，gc 没有）。
