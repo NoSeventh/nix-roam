@@ -9,6 +9,18 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-29 P1 pre-push 差异门控 + roam check 求值并行化（packages/roam.sh + .githooks/pre-push + tests/×3 + README/AGENTS/docs×2，Fedora 44 / WSL2 standalone，本机）
+
+背景：pre-push 五输出求值门槛每次 push 固定串行全量——实测基线 115s（暖缓存、干净树），纯文档提交同价；近 30 个提交里 13 个只动 docs/tests/bootstrap，对五个输出的求值结果零影响。nix eval 是树的纯函数，输入未变的重跑必同结果，跳过无风险；改 Nix 的推送则由并行化削墙钟。
+
+改动：①`cmd_check` 求值并行——各目标相互独立且只读，后台子壳并发求值、mktemp 暂存各自 out/err/rc、`wait` 全部完成后按输入次序汇报（完成次序不定，汇报次序必须稳定可测）、rc 汇总语义不变；`--build` 保持串行（并发 nix build 各自按 max-jobs 展开构建进程，内存/CPU 成倍叠加，只读求值无此成本）；子壳以 if/else 双分支显式写 rc 文件（set -e 下 nix 失败不接住会在落盘前中止子壳）。②pre-push 差异门控：钩子加 BASH_SOURCE 执行守卫（可 source 单测），`gate_needed` 读 pre-push stdin 协议（每行 `<local_ref> <local_sha> <remote_ref> <remote_sha>`）逐 ref 做端点 diff（求值只看推送后最终树，中间提交无关）匹配 `EVAL_INPUT_RE` 闭式清单（`*.nix`、`flake.lock`、`meta.json`、`packages/`、`dotfiles/`——后两者系被 Nix 路径字面量引用进 store 的非 Nix 文件；今后新增此类引用必须同步扩此清单，漏列=误放行）；删除推送（local 全零）放行，新分支（remote 全零）与 diff 失败（sha 缺失）保守跑全量（宁多跑勿漏跑）；全不命中打印说明放行，任一命中 exec 五输出并行求值。③测试：roam-functions 的 cmd_check 断言改次序无关（桩日志排序比对 + 汇报头行次序断言 + 并行预告行——后台子壳竞争写日志），73→75；新增 `tests/prepush-gate.sh` 18 例（git 函数桩 + stdin 协议注入；方向性断言：9 类求值输入命中拦下、近失名/纯文档放行、删除放行且不消费 diff、新分支与 sha 缺失保守拦下、空差异/空 stdin 放行、多 ref 任一命中即拦）；入 run-all → flake checks（shellcheck 关卡 `tests/*.sh` glob 自动覆盖新文件）。④文档同步：roam.sh 头注/usage、docs/roam.md（check 条目 + 测试段补 prepush-gate）、AGENTS.md（CI 段门控描述、目录树两行、双守卫提醒）、README 三处。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` 全过；shellcheck 零告警（`nix shell nixpkgs#shellcheck` 直跑全量改动脚本，沙箱侧另经 shellcheck-scripts 关卡）；run-all 123/123（roam-functions 75 + prepush-gate 18 新增 + 补全 19 + 脚手架 6 + repo-references 5）；钩子实机两路径——跳过路径（0742967→8f7ac9f，纯 docs/VALIDATION.md 增量）0.01s rc=0 打印放行说明；检查路径（b960794→0742967，含 packages/ 等）门控放行进入五输出并行求值 rc=0，逐目标输出/警告正确按目标归组、汇报次序=输入次序。计时：串行基线（改动前、暖缓存干净树）115s → 并行冷缓存（改动后、脏树）83s → 并行暖缓存 63s（-45%；余下受最慢单个求值支配——桌面 toplevel，Amdahl 上限；并发期 Nix 报 git-tree 输入锁等待与 eval-cache busy（ignored），均被正确处理）。`nix flake check` rc=0（shellcheck-scripts + roam-unit-tests 沙箱双确认）；activationPackage 构建 rc=0（roam.sh 过 writeShellApplication 门）；`git diff --check` 干净。
+
+过程教训两条：①新文件不 `git add -N` 就跑 flake check——git 类 flake 源不含未跟踪文件，沙箱里 run-all 找不到 tests/prepush-gate.sh 而失败，外显 signature 为「roam-unit-tests 失败 + shellcheck-scripts cancelled」（与既有老规矩同因，补记 signature 以便下次直接识别）；②验证命令勿把 `nix flake check` 管道接 `tail`——无 pipefail 时链上 rc 取自 tail，失败会被随后的 echo 假确认（首跑即如此，靠 ❓cancelled 线索识破后修正重跑）。
+
+未验证：真实 push 触发钩子（推送仍手动；本机 core.hooksPath 已启用，下次推送即实证——纯文档 push 应秒过、含 Nix 增量 push 应走并行五输出）；`--build` 多目标串行路径仅桩级验证（真构建闭包 6-8GB×多目标，不入验证预算）；macOS Bash 3.2 实机（并行子壳/裸 wait/mktemp 均为 3.2 兼容原语，按惯例待第二宿主跑过才算数）。
+
 ## 2026-09-29 P0 两项：旧名可取用 URL 清零入关卡 + roam check 多目标与 pre-push 门槛（bootstrap×4 + sync workflow + README/AGENTS/docs + packages/roam.sh + tests/ + flake.nix + .githooks/，Fedora 44 / WSL2 standalone，本机）
 
 背景：Gitee 仓库实已更名为 nix-roam（origin 即新名；旧名仓库页 302→新名、新名 raw/clone/archive URL 直连 200 均实测）——README/AGENTS「Gitee 路径仍为旧名」系改名前的过时表述。旧名只剩改名重定向撑着：重定向在旧名被他人注册后失效，届时一切仍指旧名的**可取用 URL**（curl|bash、clone、archive 回退、sync 拉源）会取到陌生人内容——供应链风险而非单纯断链。

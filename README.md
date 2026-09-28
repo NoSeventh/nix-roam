@@ -166,7 +166,7 @@ roam rollback          # 回滚上一内容世代（--list 查看，N 跳转；N
 roam gc --dry-run      # 清理旧世代与无引用路径（--older-than/--all/--system；无需检出目录）
 roam check             # 求值当前宿主目标（CI 第一层）；--build 时构建（CI 第二层）
 roam check wsl nixos   # 显式核对其它输出，可给多个：nixos / wsl / 三个系统名
-                       #（跨主机仅求值；多目标逐个跑完再退出，任一失败 rc=1）
+                       #（跨主机仅求值；多目标并行求值、全部跑完再退出，任一失败 rc=1）
 roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成。
                        # 可选输入：缺省交互列出（回车=全部），roam update nixpkgs nixvim 只更新指定项，--all 跳过交互
 roam info              # 只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
@@ -215,7 +215,7 @@ nix build --no-link .#nixosConfigurations.nixos.config.system.build.toplevel
 nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
 ```
 
-GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五条求值之外，还会实际构建 x86_64 standalone activation package——求值拦不住的 Home Manager buildEnv 冲突（如 gcc+clang、双 `python3.withPackages`）在这一层才会暴露。最后一步 `nix flake check` 构建仓库自有 checks：`shellcheck-scripts`（补全文件、tests/bootstrap 脚本与 git 钩子等 writeShellApplication 门之外脚本的静态检查）与 `roam-unit-tests`（`tests/` 的 roam.sh 纯函数单测 + 补全 harness + 脚手架样例块与旧名残留检查）。它在 Gitee 同步之后运行，属事后报警；push 前本地拦截可启用仓库内钩子（`git config core.hooksPath .githooks`——pre-push 五输出求值，等价 CI 第一层，见 [同步说明](.github/SYNC.md)）。NixOS toplevel 与 aarch64 仍只做求值。按日期的验证记录见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
+GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五条求值之外，还会实际构建 x86_64 standalone activation package——求值拦不住的 Home Manager buildEnv 冲突（如 gcc+clang、双 `python3.withPackages`）在这一层才会暴露。最后一步 `nix flake check` 构建仓库自有 checks：`shellcheck-scripts`（补全文件、tests/bootstrap 脚本与 git 钩子等 writeShellApplication 门之外脚本的静态检查）与 `roam-unit-tests`（`tests/` 的 roam.sh 纯函数单测 + 补全 harness + 脚手架样例块与旧名残留检查）。它在 Gitee 同步之后运行，属事后报警；push 前本地拦截可启用仓库内钩子（`git config core.hooksPath .githooks`——pre-push 先做差异门控：纯文档/脚本增量直接放行，碰到求值输入才跑五输出**并行**求值，等价 CI 第一层，见 [同步说明](.github/SYNC.md)）。NixOS toplevel 与 aarch64 仍只做求值。按日期的验证记录见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
 ## 目录结构
 
@@ -238,7 +238,7 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 │   └── nix-cn.nix              # Nix 镜像/缓存配置（列表与公钥单源于根 meta.json）
 ├── packages/cli-dev.nix        # 各入口共享的 CLI 软件列表
 ├── tests/                      # 脚本级测试：roam.sh 单测 + 补全 harness + 脚手架样例块/旧名残留检查（flake checks / CI）
-├── .githooks/                  # pre-push 钩子：五输出求值门槛（core.hooksPath 启用，见 .github/SYNC.md）
+├── .githooks/                  # pre-push 钩子：差异门控 + 五输出求值门槛（core.hooksPath 启用，见 .github/SYNC.md）
 ├── bootstrap/
 │   ├── bootstrap.sh            # 统一入口：自动检测环境（OS / NixOS / 架构 / sudo）派发到下列脚本
 │   ├── linux.sh                # 全新普通 Linux / WSL 引导脚本（多用户 / 单用户两种安装模式）
