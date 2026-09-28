@@ -30,7 +30,7 @@ jobs:
           git init --bare mirror.git
           for attempt in 1 2 3 4; do
             if git -C mirror.git -c protocol.version=1 fetch --no-tags \
-              https://gitee.com/qihaoxu/nixos-niri-noctalia.git \
+              https://gitee.com/qihaoxu/nix-roam.git \
               'refs/heads/*:refs/heads/*' 'refs/tags/*:refs/tags/*'; then
               exit 0
             fi

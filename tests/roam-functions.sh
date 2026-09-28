@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # roam.sh 纯函数单测 —— source 方式加载被测脚本（分发段经 BASH_SOURCE 执行守卫跳过）。
 # 覆盖最脆的解析点：home-manager generations 文本格式、profile 目录 glob、
-# meta.json 提取、choose_inputs 交互解析、standalone_target 架构分发。
+# meta.json 提取、choose_inputs 交互解析、standalone_target 架构分发、
+# cmd_check 多目标分发与失败汇总。
 # 打桩手段：PATH 注入假 home-manager（cat fixture）、ROAM_SYSTEM_PROFILES_DIR
 # 指向临时目录、source 前定义 uname 函数（kernel 在 source 期捕获）、stdin 管道。
 # 运行：检出内 bash tests/roam-functions.sh；或经 flake checks
@@ -248,6 +249,68 @@ for badargs in '--older-than 0d' '--older-than x' '--all --older-than 30d' '--ol
   expect_rc "gc：[$badargs] 须拒绝" 1 "$rc"
 done
 
-rm -rf "$STUBBIN" "$PROF" "$NIXSTUB" "$STUBGC" "$GCLOG_FILE"
+# --- cmd_check（多目标；nix 函数桩记录调用、失败按 FAIL_ATTR 注入；
+# cd 仓库根满足 repo_check。宿主探测钉死：is_nixos/uname 桩——缺省目标的
+# host_attr 走真实探测会随宿主漂移）---
+CHECK_LOG="$(mktemp)"
+FAIL_ATTR=''
+ckr() {
+  (
+    cd "$REPO" || exit 1
+    : >"$CHECK_LOG"
+    nix() {
+      printf '%s\n' "$*" >>"$CHECK_LOG"
+      # 失败注入仅在 FAIL_ATTR 非空时启用：空串作 case 模式等价 **（匹配一切），
+      # 曾使全部桩调用假失败（本批新增用例首跑实测）
+      if [ -n "$FAIL_ATTR" ]; then
+        case "$*" in
+          *"$FAIL_ATTR"*) return 4 ;;
+        esac
+      fi
+      return 0
+    }
+    is_nixos() { return 1; }
+    uname() {
+      case "$1" in
+        -m) printf '%s\n' x86_64 ;;
+        *) command uname "$@" ;;
+      esac
+    }
+    cmd_check "$@"
+  )
+}
+out="$(ckr wsl nixos)"; rc=$?
+expect_rc 'check：多目标 rc=0' 0 "$rc"
+expect_eq 'check：多目标逐个求值（次序=输入次序）' "$(cat "$CHECK_LOG")" \
+  'eval --raw .#nixosConfigurations.wsl.config.system.build.toplevel.drvPath
+eval --raw .#nixosConfigurations.nixos.config.system.build.toplevel.drvPath'
+expect_sub 'check：多目标通过汇总行' "$out" '2 个目标全部通过'
+out="$(ckr wsl wsl)"; rc=$?
+expect_rc 'check：重复目标去重 rc=0' 0 "$rc"
+expect_eq 'check：重复目标只跑一次' "$(grep -c . "$CHECK_LOG" || true)" 1
+expect_eq 'check：单目标不打汇总行' "$(printf '%s' "$out" | grep -c '个目标' || true)" 0
+out="$(ckr x86_64-linux --build)"; rc=$?
+expect_rc 'check：--build 可后置 rc=0' 0 "$rc"
+expect_eq 'check：--build 走构建命令' "$(cat "$CHECK_LOG")" \
+  'build --no-link .#homeConfigurations.x86_64-linux.activationPackage'
+out="$(ckr)"; rc=$?
+expect_rc 'check：缺省目标 rc=0（standalone 桩）' 0 "$rc"
+expect_contains 'check：缺省=当前宿主（x86_64-linux）' "$(cat "$CHECK_LOG")" \
+  'eval --raw .#homeConfigurations.x86_64-linux.activationPackage.drvPath'
+out="$(ckr bogus 2>/dev/null)"; rc=$?
+expect_rc 'check：未知目标须拒绝' 1 "$rc"
+errout="$(ckr bogus 2>&1)"
+expect_sub 'check：未知目标报错点名' "$errout" '未知目标：bogus'
+out="$(ckr --bogus 2>/dev/null)"; rc=$?
+expect_rc 'check：未知选项须拒绝' 1 "$rc"
+FAIL_ATTR='nixosConfigurations.wsl'
+out="$(ckr wsl nixos 2>/dev/null)"; rc=$?
+expect_rc 'check：任一目标失败 rc=1' 1 "$rc"
+expect_eq 'check：失败不中断，两目标都跑' "$(grep -c . "$CHECK_LOG" || true)" 2
+errout="$(ckr wsl nixos 2>&1)"
+expect_sub 'check：失败汇总行' "$errout" '存在失败目标'
+FAIL_ATTR=''
+
+rm -rf "$STUBBIN" "$PROF" "$NIXSTUB" "$STUBGC" "$GCLOG_FILE" "$CHECK_LOG"
 printf 'roam-functions: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

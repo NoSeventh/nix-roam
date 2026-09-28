@@ -143,8 +143,10 @@
         };
 
       # 仓库自有脚本关卡（nix flake check；CI eval.yml 第三层）：
-      #   shellcheck-scripts —— 补全文件等不经 writeShellApplication 门的脚本静态检查
-      #   roam-unit-tests   —— tests/ 单测（roam.sh 纯函数 source 加载 + 补全 harness）
+      #   shellcheck-scripts —— 补全文件、tests/bootstrap 脚本与 git 钩子等不经
+      #                         writeShellApplication 门的脚本静态检查
+      #   roam-unit-tests   —— tests/ 单测（roam.sh 纯函数 source 加载 + 补全 harness +
+      #                         脚手架样例块与旧名残留检查）
       # 两个 Linux 系统显式输出（与 standalone 输出同款惯例，不做 forAllSystems 展开）；
       # darwin 不提供——tests 只依赖 bash/jq/shellcheck，两侧行为无差。
       scriptChecks =
@@ -156,7 +158,8 @@
             cd ${self.outPath}
             # packages/roam.sh 另有 writeShellApplication 构建期门，此处重复纳入：
             # nix flake check 单独跑时也能拦住它（双重覆盖，非冗余失误）
-            shellcheck packages/roam.sh packages/roam-completion.bash tests/*.sh bootstrap/*.sh || exit 1
+            # .githooks/pre-push 无 .sh 后缀，显式列出
+            shellcheck packages/roam.sh packages/roam-completion.bash tests/*.sh bootstrap/*.sh .githooks/pre-push || exit 1
             touch $out
           '';
           roam-unit-tests = pkgs'.runCommand "roam-unit-tests" {

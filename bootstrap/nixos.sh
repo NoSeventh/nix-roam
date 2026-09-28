@@ -239,7 +239,7 @@ else
     mv "$CLONE_DIR" "${CLONE_DIR}.bak-${TS}"
     echo "    已备份原有配置：${CLONE_DIR} -> ${CLONE_DIR}.bak-${TS}"
   fi
-  git clone https://gitee.com/qihaoxu/nixos-niri-noctalia.git "$CLONE_DIR"
+  git clone https://gitee.com/qihaoxu/nix-roam.git "$CLONE_DIR"
 fi
 
 # 目标用户名从仓库单点定义读取（meta.json 的 username），
