@@ -28,6 +28,18 @@ expect_eq() { # 描述 got want
 expect_rc() { # 描述 期望rc 实际rc
   if [ "$3" = "$2" ]; then ok "$1"; else bad "$1：rc=$3 want $2"; fi
 }
+expect_contains() { # 描述 haystack needle（空格定界——补全/旗标列表用）
+  case " $2 " in
+    *" $3 "*) ok "$1" ;;
+    *) bad "$1：[$2] 不含 [$3]" ;;
+  esac
+}
+expect_sub() { # 描述 haystack needle（无边界子串——路径内匹配用）
+  case "$2" in
+    *"$3"*) ok "$1" ;;
+    *) bad "$1：[$2] 不含 [$3]" ;;
+  esac
+}
 
 # 加载被测函数；roam.sh 的 set -euo pipefail 会带上，断言逐条显式判 rc，关掉 errexit。
 # shellcheck source=/dev/null
@@ -173,6 +185,50 @@ expect_rc 'choose_inputs：越界编号须拒绝' 1 "$rc"
 sel="$(choose 'bogus' 2>/dev/null)"; rc=$?
 expect_rc 'choose_inputs：未知输入名须拒绝' 1 "$rc"
 
-rm -rf "$STUBBIN" "$PROF" "$NIXSTUB"
+# --- cmd_gc（假 nix-collect-garbage / sudo 经 PATH 打桩，调用参数落 GC_LOG）---
+STUBGC="$(mktemp -d)"
+GCLOG_FILE="$(mktemp)"
+# shellcheck disable=SC2016  # 单引号内 $* / $GC_LOG 系刻意字面量：stub 本体运行期展开
+printf '#!%s\nprintf "%%s\\n" "$*" >> "$GC_LOG"\n' "$BASH" > "$STUBGC/nix-collect-garbage"
+# shellcheck disable=SC2016  # 同上
+printf '#!%s\nprintf "sudo %%s\\n" "$*" >> "$GC_LOG"\n' "$BASH" > "$STUBGC/sudo"
+chmod +x "$STUBGC/nix-collect-garbage" "$STUBGC/sudo"
+gcr() { # 桩环境里跑 cmd_gc，调用记录落 GCLOG_FILE
+  (
+    PATH="$STUBGC:$PATH"
+    export GC_LOG="$GCLOG_FILE"
+    : >"$GC_LOG"
+    cmd_gc "$@"
+  )
+}
+out="$(gcr --dry-run)"; rc=$?
+expect_rc 'gc：--dry-run rc=0' 0 "$rc"
+expect_sub 'gc：dry-run 打印命令（gc_bin 为桩路径）' "$out" 'nix-collect-garbage --delete-older-than 14d'
+expect_eq 'gc：dry-run 不执行' "$(cat "$GCLOG_FILE")" ''
+out="$(gcr)"; rc=$?
+expect_rc 'gc：缺省 rc=0' 0 "$rc"
+expect_contains 'gc：缺省 14d 用户侧' "$(cat "$GCLOG_FILE")" '--delete-older-than 14d'
+expect_eq 'gc：无 --system 不调 sudo' "$(grep -c sudo "$GCLOG_FILE" || true)" '0'
+out="$(gcr --older-than 30d)"; rc=$?
+expect_rc 'gc：--older-than 30d rc=0' 0 "$rc"
+expect_contains 'gc：期限透传' "$(cat "$GCLOG_FILE")" '--delete-older-than 30d'
+out="$(gcr --all)"; rc=$?
+expect_rc 'gc：--all rc=0' 0 "$rc"
+expect_contains 'gc：--all → --delete-old' "$(cat "$GCLOG_FILE")" --delete-old
+out="$(gcr --system)"; rc=$?
+expect_rc 'gc：--system rc=0' 0 "$rc"
+expect_contains 'gc：--system 用户侧先清' "$(head -n 1 "$GCLOG_FILE")" '--delete-older-than 14d'
+expect_contains 'gc：--system sudo 侧后清' "$(tail -n 1 "$GCLOG_FILE")" 'sudo -H --'
+out="$(gcr --help)"; rc=$?
+expect_rc 'gc：--help rc=0' 0 "$rc"
+expect_contains 'gc：--help 出用法' "$out" '用法：roam gc'
+# 拒绝路径（参数组刻意经词切分展开）
+# shellcheck disable=SC2086
+for badargs in '--older-than 0d' '--older-than x' '--all --older-than 30d' '--older-than' '--bogus'; do
+  out="$(gcr $badargs 2>/dev/null)"; rc=$?
+  expect_rc "gc：[$badargs] 须拒绝" 1 "$rc"
+done
+
+rm -rf "$STUBBIN" "$PROF" "$NIXSTUB" "$STUBGC" "$GCLOG_FILE"
 printf 'roam-functions: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -8,8 +8,8 @@
 #
 # 注意：本文件不经过 writeShellApplication 的 bash -n + shellcheck 门，
 # 静态检查由 flake checks 的 shellcheck-scripts 关卡覆盖（nix flake check / CI
-# eval.yml 第三层）。子命令/旗标清单与 packages/roam.sh 的 case 分发、
-# bootstrap/gc.sh 的参数保持同步（人工维护——补全内容本身无自动同步）。
+# eval.yml 第三层）。子命令/旗标清单与 packages/roam.sh 的 case 分发及 gc 旗标
+# 保持同步（人工维护——补全内容本身无自动同步）。
 # 只用 bash 内建 + compgen/completion；不依赖 _init_completion 等
 # bash-completion 内部助手（跨版本名不稳），macOS Bash 3.2 兼容。
 

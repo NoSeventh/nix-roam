@@ -101,7 +101,6 @@ bootstrap/bootstrap.sh       # Unified auto-detecting entry (OS / NixOS / arch /
 bootstrap/linux.sh         # Seven-step installer for standalone Linux/WSL (multi-user or single-user Nix install)
 bootstrap/darwin.sh        # macOS counterpart (Apple Silicon only)
 bootstrap/nixos.sh         # NixOS bootstrap: install (live ISO) / adopt (running system or NixOS-WSL)
-bootstrap/gc.sh            # Manual GC with host detection and dry-run
 dotfiles/                  # Raw config files, referenced via ../dotfiles from home/ and modules/
 docs/                      # Mechanism & history pages split out of this file: roam.md (switching system), mirrors.md (China caches), bootstrap.md (install chains), VALIDATION.md (dated verification records)
 AGENTS.md                  # Maintained architecture and operating conventions
@@ -264,7 +263,7 @@ Use `home.sessionVariables.NPM_CONFIG_REGISTRY` and the Bash `npmr` alias, rathe
 
 ## Garbage collection
 
-`bootstrap/gc.sh` defaults to deleting generations older than 14 days; `--older-than Nd` changes retention, `--all` removes all non-current generations, and `--dry-run` only prints commands. Run as the normal user: it cleans the user first and uses sudo for NixOS system generations; standalone/macOS require `--system` for root/system cleanup. Referenced store paths remain; deleted generations lose rollback availability. The script does not refresh boot menus. Automatic GC (weekly `--delete-older-than 2w` + daily optimise + weekly user-generation cleanup) is configured on every NixOS host — desktop and WSL — through `profiles/nixos-base.nix` since 2026-09-26; gc.sh stays the on-demand tool and remains the only option on standalone/macOS.
+`roam gc` (folded in from the former `bootstrap/gc.sh` on 2026-09-28, the file deleted since — GC is a machine operation, not repo-touching, so it needs no checkout; direct-run equivalent `bash packages/roam.sh gc`) defaults to deleting generations older than 14 days; `--older-than Nd` changes retention, `--all` removes all non-current generations, and `--dry-run` only prints commands. Run as the normal user: it cleans the user first and uses sudo for system generations (automatic `--system` on NixOS); standalone/macOS require explicit `--system` for root/system cleanup. Referenced store paths remain; deleted generations lose rollback availability. gc does not refresh boot menus. Automatic GC (weekly `--delete-older-than 2w` + daily optimise + weekly user-generation cleanup) is configured on every NixOS host — desktop and WSL — through `profiles/nixos-base.nix` since 2026-09-26; `roam gc` stays the on-demand tool and remains the only option on standalone/macOS.
 
 ## Repository hosting and synchronization
 

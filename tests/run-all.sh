@@ -7,6 +7,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 RC=0
 bash "$DIR/roam-functions.sh" || RC=1
 bash "$DIR/completion-harness.sh" || RC=1
+bash "$DIR/scaffold-blocks.sh" || RC=1
 if [ "$RC" -eq 0 ]; then
   printf 'run-all: ALL PASS\n'
 else

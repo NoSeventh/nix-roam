@@ -163,7 +163,7 @@ roam switch            # 按宿主切换：NixOS → nh os switch --diff always 
 roam status            # 漂移检测：检出求值 vs 运行世代（一致/已回滚/漂移），附 git 状态
 roam doctor            # 只读体检：磁盘/世代/镜像可达/守卫/漂移/失败单元；结果落日志
 roam rollback          # 回滚上一内容世代（--list 查看，N 跳转；NixOS 走 nixos-rebuild）
-roam gc --dry-run      # 透传 bootstrap/gc.sh
+roam gc --dry-run      # 清理旧世代与无引用路径（--older-than/--all/--system；无需检出目录）
 roam check             # 求值当前宿主目标（CI 第一层）；--build 时构建（CI 第二层）
 roam check wsl         # 显式核对其它输出：nixos / wsl / 三个系统名（跨主机仅求值）
 roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成。
@@ -173,14 +173,16 @@ roam info              # 只读打印宿主探测结论（NixOS/standalone、架
 
 `roam` 自带 bash 补全，随包装进四个安装点：子命令（`roam <TAB>`）、`check` 的目标名与 `--build`、`update` 的 flake 输入名（实时读 `flake.lock`）、`rollback` 的世代号与旗标、`gc` 的旗标。bash-completion（≥2.12）按 `XDG_DATA_DIRS` 自动懒加载，无需额外配置；`switch`/`status`/`doctor`/`info` 无自有参数，不做补全。
 
-手动垃圾回收（自动识别 NixOS、普通 Linux / WSL 和 macOS）：
+手动垃圾回收（自动识别 NixOS、普通 Linux / WSL 和 macOS；无需在检出目录）：
 
 ```bash
-bash bootstrap/gc.sh --dry-run        # 仅预览命令，不执行清理
-bash bootstrap/gc.sh                  # 清理超过 14 天的旧世代及无引用的包
-bash bootstrap/gc.sh --older-than 30d # 改为保留最近 30 天
-bash bootstrap/gc.sh --all            # 清理全部非当前世代，失去这些世代的回滚能力
+roam gc --dry-run        # 仅预览命令，不执行清理
+roam gc                  # 清理超过 14 天的旧世代及无引用的包
+roam gc --older-than 30d # 改为保留最近 30 天
+roam gc --all            # 清理全部非当前世代，失去这些世代的回滚能力
 ```
+
+（未安装 roam 的机器等价直跑 `bash packages/roam.sh gc …`，需检出。2026-09-28 起 gc 并入 roam，原独立脚本 `bootstrap/gc.sh` 已删除。）
 
 以普通用户运行即可：NixOS 会先清理用户环境，再通过 sudo 清理系统旧世代；普通 Linux / WSL 和 macOS 默认只清理用户环境，需要清理系统/root 世代（例如 nix-darwin）时加 `--system`。当前环境及其他 GC 根引用的包不会被删除；脚本不刷新引导菜单。NixOS 主机（桌面与 WSL）自 2026-09-26 起由 `profiles/nixos-base.nix` 自带自动 GC（每周清理超两周的系统世代、每日 optimise、每周清理用户世代）；本脚本用于按需手动清理，standalone / macOS 仍仅手动。
 

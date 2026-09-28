@@ -16,7 +16,7 @@ On NixOS, `roam switch` additionally **preflights that convention** before dispa
 
 ## nh 双侧后端
 
-Switching goes through nh on **both** fronts (since 2026-09-28; the standalone side previously called `home-manager switch` directly): `nh os switch --diff always .` on NixOS, `nh home switch --diff always --configuration <system> .` on standalone. nh ships via the shared `packages/cli-dev.nix` list to all four install sites, and the former `programs.nh.enable` in `profiles/nixos-base.nix` was retired in favor of that single source (the module did nothing beyond installing the package; still deliberately no `programs.nh.flake`, which would hardcode a checkout path — `roam switch` passes the cwd-relative `.` instead — and no `nh clean`, GC stays with `bootstrap/gc.sh`).
+Switching goes through nh on **both** fronts (since 2026-09-28; the standalone side previously called `home-manager switch` directly): `nh os switch --diff always .` on NixOS, `nh home switch --diff always --configuration <system> .` on standalone. nh ships via the shared `packages/cli-dev.nix` list to all four install sites, and the former `programs.nh.enable` in `profiles/nixos-base.nix` was retired in favor of that single source (the module did nothing beyond installing the package; still deliberately no `programs.nh.flake`, which would hardcode a checkout path — `roam switch` passes the cwd-relative `.` instead — and no `nh clean`, GC stays with `roam gc`).
 
 nh handles privilege elevation itself (no `sudo` prefix in the command) and prints a dix package diff between generations after each switch (nh 4.x's diff engine; older nh used nvd).
 
@@ -33,14 +33,14 @@ nh home semantics (read against nh 4.4.2 upstream source): nh home builds the `a
 ## 子命令语义速查
 
 - `roam doctor` runs read-only health checks (user guard, `/nix` free space, generation count + oldest, substituter reachability from `meta.json` via curl, drift, failed systemd units on NixOS), logs to the state dir and exits 1 only on ✗.
-- `roam gc` passes through to `bootstrap/gc.sh`.
+- `roam gc [flags]` is the on-demand garbage collector, folded in from the former `bootstrap/gc.sh` on 2026-09-28 (file deleted): user generations first, then system via sudo (`--system`, automatic on NixOS); `--older-than Nd` (default 14d), `--all`, `--dry-run` (print only). A machine operation — no checkout required. It does not refresh boot menus and does not touch the automatic GC configured on NixOS hosts.
 - `roam check [--build] [target]` reproduces CI's two layers locally — `nix eval --raw` of the host target's drvPath by default, `nix build --no-link` with `--build` — with explicit targets `nixos`/`wsl`/`x86_64-linux`/`aarch64-linux`/`aarch64-darwin` for cross-checking foreign outputs (cross-arch stays eval-only; builds need real hardware).
 - `roam update [input...|--all]` lists the inputs locked in `flake.lock` (jq) for an interactive pick — Enter/EOF means all (default), numbers and names mix freely — while explicit input names or `--all` skip the prompt and update only the chosen inputs via `nix flake update <input>...`; it prints the `flake.lock` diff but never commits or switches.
 - `roam info` prints the host detection read-only.
 
 ## 补全机制
 
-The completion is lazy-loaded by bash-completion (≥2.12) from `$XDG_DATA_DIRS`'s `bash-completion/completions/` — HM injects `~/.nix-profile/share` into `XDG_DATA_DIRS` on standalone and NixOS links `/share/bash-completion` into the system profile by default (`environment.pathsToLink`), so both fronts need no extra wiring. The subcommand/flag lists are kept in sync with `packages/roam.sh`'s dispatch and `bootstrap/gc.sh`'s arguments by hand (see the completion file's header).
+The completion is lazy-loaded by bash-completion (≥2.12) from `$XDG_DATA_DIRS`'s `bash-completion/completions/` — HM injects `~/.nix-profile/share` into `XDG_DATA_DIRS` on standalone and NixOS links `/share/bash-completion` into the system profile by default (`environment.pathsToLink`), so both fronts need no extra wiring. The subcommand/flag lists are kept in sync with `packages/roam.sh`'s dispatch and the `gc` flags by hand (see the completion file's header).
 
 ## NixOS-WSL 切换可靠性（stc exit 4 的两个来源）
 
