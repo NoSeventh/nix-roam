@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 roam 新增 status/doctor/rollback 与切换日志（packages/roam.sh，Fedora 44 / WSL2 standalone，本机）
+
+改动（借鉴 omarchy 的 version/debug 意识与日志习惯，映射到 Nix 语义）：`roam status` 漂移检测——检出求值（activationPackage/toplevel 的 outPath）对比运行世代（standalone 取 `home-manager generations` 的 `(current)` 世代、NixOS 取 `/run/current-system`），三态结论 一致 / 已回滚或检出已回退 / 漂移，附 git 提交与脏标记；`roam doctor` 只读体检（用户守卫、/nix 余量、世代数与最老年代、meta.json 的 substituters 逐个 curl 可达性、漂移、NixOS failed units），结果落 `~/.local/state/nix-roam/doctor-*.log`，仅 ✗ 致退出 1；`roam rollback [N|--list]` standalone 经 `<gen>/activate` 重激活旧世代（y/N 确认、--yes 跳过）、NixOS 走 `sudo nixos-rebuild --rollback / --switch-generation N`（nh 无回滚入口）；switch/rollback 全程 tee 到同目录 `switch-*.log`/`rollback-*.log`（与 bootstrap 链同源）。抽出 host_attr / compute_drift / run_logged / load_hm_generations 复用；解析只用 bash 内建与 sed/grep（目标机可能无 awk，与 gc.sh 同款约束）。
+
+实测纠偏两点（已固化进代码注释）：① HM 的 `activate` 会把旧内容登记为**新世代号**（回滚到 id 21 的内容后出现同 store 路径的 id 23），因此「已回滚」判定必须比对任一历史世代而非仅最新一条，且缺省回滚目标须跳过与当前同路径的重复世代；② doctor 文案避免与 verdict 自带的「漂移」前缀重复。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64）：`nix shell nixpkgs#shellcheck` 零告警（含修掉 3 处 SC2004 样式级，writeShellApplication 对任何级别都会失败）+ `bash -n`；status 三态实测——漂移（改 roam.sh 未切）、已回滚或检出已回退（代码保持不动：switch → rollback → status 正确引用历史世代 id）、一致（终态）；doctor 全项通过（922G 余量、9 世代最老 2026-09-17、六镜像 HTTP 200/301/302 全可达、漂移以 ! 提醒不致败）且日志落盘；rollback 实测 y 确认回滚（旧内容登记为新 id）、EOF 取消 rc=0、--list 表格带 (current) 标记；switch 日志含头（date/cmd）与全输出；五输出求值全过 + activationPackage 构建 + 最终 switch 均真 rc=0，终态 status=一致。
+
+未验证：NixOS 侧 status（`/run/current-system` 对比）、doctor 的 systemd 段、rollback 的 nixos-rebuild 路径——均需 NixOS 实机（该侧下次 `roam switch` 后顺手各跑一次即可补齐）；macOS 桩级同前。
+
 ## 2026-09-28 移除 hms/nrs 切换别名，roam switch 成为唯一切换入口（home/common.nix + 全仓引用清理，Fedora 44 / WSL2 standalone，本机）
 
 前置：删除门槛由两条实机验证闭合——roam switch 的 standalone 分支（本机 2026-09-27/28 两次激活）与 NixOS 分支（NixOS-WSL 26.11 实机真 rc=0，含系统级安装位首覆，见上一条记录）。`hms` 为 standalone-only（NixOS 从未注入）、`nrs` 为 NixOS-only，替代命令串逐字一致，别名此时只剩肌肉记忆短写价值。
