@@ -76,6 +76,10 @@ with pkgs; [
   (pkgs.callPackage ./roam.nix { })
 
   # --- Nix 工具 ---
+  # nh：roam switch 双侧重建前端（NixOS → nh os、standalone → nh home），四安装点
+  # 同包保证各宿主行为一致（nom 已随 wrapper 进 PATH）。NixOS 侧原 programs.nh.enable
+  # 已退役改由此列表单源（该模块除装包外无额外作用）。
+  nh
   nil
   nixpkgs-fmt
 

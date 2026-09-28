@@ -4,8 +4,12 @@
 # 与 bootstrap/bootstrap.sh 同款宿主探测约定（入口级重复在本仓库是刻意允许的）：
 # /etc/NIXOS 存在 → NixOS；否则 standalone Home Manager。
 #   roam switch [args...]  NixOS → nh os switch --diff always .（WSL 下失败时打印
-#                          stc-exit-4 补救提示）；standalone → home-manager switch
-#                          .#<系统名输出>（按求值平台选输出 + meta.json 用户守卫）。
+#                          stc-exit-4 补救提示）；standalone → nh home switch
+#                          --diff always --configuration <系统名输出> .（按求值平台
+#                          选输出 + meta.json 用户守卫；nh 自建 activationPackage
+#                          再跑 activate —— 世代登记语义与 home-manager switch 相同，
+#                          但不显示 HM news、激活日志缺省隐藏，排障时加
+#                          --show-activation-logs）。
 #                          两条路径全程 tee 到状态目录日志（与 bootstrap 链同惯例）。
 #   roam status            漂移检测：检出求值（activationPackage/toplevel 的 outPath）
 #                          对比运行世代（standalone 取 (current) 世代、NixOS 取
@@ -41,8 +45,8 @@ usage() {
 用法：roam <子命令> [参数]（本仓库统一 CLI；除 rollback 外需在仓库检出目录下运行）
 
   switch [args...]   按宿主切换：NixOS → nh os switch --diff always .
-                     standalone → home-manager switch .#<系统输出>（含用户守卫）；
-                     全程落日志到 ~/.local/state/nix-roam/switch-*.log
+                     standalone → nh home switch --diff always --configuration <系统输出> .
+                     （含用户守卫）；全程落日志到 ~/.local/state/nix-roam/switch-*.log
   status             漂移检测：检出求值 vs 运行世代（一致/已回滚/漂移），附 git 提交
   doctor             只读体检：磁盘/世代/镜像可达/用户守卫/漂移/NixOS 失败单元；
                      写 doctor-*.log，存在 ✗ 时退出码 1
@@ -246,9 +250,12 @@ cmd_switch() {
   [ "$(id -un)" = "$u" ] \
     || die "当前用户是 $(id -un)，不是 $u；拒绝切换（本地用户名在 meta.json 单点定义）"
   target="$(standalone_target)"
-  command -v home-manager >/dev/null 2>&1 \
-    || die "未找到 home-manager（standalone 激活后应位于 ~/.nix-profile/bin）"
-  if run_logged switch home-manager switch --flake ".#${target}" "$@"; then
+  command -v nh >/dev/null 2>&1 \
+    || die "未找到 nh（standalone 侧由 packages/cli-dev.nix 提供；首次进入闭包前可先 home-manager switch --flake .#${target} 自举一次）"
+  # nh 4.4.2 把裸 .#attr 解析成 packages.<system>.<attr> 简写而非 homeConfigurations
+  # 属性，须用 --configuration 显式点名 + 位置参数 . 传 flake（nh 上游 master 已改，
+  # 以锁定 nixpkgs 的实际行为为准）。
+  if run_logged switch nh home switch --diff always --configuration "$target" . "$@"; then
     return 0
   else
     rc=$?
@@ -654,12 +661,17 @@ cmd_info() {
     fi
   else
     target="$(standalone_target)"
-    printf 'switch 目标 : home-manager switch --flake .#%s\n' "$target"
+    printf 'switch 目标 : nh home switch --diff always --configuration %s .\n' "$target"
     printf 'check 目标  : homeConfigurations.%s.activationPackage\n' "$target"
-    if command -v home-manager >/dev/null 2>&1; then
-      printf 'home-manager: 可用\n'
+    if command -v nh >/dev/null 2>&1; then
+      printf 'nh          : 可用\n'
     else
-      printf 'home-manager: 缺失（switch 将拒绝）\n'
+      printf 'nh          : 缺失（switch 将拒绝；由 packages/cli-dev.nix 提供）\n'
+    fi
+    if command -v home-manager >/dev/null 2>&1; then
+      printf 'home-manager: 可用（status/rollback 世代枚举用）\n'
+    else
+      printf 'home-manager: 缺失（status/rollback 世代枚举将不可用；由 bootstrap 安装）\n'
     fi
   fi
   printf '检出目录    : %s\n' "$PWD"
