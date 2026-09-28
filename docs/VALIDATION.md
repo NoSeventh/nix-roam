@@ -8,6 +8,14 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 文档拆分 P2：机制细节出 AGENTS/README 落 docs/ 三页（docs/{roam,mirrors,bootstrap}.md + AGENTS.md + README.md，纯文档改动）
+
+改动：结构原则 = README 用法 / AGENTS.md 规则 / docs/ 原因与机制。新增 `docs/roam.md`（roam 打包与安装位、宿主探测与用户守卫、nh 双侧后端语义、世代/漂移/回滚、子命令速查、补全机制、WSL stc-exit-4 两来源、测试与沙箱发现）——吞 AGENTS.md「Build & activate commands」的切换长段与「NixOS-WSL」的 getty-mask/linger 两段；`docs/mirrors.md`（CERNET 聚合器、substituter 单源、rainbow-delimiters 事件、cachix 公钥归属、npm registry、bootstrap 写入机制、已死镜像考古）——吞 AGENTS.md「China mirrors」整节与 README 注意事项的镜像长注；`docs/bootstrap.md`（统一入口、linux.sh 七步与两种安装模式/建号交互/wsl.conf 合并、darwin.sh、nixos.sh install/adopt）——吞 AGENTS.md 引导节四条巨弹。AGENTS.md 对应位置改短规则 + 链接（保留的规则含：无切换别名、检出目录约束、目录名=hostname=输出名、镜像单源与公钥归属、bootstrap 写入机制两侧同步、flake inputs 不指向死镜像、BASH_SOURCE 守卫勿删）；README 镜像注压缩为结论 + 手工补缓存命令块（用户侧操作保留）+ 链接，roam/bootstrap 两处加 docs 指针；两处目录树改 docs/ 行。措辞以机械搬运为主，仅连接句与标题新写。
+
+验证：纯文档标准——逐文件相对链接解析 16/16 全通（README×6 / AGENTS×5 / 三 docs 页×5，含跨目录 `../AGENTS.md`）；孤儿引用检查（sysadminctl / wsl_conf_merge / LwCD 等被移短语在 AGENTS.md 与 README 正文零残留，仅存于新页与 VALIDATION 历史记录）；`git diff --check` 干净。无 Nix 求值影响（docs 不进任何闭包；shellcheck-scripts 与 roam-unit-tests 的输入文件未动）。
+
+未验证：无（文档 pass，无重建/激活项）。
+
 ## 2026-09-28 bootstrap 纳入 shellcheck 关卡 + 上批 flake check 结论更正（bootstrap/{linux,gc}.sh + tests/roam-functions.sh + flake.nix + AGENTS.md，Fedora 44 / WSL2 standalone，本机）
 
 改动：`bootstrap/*.sh` 纳入 `shellcheck-scripts` 关卡（flake.nix 命令行补入，AGENTS CI 段措辞同步）。两处告警均为 SC1091「无法跟随运行时才存在的 source 路径」的固有误报：linux.sh 原有豁免注解把代码写错（SC1090 ≠ SC1091，警告正是由 SC1091 报出），改对并注明理由；gc.sh 的 `/etc/os-release` 读取处新补同款豁免。
