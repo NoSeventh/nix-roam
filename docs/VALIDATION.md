@@ -8,6 +8,16 @@
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-28 编辑残留清理 + roam 单测/补全 harness 进仓（packages/roam.{nix,sh} + tests/ + flake.nix + eval.yml，Fedora 44 / WSL2 standalone，本机）
+
+改动：两部分。①残留——roam.sh NixOS 分支的 nh 缺失提示改指 cli-dev 共享列表（原提示仍指向 2026-09-28 已退役的 `programs.nh.enable`，standalone 分支此前已改对）；flake.nix 删除 electron-41.9.1 近逐字重复的注释块（保留带探针验证细节与 nixos-base 指针的一份）；VALIDATION.md 复原 4e7a8af 条目失落的 `##` 标题行（与 git 历史逐字比对确认仅缺该行）。②测试基建——roam.sh 分发段加 `${BASH_SOURCE[0]} = $0` 执行守卫（source 加载不分发、直跑照旧），`system_generation_ids` 的 profile 目录可用 `ROAM_SYSTEM_PROFILES_DIR` 重定向；新增 `tests/`：roam-functions.sh（纯函数单测 29 例——meta_username 好坏样本、standalone_target 架构矩阵（uname 打桩、kernel 捕获期重 source）、nixos_output、load_hm_generations（PATH 注入假 home-manager 喂 fixture，含 rollback 同路径重复世代语义）、system_generation_ids（临时目录 + 噪声过滤）、choose_inputs（fixture flake.lock + stdin 管道，编号/名称/逗号混用/越界拒绝））+ completion-harness.sh（模拟 COMP_WORDS/COMP_CWORD 直调 `_roam` 19 例；世代号宿主相关只断言旗标，update 输入名读真 flake.lock 只做成员断言）+ run-all.sh 汇总 + fixtures/；flake 新增 `checks.{x86_64,aarch64}-linux`（显式两系统，不做 forAllSystems）：`shellcheck-scripts`（补全文件与 tests/*.sh 静态关卡——堵上 writeShellApplication 门外的洞）与 `roam-unit-tests`（`ROAM_TEST_REPO` 指向 store 副本跑 run-all）；CI eval.yml 加第三步 `nix flake check`。AGENTS/README/roam.nix 注释同步。
+
+沙箱实测发现两条（已固化进代码注释）：①构建沙箱 PATH 上的 `bash` 是 stdenv 极简构建（无 progcomp，`compgen` 不可用；沙箱外同一锁定 rev 的 bash-interactive 正常）——roam-unit-tests 的 nativeBuildInputs 须带 `bashInteractive`；②沙箱无 `/usr/bin/env`，stub 脚本 shebang 以 `$BASH` 绝对路径生成，固定 `#!/usr/bin/env bash` 在 flake checks 里跑不起来。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：编辑文件 `bash -n` / `nix-instantiate --parse` 全过；`nix shell nixpkgs#shellcheck` 对 roam.sh / 补全 / tests 三脚本零告警（tests 的 SC2030/2031/2329 系打桩固有误报，文件级豁免并注明理由）；`bash tests/run-all.sh` 48/48 全过（本地，函数单测 29 + 补全 19）；五输出求值全过，`checks.aarch64-linux` 两 check 亦求值过；`nix build .#checks.x86_64-linux.shellcheck-scripts` 与 `.#checks.x86_64-linux.roam-unit-tests` 沙箱构建真 rc=0（后者即补全 harness 在沙箱内 19/19）；`nix flake check` 全过；activationPackage 构建真 rc=0（双 roam.drv 过 writeShellApplication 门，1499 路径 +512 字节）；`bash packages/roam.sh info` / `switch` 实机直跑（执行守卫未破坏直跑分发），switch 真 rc=0 落世代 id 33、switch-*.log 带头部、补全文件随新包落位 `~/.nix-profile/share/bash-completion/completions/roam`；`~/.nix-profile/bin/roam status` 终态一致；`git diff --check` 干净。
+
+未验证：CI 在本批提交上的运行（Gitee 同步后事后跑；且 eval.yml 属 workflow 文件，需本机凭据手动双推 Gitee 与 GitHub 后新步骤才生效——GITHUB_TOKEN 推不动）；补全 harness 与真实 TAB 键的等价性（与既往同界，模拟 COMP_WORDS/COMP_CWORD）；bootstrap/*.sh 未纳入 shellcheck-scripts（实测存量 5 处告警，纳入前需先清零，另行一批）；NixOS 侧（桌面/WSL）安装位本次未激活——roam.sh 文本变化已进其闭包，下次该侧 `roam switch` 生效。
+
 ## 2026-09-28 NixOS 侧 roam 四项遗留实测 + 世代号读取纠偏（packages/roam.sh + packages/roam-completion.bash，NixOS-WSL 26.11 x86_64，本机 wsl）
 
 复验范围：前四条「未验证」清单的 NixOS 部分——补全实机效果（559861a）、nh 经 cli-dev 落系统安装位（b779f51）、status/doctor/rollback 的 NixOS 路径（fb20037）、nrs/hms 在新 bashrc 消失（8a989c7）。
@@ -74,7 +84,7 @@
 
 未验证：安装后二进制的成功更新路径未在真实仓库跑（会动真锁文件）；同一脚本文本已在 /tmp 副本以 `bash packages/roam.sh` 全覆盖，包装差异仅 PATH。NixOS 分支（nh 路径）仍无实机；darwin 桩级。
 
-
+## 2026-09-27 roam 统一 CLI（packages/roam.{nix,sh} + packages/cli-dev.nix，Fedora 44 / WSL2 standalone，本机）
 
 改动：新增仓库自有统一 CLI `roam`——`packages/roam.sh`（脚本本体，macOS Bash 3.2 兼容）经 `packages/roam.nix`（writeShellApplication，构建期 bash -n + ShellCheck 门）打包，挂入 `packages/cli-dev.nix` 共享列表进入全部四个安装点。子命令按 `/etc/NIXOS` 探测分发（与 bootstrap/bootstrap.sh 同款约定，入口级重复系本仓库刻意允许）：`switch`（NixOS → `nh os switch --diff always .`，命令串与 nrs 逐字一致，WSL 下失败打印 stc-exit-4 补救提示；standalone → hms 同款逻辑：按求值平台选系统名输出 + meta.json 用户守卫）；`gc` 原样透传 `bootstrap/gc.sh`；`check [--build] [目标]` 复现 CI 两层验证（默认 `nix eval --raw …drvPath`，`--build` 时 `nix build --no-link`；目标可显式 nixos / wsl / x86_64-linux / aarch64-linux / aarch64-darwin，缺省为当前宿主）；`update`（`nix flake update` + flake.lock 差异摘要，不提交不切换）；`info` 只读打印探测结论。不带 runtimeInputs（闭包零新增依赖；nh / home-manager 缺失由脚本按子命令检测并给出出处指引）。AGENTS.md（别名段 + 目录树）与 README「更新与验证」段同步。
 
