@@ -123,7 +123,7 @@ Fast path: run `sudo bash bootstrap/nixos.sh adopt --target <hostname>` on the m
 
 1. Copy `hosts/_template/` to `hosts/<hostname>/` and replace `__HOSTNAME__`. The convention is directory name = `networking.hostName` = output attribute name (so `roam switch`/`nh` auto-match by hostname). Keep `profiles/desktop.nix` for a full desktop, `profiles/desktop-lite.nix` for the decided light composition (core + dev + office + flatpak + browsers + agents; no media/proxy/gaming/virtualization/mnt/fallback DEs), compose `nixos-base.nix` + selected `modules/desktop/` tiers for anything in between, or `nixos-base.nix` + `cli.nix` for CLI-only; import one `profiles/hardware/*.nix` GPU/VM profile if the machine needs it.
 2. Fill `variables.nix` knobs (`timeZone`, optional `gpuBusIDs`) and provide a real `hardware-configuration.nix` — the install chain regenerates it, adopting an existing system means copying that machine's current file in.
-3. Add the `nixosConfigurations.<hostname>` output in `flake.nix` pointing at `./hosts/<hostname>` (copy the desktop or WSL block as appropriate; the scaffold prints both variants).
+3. Add the `nixosConfigurations.<hostname>` output in `flake.nix` pointing at `./hosts/<hostname>` (copy the desktop or WSL block as appropriate; the scaffold prints both variants) — and keep `(hostnameGuard "<hostname>")` in the modules list (the scaffold-printed blocks carry it): the dir = hostName = output-attr convention is asserted at build time and preflighted by `roam switch` before dispatching to nh.
 4. If the host needs a different HM user profile, pass a different module to `nixosHome`.
 5. Build without activating via `nix build --no-link .#nixosConfigurations.<hostname>.config.system.build.toplevel` before the first `switch`; preserve that host's original `system.stateVersion` when adopting an existing system.
 
@@ -234,6 +234,7 @@ Hard-won — read the header comments in `packages/cli-dev.nix` before editing t
 - Don't uncomment the `noctalia`/`dms`/`quickshell` inputs — those packages now come from nixpkgs unstable (`chaotic` removed).
 - The local username and the Nix cache list/key live in one place: the repo-root `meta.json` (`username`, `substituters`, `nixCommunityCachixKey`), read by `flake.nix`/`home/nix-cn.nix`/`modules/fix-network.nix` (fromJSON) and every bootstrap script (sed on a format we own, fail-loud). Everything else (`users.users.*`, `home-manager.users.*`, the `roam switch`/bootstrap user guards, bootstrap password setup) derives from or reads that value; standalone flake outputs are named by system (`x86_64-linux` / `aarch64-linux` / `aarch64-darwin`) and are username-independent — don't reintroduce hardcoded local usernames, cache lists or silent fallbacks. Remote identities (IHEP/JUNO accounts, git email) in `home/common.nix` are separate.
 - Adding an EOL exception → inspect **both** `flake.nix` and `profiles/nixos-base.nix` and update the affected nixpkgs instances; their current lists differ.
+- Every `nixosConfigurations` output includes `(hostnameGuard "<attr>")` — the hosts/<dir> = `networking.hostName` = output-attr convention is build-asserted and preflighted by `roam switch` on NixOS.
 
 ## NixOS-WSL
 

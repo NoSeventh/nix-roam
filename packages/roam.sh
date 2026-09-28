@@ -114,6 +114,20 @@ nixos_output() {
   printf 'nixosConfigurations.%s' "${h%%.*}"
 }
 
+# NixOS 分支切换预检：以一次轻求值换取指向约定的干净报错（错配时 nix/nh 的原始
+# 属性缺失信息难懂）。求值失败 = 无对应输出；值不等 = 配置内 hostName 与输出名
+# 脱节——flake.nix 的 hostnameGuard 断言在 toplevel 求值期也会拦（checkAssertWarn
+# throw），预检的价值是更早一步、报错直接给出约定与修法。
+nixos_preflight() {
+  local short cfg
+  short="$(uname -n)"
+  short="${short%%.*}"
+  cfg="$(nix eval --raw ".#nixosConfigurations.${short}.config.networking.hostName")" \
+    || die "hostname ${short} 无对应 flake 输出 nixosConfigurations.${short}（约定：hosts/ 目录名 = networking.hostName = 输出属性名；新主机经 bootstrap/nixos.sh adopt --target <名> 脚手架，见 README「NixOS 全新安装与迁移」）"
+  [ "$cfg" = "$short" ] \
+    || die "nixosConfigurations.${short} 内 networking.hostName=${cfg}，与输出属性名不一致（同一约定；改 hosts/${short}/default.nix 或输出名，两侧对齐）"
+}
+
 # 当前宿主的 flake 属性路径（check/status/doctor 共用）
 host_attr() {
   if is_nixos; then
@@ -253,6 +267,7 @@ cmd_switch() {
   if is_nixos; then
     command -v nh >/dev/null 2>&1 \
       || die "未找到 nh（NixOS 侧经 packages/cli-dev.nix 共享列表落系统位；首次进入闭包前可先 sudo nixos-rebuild switch --flake .#<主机名> 自举一次）"
+    nixos_preflight
     if run_logged switch nh os switch --diff always . "$@"; then
       return 0
     else

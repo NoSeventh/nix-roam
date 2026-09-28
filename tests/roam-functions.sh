@@ -88,6 +88,28 @@ out="$(
 )"
 expect_eq 'nixos_output：FQDN 取短名' "$out" 'nixosConfigurations.wsl'
 
+# --- nixos_preflight（nix 命令 PATH 打桩 + uname -n 函数打桩；短名=wsl）---
+NIXSTUB="$(mktemp -d)"
+# shellcheck disable=SC2016  # 单引号内 ${NIX_STUB_*} 系刻意字面量：stub 本体运行期展开
+printf '#!%s\n[ -n "${NIX_STUB_FAIL:-}" ] && exit 1\nprintf "%%s\\n" "${NIX_STUB_HOSTNAME:-wsl}"\n' "$BASH" > "$NIXSTUB/nix"
+chmod +x "$NIXSTUB/nix"
+pfp() { # $1=假 nix 返回的 hostName；$2=fail 时让 nix 桩失败（模拟无对应输出）
+  (
+    PATH="$NIXSTUB:$PATH"
+    export NIX_STUB_HOSTNAME="$1" NIX_STUB_FAIL="${2:-}"
+    uname() {
+      [ "$1" = -n ] && printf 'wsl.example.com\n' || printf 'stub\n'
+    }
+    nixos_preflight
+  )
+}
+out="$(pfp wsl)"; rc=$?
+expect_rc 'nixos_preflight：输出存在且 hostName 一致 rc=0' 0 "$rc"
+out="$(pfp whatever fail 2>/dev/null)"; rc=$?
+expect_rc 'nixos_preflight：无对应输出须拒绝' 1 "$rc"
+out="$(pfp otherbox 2>/dev/null)"; rc=$?
+expect_rc 'nixos_preflight：hostName 与输出名不一致须拒绝' 1 "$rc"
+
 # --- load_hm_generations（home-manager generations 文本解析；PATH 注入假命令）---
 # stub 的 shebang 取 $BASH（当前 bash 的绝对路径）：构建沙箱没有 /usr/bin/env，
 # 固定 #!/usr/bin/env bash 会让 stub 在 flake checks 里跑不起来（2026-09-28 实测）。
@@ -151,6 +173,6 @@ expect_rc 'choose_inputs：越界编号须拒绝' 1 "$rc"
 sel="$(choose 'bogus' 2>/dev/null)"; rc=$?
 expect_rc 'choose_inputs：未知输入名须拒绝' 1 "$rc"
 
-rm -rf "$STUBBIN" "$PROF"
+rm -rf "$STUBBIN" "$PROF" "$NIXSTUB"
 printf 'roam-functions: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

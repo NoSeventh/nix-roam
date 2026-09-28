@@ -281,6 +281,7 @@ EOF
           ./hosts/__HOSTNAME__
           home-manager.nixosModules.home-manager
           inputs.hermes-agent.nixosModules.default
+          (hostnameGuard "__HOSTNAME__")
           (nixosHome ./home/default.nix)
         ];
       };
@@ -296,6 +297,7 @@ EOF
         modules = [
           ./hosts/__HOSTNAME__
           home-manager.nixosModules.home-manager
+          (hostnameGuard "__HOSTNAME__")
           (nixosHome ./home/nixos-cli.nix)
         ];
       };

@@ -101,6 +101,21 @@
         };
       };
 
+      # 主机名约定守卫：目录名 = networking.hostName = 输出属性名（roam switch 的
+      # nh 后端按 hostname 选输出，依赖此约定）。错配原先只在切换时撞出一条难懂的
+      # 属性缺失；NixOS 的 checkAssertWarn 在 toplevel 求值期即 throw——nix eval
+      # drvPath / CI 第一层 / 任何构建切换全都会拦（2026-09-28 /tmp 负例实测）。
+      # roam switch 另有 nixos_preflight 预检（见 packages/roam.sh）：求值更轻、
+      # 报错直接指向约定。脚手架（bootstrap/nixos.sh）打印的样例块自带本守卫。
+      hostnameGuard = hostName: { config, ... }: {
+        assertions = [
+          {
+            assertion = config.networking.hostName == hostName;
+            message = "nixosConfigurations.${hostName}: networking.hostName = \"${config.networking.hostName}\", expected \"${hostName}\" (convention: hosts/<dir> = hostName = flake output attr name — fix the host entry or the output name)";
+          }
+        ];
+      };
+
       # 构造 standalone home-manager 配置（非 NixOS）
       mkStandaloneHome = {
         system,
@@ -169,6 +184,7 @@
           ./hosts/nixos
           home-manager.nixosModules.home-manager
           inputs.hermes-agent.nixosModules.default
+          (hostnameGuard "nixos")
           (nixosHome ./home/default.nix)
         ];
       };
@@ -185,6 +201,7 @@
           inputs.nixos-wsl.nixosModules.default
           ./hosts/wsl
           home-manager.nixosModules.home-manager
+          (hostnameGuard "wsl")
           (nixosHome ./home/nixos-cli.nix)
         ];
       };
