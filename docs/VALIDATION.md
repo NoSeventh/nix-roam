@@ -9,6 +9,18 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-29 P0 两项：旧名可取用 URL 清零入关卡 + roam check 多目标与 pre-push 门槛（bootstrap×4 + sync workflow + README/AGENTS/docs + packages/roam.sh + tests/ + flake.nix + .githooks/，Fedora 44 / WSL2 standalone，本机）
+
+背景：Gitee 仓库实已更名为 nix-roam（origin 即新名；旧名仓库页 302→新名、新名 raw/clone/archive URL 直连 200 均实测）——README/AGENTS「Gitee 路径仍为旧名」系改名前的过时表述。旧名只剩改名重定向撑着：重定向在旧名被他人注册后失效，届时一切仍指旧名的**可取用 URL**（curl|bash、clone、archive 回退、sync 拉源）会取到陌生人内容——供应链风险而非单纯断链。
+
+改动：①13 处可取用旧名 URL 全换新名（README raw×4/clone×2/远程激活×1、bootstrap 四脚本 raw 头注×3/clone×4/archive×3、sync workflow 拉源×1）；README/AGENTS 过时语句改写为新名事实 + 既有检出 `git remote set-url` 建议；顺带修 README 目录树两处陈旧（已删 gc.sh、缺 hosts/_template）。bootstrap 四脚本「既有检出识别」的裸名 alternation（`grep -qE '旧名|nix-roam'`）**刻意保留**——识别旧名时代克隆的 remote，删掉会使旧检出被当异物重克隆。②新增 `tests/repo-references.sh`：跟踪文件零「可取用 URL 形式」（`gitee.com/qihaoxu/<旧名>`——raw/.git/archive/仓库页四前缀共有的域名+路径段）；裸名仅放行 alternation（计数钉死 4 处防「顺手清理」）与 VALIDATION 历史记录；含清单自检（非空≥50/含 README）防空转通过；入 run-all → flake checks → CI 第三层。③`roam check` 多目标：目标可给多个（解析期经 check_attr 校验+去重、保首现次序），逐个跑完再退出、rc 汇总（不在第一个失败处中断——push 前核对应看到全部断点）；`check_attr` 助手与 `host_attr` 分工（显式目标 vs 当前宿主）；usage/头注释/docs/roam.md 同步。④`.githooks/pre-push`：`git config core.hooksPath .githooks` 一次性启用（本机配置不随提交同步，每台推送机各自启用）；钩子 cd 到仓库根后一条 `roam check` 五输出全量求值，任一失败拦下 push，`--no-verify` 跳过一次；只求值不构建（6-8GB 闭包不进 push 路径）。入 shellcheck-scripts 关卡（无 .sh 后缀，显式列出）；.github/SYNC.md 补启用说明；README/AGENTS 的 CI 段由「无 push 前拦截」改为「钩子可选前移第一层」。
+
+过程教训一条：cmd_check 桩的失败注入首跑 5 例假失败——`FAIL_ATTR` 空串作 case 模式等价 `**`（匹配一切），全部 nix 桩调用被注入 rc=4；桩加非空守卫后全绿。空串模式匹配一切属 shell case 语义盲区，已记入用例注释。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` 全过；shellcheck 零告警（roam.sh/补全/tests/bootstrap/钩子——即关卡新命令行全量）；run-all 103/103（roam-functions 73 + 补全 19 + 脚手架 6 + repo-references 5；rc 直取）；**负例**：/tmp 副本（git archive HEAD + 注入一条旧名 URL）→ repo-references FAIL rc=1（顺带把 HEAD 存量旧名 URL 七文件全数点名，检出能力双重确认）；实机 `bash packages/roam.sh check wsl nixos` rc=0（次序正确+汇总行）、`check bogus` / `check --bogus` rc=1；钩子实机自 docs/ 子目录执行（样例 ref 行 stdin）rc=0——五输出求值全过即本批五输出 drvPath 验证（roam.sh 文本变更随含它闭包的 drvPath 移动）；`nix flake check` rc=0（shellcheck-scripts 含新钩子文件、roam-unit-tests 含新关卡——沙箱层双确认；两新文件先 `git add -N`，老规矩）；activationPackage 构建 rc=0（改动 roam.sh 过 writeShellApplication 门）；`git diff --check` 干净；README/AGENTS→.github/SYNC.md、docs/roam.md 链接目标存在。
+
+未验证：真实 push 触发钩子（推送仍手动；本机已启用 core.hooksPath，下次推送即实证，异常则记新条）；CI 实跑（同前，Gitee 同步后事后层）；macOS / aarch64 实机（同前）；Gitee 旧名重定向失效场景（外部依赖不可制造——关卡+文档已把暴露面收敛到 4 处 alternation 与历史记录）。
+
 ## 2026-09-28 NixOS 侧 roam switch 实机首跑——预检/安装位/断言三项遗留关闭（检出 ≥b9c3cea 的 roam 变更实机激活，NixOS-WSL 26.11 x86_64，主机 wsl；记录自用户实跑输出转记）
 
 范围：NixOS-WSL 主机对含 hostname 预检（a1401d0）与 gc 折入（200e441）的检出执行 `roam switch`。实跑 rc=0（run_logged 的「完成」仅在 rc=0 打印）：19 个派生构建、12 路径经 NJU 镜像替换、激活与 bootloader 登记完成、全程无 stc exit 4（getty mask 与 linger 在位——闭包可见 `unit-console-getty.service-disabled`）；dix 差异 2110→2110 路径（+12/-12、+4.69 KiB，与 standalone 侧同批切换同幅 = 同一 roam 包内容）；`ShellCheck-0.11.0` 被取入构建环境——writeShellApplication 门在 NixOS 侧真实执行（三个 roam.drv：文本装配 + 检查 + symlinkJoin 外壳）。
