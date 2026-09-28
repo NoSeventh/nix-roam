@@ -158,6 +158,9 @@ home-manager switch --flake .#aarch64-darwin
 ```bash
 roam switch            # 按宿主切换：NixOS → nh（os switch --diff always .），standalone →
                        # home-manager switch .#<系统输出>（含 meta.json 用户守卫）
+roam status            # 漂移检测：检出求值 vs 运行世代（一致/已回滚/漂移），附 git 状态
+roam doctor            # 只读体检：磁盘/世代/镜像可达/守卫/漂移/失败单元；结果落日志
+roam rollback          # 回滚上一内容世代（--list 查看，N 跳转；NixOS 走 nixos-rebuild）
 roam gc --dry-run      # 透传 bootstrap/gc.sh
 roam check             # 求值当前宿主目标（CI 第一层）；--build 时构建（CI 第二层）
 roam check wsl         # 显式核对其它输出：nixos / wsl / 三个系统名（跨主机仅求值）
