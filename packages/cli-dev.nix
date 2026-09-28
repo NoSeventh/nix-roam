@@ -71,7 +71,8 @@ with pkgs; [
   pi-coding-agent
 
   # --- 本仓库自有工具 ---
-  # roam 统一 CLI（switch/gc/check/update/info，按宿主分发；实现见 packages/roam.sh）。
+  # roam 统一 CLI（switch/status/doctor/rollback/gc/check/update/info，按宿主分发；
+  # 实现见 packages/roam.sh；包内经 symlinkJoin 附 bash 补全文件，见 roam.nix）。
   # 放共享列表使四个安装点都有它；纯 bash + 各点本就有的环境工具，闭包无新增依赖。
   (pkgs.callPackage ./roam.nix { })
 

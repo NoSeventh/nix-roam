@@ -170,6 +170,8 @@ roam update            # nix flake update + flake.lock 差异；提交与切换�
 roam info              # 只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
 ```
 
+`roam` 自带 bash 补全，随包装进四个安装点：子命令（`roam <TAB>`）、`check` 的目标名与 `--build`、`update` 的 flake 输入名（实时读 `flake.lock`）、`rollback` 的世代号与旗标、`gc` 的旗标。bash-completion（≥2.12）按 `XDG_DATA_DIRS` 自动懒加载，无需额外配置；`switch`/`status`/`doctor`/`info` 无自有参数，不做补全。
+
 手动垃圾回收（自动识别 NixOS、普通 Linux / WSL 和 macOS）：
 
 ```bash
