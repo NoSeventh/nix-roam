@@ -3,11 +3,16 @@
 # BASH_SOURCE 执行守卫跳过，与 roam-functions.sh 加载 roam.sh 同款），打桩 git
 # 函数后向 gate_needed 管道注入模拟 stdin（pre-push 协议：每行
 # <local_ref> <local_sha> <remote_ref> <remote_sha>）。
-# 门控的方向性是断言重点：命中任一求值输入 → rc 0（拦下检查）；纯文档增量 /
-# 删除推送 → rc 1（放行）；新分支与 sha 缺失 → rc 0（保守跑全量，宁多跑勿漏跑）。
+# 门控的方向性是断言重点（2026-09-29 起黑名单形式）：增量含清单外任一文件——
+# *.nix、flake.lock、meta.json、packages/、dotfiles/，及未知路径（含目录导入内
+# 非 .nix 文件、新增根文件）—— → rc 0（拦下检查）；增量全为已知非输入
+# （docs/tests/bootstrap/.github/.githooks 与根 README/AGENTS/LICENSE/.gitignore）
+# → rc 1（放行）；新分支与 sha 缺失 → rc 0（保守跑全量，宁多跑勿漏跑）。
 # git 桩：gate 只应调 git diff --name-only <remote> <local>；按场景导出
 # GIT_STUB_DIFF（多行差异清单，空串=空差异）与 GIT_STUB_BAD_SHA（命中该 remote
 # sha 时模拟本地缺失，rc 128）；桩收到其它 git 调用一律失败点名，防语义漂移。
+# 文件尾部另有静态审计：.nix 不得引用 EVAL_SKIP_RE 清单内路径（flake.nix 对
+# tests/ 的 checks 引用除外）——黑名单与 Nix 引用交叉时此处先红。
 # 运行：检出内 bash tests/prepush-gate.sh；或经 flake checks（ROAM_TEST_REPO）。
 set -u
 
@@ -50,28 +55,38 @@ Z='0000000000000000000000000000000000000000'
 line() { printf 'refs/heads/master %s refs/heads/master %s' "$1" "$2"; }
 g() { printf '%s\n' "$1" | gate_needed; }
 
-# --- 命中求值输入 → 拦下（rc 0）---
+# --- 清单外文件 → 拦下（rc 0）：显式输入、未知路径、目录导入内非 .nix 文件 ---
 for hit in 'home/common.nix' 'modules/desktop/core.nix' \
   'hosts/nixos/hardware-configuration.nix' 'flake.lock' 'meta.json' \
   'packages/roam.sh' 'packages/roam-completion.bash' \
-  'dotfiles/kitty/kitty.conf' 'README.md
+  'dotfiles/kitty/kitty.conf' \
+  'hosts/nixos/notes.txt' 'data.json' 'README.md
 flake.nix'; do
   GIT_STUB_DIFF="$hit"
   g "$(line "$L" "$R")"; rc=$?
-  expect_rc "gate：命中求值输入须拦下（${hit%%$'\n'*}）" 0 "$rc"
+  expect_rc "gate：清单外文件须拦下（${hit%%$'\n'*}）" 0 "$rc"
 done
 
-# --- 近失名与纯文档/脚本增量 → 放行（rc 1）---
+# --- 未知/近失路径 → 保守拦下（rc 0）：黑名单语义，认不出的就是输入 ---
 GIT_STUB_DIFF='mypackages/x
 dotfiles-extra/y
-docs/dotfiles.md
-notes.flake.lock.bak
-docs/roam.md
+notes.flake.lock.bak'
+g "$(line "$L" "$R")"; rc=$?
+expect_rc 'gate：未知/近失路径须保守拦下' 0 "$rc"
+
+# --- 已知非输入 → 放行（rc 1）：黑名单全集 + fixtures 精度 ---
+GIT_STUB_DIFF='docs/roam.md
 tests/x.sh
 bootstrap/linux.sh
-.githooks/pre-push'
+.githooks/pre-push
+.github/workflows/eval.yml
+README.md
+AGENTS.md
+LICENSE
+.gitignore
+tests/fixtures/flake.lock'
 g "$(line "$L" "$R")"; rc=$?
-expect_rc 'gate：近失名/纯文档脚本增量须放行' 1 "$rc"
+expect_rc 'gate：已知非输入增量须放行' 1 "$rc"
 
 # --- 删除推送（local 全零）：无新提交，放行且不消费 diff ---
 GIT_STUB_DIFF='home/common.nix' # 桩即使配了命中差异也不应被读到
@@ -106,6 +121,30 @@ expect_rc 'gate：删除+纯文档混合放行' 1 "$rc"
 
 printf '\n' | gate_needed; rc=$?
 expect_rc 'gate：空 stdin（无可推送增量）放行' 1 "$rc"
+
+# --- 静态审计：黑名单与 Nix 引用不得交叉 ---
+# 黑名单的反向风险是「Nix 开始引用清单内路径」（readFile ./docs/foo.txt、
+# import ./tests/bar.nix 之类）——该文件改动会移动五输出 drvPath 而门控放行。
+# grep 级钉住两件事：全仓 .nix 的相对路径字面量指向清单目录的引用仅 flake.nix
+# 对 ${./tests} 的一处（checks 专用，不进五输出闭包）；清单目录内不存在 .nix
+# 文件（藏不进 import）。
+if [ -n "${EVAL_SKIP_RE:-}" ]; then
+  ok "EVAL_SKIP_RE 已定义（黑名单非空）"
+else
+  bad "EVAL_SKIP_RE 未定义/为空（钩子变量改名了？审计与门控脱钩）"
+fi
+n_ref="$(grep -rnE --include='*.nix' '(\.\./|\./)(\.github|\.githooks|bootstrap|docs|tests)(/|[}"])' "$REPO" | grep -c . || true)"
+if [ "$n_ref" = 1 ]; then
+  ok ".nix 引用清单目录仅 1 处（flake.nix \${./tests}，checks 专用）"
+else
+  bad ".nix 引用清单目录 $n_ref 处（期望 1）：黑名单与 Nix 引用交叉——先移文件或改清单，再更新本断言"
+fi
+n_nix="$(find "$REPO/.github" "$REPO/.githooks" "$REPO/bootstrap" "$REPO/docs" "$REPO/tests" -name '*.nix' 2>/dev/null | grep -c . || true)"
+if [ "$n_nix" = 0 ]; then
+  ok "清单目录内无 .nix 文件（import 不进五输出闭包）"
+else
+  bad "清单目录内发现 $n_nix 个 .nix（被 import 即成求值输入而门控放行——移出或改清单）"
+fi
 
 printf 'prepush-gate: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
