@@ -6,10 +6,15 @@
 #   ② 需要检查时经 packages/roam.sh 的 check 多目标一条完成：五输出 drvPath
 #      并行求值，全部跑完才退出，任一失败即拦下本次 push。
 #
-# 求值输入清单（闭式，漏列=误放行，宁多跑勿漏跑）：*.nix、flake.lock、meta.json、
-# packages/ 与 dotfiles/ 下任意文件——后两者虽非 Nix 文件，但被 Nix 表达式以路径
-# 字面量引用、进 store 影响 drvPath。今后从 Nix 新引用其它非 .nix 目录时，必须
-# 同步扩 EVAL_INPUT_RE。
+# 非输入清单（黑名单，2026-09-29 自白名单反转）：列出确定不进五输出求值的路径
+# （根 README/AGENTS/LICENSE/.gitignore 与 docs/ tests/ bootstrap/ .github/
+# .githooks/），清单外一律视为求值输入。方向性是选黑名单的原因：漏扩清单只会
+# 多跑一次求值（安全方向），白名单形式的漏列=误放行（tests/fixtures/flake.lock
+# 这类同后缀文件在白名单下曾被过度命中，亦顺带修正）。tests/ 只被 checks
+# （shellcheck/单测）引用、不进五输出闭包，属精确非输入。新增纯文档/脚本目录时
+# 扩 EVAL_SKIP_RE（漏扩的代价是多跑，不是漏放行）。tests/prepush-gate.sh 尾部的
+# 静态审计钉住「.nix 不引用清单内路径（flake.nix 对 tests/ 的 checks 引用除外）」
+# ——防止清单与 Nix 引用悄然交叉。
 #
 # 启用（一次性，本机配置不随提交同步）：git config core.hooksPath .githooks
 # 跳过一次：git push --no-verify（慎用——跳过的正是全输出求值拦截）。
@@ -23,7 +28,7 @@ set -euo pipefail
 # 端点差异碰到求值输入 → 返回 0（须检查）。放行：删除推送（local 全零）无新
 # 提交落库；diff 本身失败（remote sha 本地缺失等）与新分支（remote 全零，无
 # 基线可比）不属此类——一律保守跑全量，方向上宁多跑勿漏跑。
-EVAL_INPUT_RE='(^|/)(packages|dotfiles)/|\.nix$|(^|/)flake\.lock$|(^|/)meta\.json$'
+EVAL_SKIP_RE='^(\.github|\.githooks|bootstrap|docs|tests)/|^(README\.md|AGENTS\.md|LICENSE|\.gitignore)$'
 gate_needed() {
   local _ local_sha remote_sha diff_out
   while read -r _ local_sha _ remote_sha; do
@@ -34,10 +39,14 @@ gate_needed() {
     case "$remote_sha" in
       *[!0]*)
         diff_out="$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)" || return 0
-        if printf '%s\n' "$diff_out" | grep -qE "$EVAL_INPUT_RE"; then
+        # 清单外任一文件 = 潜在求值输入 → 拦下。here-string 而非 printf|grep 管道：
+        # grep -q 命中即退会让管道对端吃 SIGPIPE，pipefail 下整管道判假——恰好落在
+        # 漏放行方向。空差异显式排除：here-string 对空串产生一个空行，-v 会把它
+        # 当「未命中清单」误判为输入。
+        if [ -n "$diff_out" ] && grep -qEv "$EVAL_SKIP_RE" <<<"$diff_out"; then
           return 0
         fi
-        ;; # 该 ref 增量不含求值输入——继续看下一个 ref
+        ;; # 该 ref 增量全为清单内非输入——继续看下一个 ref
       *)
         return 0 # 新分支无基线可比，保守跑全量
         ;;
@@ -52,5 +61,5 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   if gate_needed; then
     exec bash packages/roam.sh check nixos wsl x86_64-linux aarch64-linux aarch64-darwin
   fi
-  printf 'pre-push: 推送增量不含求值输入（*.nix / flake.lock / meta.json / packages/ / dotfiles/），跳过五输出求值\n'
+  printf 'pre-push: 推送增量全部为已知非求值输入（README/AGENTS/LICENSE 与 docs/ tests/ bootstrap/ .github/ .githooks/），跳过五输出求值\n'
 fi
