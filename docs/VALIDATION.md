@@ -9,6 +9,16 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-09-29 门控黑名单反转 + SIGPIPE/空行修正 + 清单静态审计（.githooks/pre-push + tests/prepush-gate.sh + AGENTS/docs·roam + flake.nix 注释，Fedora 44 / WSL2 standalone，本机）
+
+背景（对上条门控的复评发现三点）：①`EVAL_INPUT_RE` 白名单形式与「宁多跑勿漏跑」教义相悖——漏列=误放行，恰是禁止的方向；②`printf | grep -q` 管道在 `set -o pipefail` 下有 SIGPIPE→141→判假的潜伏路径（触发条件苛刻但同属漏放行方向）；③清单只靠头注释提醒人工扩列，是全仓唯一无守卫的不变量（hostnameGuard 已立「约定→断言」先例）。另 `tests/fixtures/flake.lock` 在白名单下被 `(^|/)flake\.lock$` 过度命中（多跑方向无害，属精度损失）。
+
+改动：①清单反转为黑名单 `EVAL_SKIP_RE`——docs/tests/bootstrap/.github/.githooks 五目录与根 README/AGENTS/LICENSE/.gitignore 为已知非输入，**清单外一律视为求值输入**：未知路径（近失名、新增根文件、目录导入内非 .nix 文件——`./hosts/<h>/` 整目录进 store 的潜伏缺口由此自动覆盖）全部保守拦下；漏扩清单的代价降为多跑一次（安全方向）。②判定改 here-string `grep -qEv <<<"$diff_out"`（无管道，SIGPIPE 面归零）+ 空差异显式 `[ -n ]` 前置——here-string 对空串产生一个空行，`-v` 会把空行当「未命中清单」误判为输入（实现时预判，「空差异放行」既有用例即其覆盖）。③prepush-gate 18→24 例：近失名语义反转（mypackages/x、dotfiles-extra/y、notes.flake.lock.bak 由放行改拦下）、已知非输入全集放行（含 fixtures/flake.lock 精度提升、根四文件、.github）、审计三断言（`EVAL_SKIP_RE` 在位防改名脱钩；全仓 .nix 相对路径引用清单目录 ==1——钉 flake.nix `${./tests}` 的 checks 专用引用，钉数前先独立 grep 确认真值；清单五目录内 .nix ==0）。④AGENTS CI 段、docs/roam.md check 条目、flake.nix scriptChecks 注释同步（flake.nix 仅注释变化）。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` / shellcheck 零告警（改动两文件）；run-all 129/129（roam-functions 75 + prepush-gate 24 + 补全 19 + 脚手架 6 + repo-references 5；rc 直取）；真 sha 门控：docs-only（0742967→8f7ac9f）rc=1、含 Nix 增量（b960794→0742967）rc=0；钩子端到端——放行路径（真实钩子 + docs-only 增量）0.014s rc=0、新放行说明正确打印；触发路径（本批 38f1d64→2425258，含 flake.nix/钩子/测试）门控正确触发五输出并行求值 rc=0（68s，暖缓存波动区间内）；`nix flake check` rc=0（改动后内容，沙箱 shellcheck-scripts + roam-unit-tests 双确认）；`git diff --check` 干净；**五输出 drvPath 提交前后逐一相同**（38f1d64 vs 2425258，干净树对干净树——flake.nix 仅注释变化的「注释级纯重构」主张实证；checks 输出因引用 `self.outPath` 而移动，符合预期不在对比范围）。
+
+未验证：真实 push 触发钩子（同前，推送仍手动）；macOS Bash 3.2 实机（here-string 自 bash 2.05b 起，3.2 兼容按惯例待第二宿主实证）。
+
 ## 2026-09-29 P1 pre-push 差异门控 + roam check 求值并行化（packages/roam.sh + .githooks/pre-push + tests/×3 + README/AGENTS/docs×2，Fedora 44 / WSL2 standalone，本机）
 
 背景：pre-push 五输出求值门槛每次 push 固定串行全量——实测基线 115s（暖缓存、干净树），纯文档提交同价；近 30 个提交里 13 个只动 docs/tests/bootstrap，对五个输出的求值结果零影响。nix eval 是树的纯函数，输入未变的重跑必同结果，跳过无风险；改 Nix 的推送则由并行化削墙钟。
