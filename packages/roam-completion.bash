@@ -38,7 +38,7 @@ _roam()
 
     if [ -z "$sub" ]; then
         # 一级：子命令 + 帮助
-        list="switch status doctor rollback gc check update info help -h --help"
+        list="switch status doctor rollback gc check update flake info help -h --help"
     else
         case "$sub" in
             switch | status | doctor | info | help)
@@ -91,6 +91,9 @@ _roam()
                     list="$(jq -r '.nodes.root.inputs // {} | keys[]' flake.lock 2>/dev/null | tr '\n' ' ')"
                 fi
                 list="-a --all $list"
+                ;;
+            flake)
+                list="-a --all"
                 ;;
             *)
                 # 未知子命令（多为笔误）：不补，避免误导

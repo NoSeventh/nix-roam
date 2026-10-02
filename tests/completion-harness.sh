@@ -43,9 +43,11 @@ cd "$REPO" || exit 9
 
 # --- 一级 ---
 got="$(compline roam '' | joined)"
-expect_eq '一级：八子命令 + help' "$got" 'switch status doctor rollback gc check update info help -h --help'
+expect_eq '一级：九子命令 + help' "$got" 'switch status doctor rollback gc check update flake info help -h --help'
 got="$(compline roam ch | joined)"
 expect_eq '前缀 ch → check' "$got" 'check'
+got="$(compline roam fl | joined)"
+expect_eq '前缀 fl → flake' "$got" 'flake'
 got="$(compline roam - | joined)"
 expect_eq '前缀 - → 帮助旗标' "$got" '-h --help'
 
@@ -69,6 +71,12 @@ case "$got" in
 esac
 expect_contains 'update：补出 nixpkgs 输入名' "$got" nixpkgs
 expect_contains 'update：补出 nixvim 输入名' "$got" nixvim
+
+# --- flake：旗标 ---
+got="$(compline roam flake '' | joined)"
+expect_eq 'flake：旗标' "$got" '-a --all'
+got="$(compline roam flake --a | joined)"
+expect_eq 'flake：--a → --all' "$got" '--all'
 
 # --- rollback：世代号宿主相关，只断言旗标 ---
 got="$(compline roam rollback '' | joined)"

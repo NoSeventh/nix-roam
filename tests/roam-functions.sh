@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # roam.sh 纯函数单测 —— source 方式加载被测脚本（分发段经 BASH_SOURCE 执行守卫跳过）。
 # 覆盖最脆的解析点：home-manager generations 文本格式、profile 目录 glob、
-# meta.json 提取、choose_inputs 交互解析、standalone_target 架构分发、
-# cmd_check 多目标分发与失败汇总。
+# meta.json 提取、choose_inputs 交互解析、read_flake_lock/flake.lock 缩进解析、
+# standalone_target 架构分发、cmd_check 多目标分发与失败汇总。
 # 打桩手段：PATH 注入假 home-manager（cat fixture）、ROAM_SYSTEM_PROFILES_DIR
 # 指向临时目录、source 前定义 uname 函数（kernel 在 source 期捕获）、stdin 管道。
 # 运行：检出内 bash tests/roam-functions.sh；或经 flake checks
@@ -185,6 +185,93 @@ sel="$(choose '9' 2>/dev/null)"; rc=$?
 expect_rc 'choose_inputs：越界编号须拒绝' 1 "$rc"
 sel="$(choose 'bogus' 2>/dev/null)"; rc=$?
 expect_rc 'choose_inputs：未知输入名须拒绝' 1 "$rc"
+
+# --- read_flake_lock / lock_date / cmd_flake（fixture + 仓库真实 flake.lock）---
+out="$(
+  cd "$FIX" || exit 9
+  if read_flake_lock; then printf 'rc0\n'; else printf 'rc1\n'; fi
+  printf 'roots=%s\n' "${ROOT_KEYS[*]}"
+  printf 'nodes=%s\n' "${LOCK_NAMES[*]}"
+  printf 'revs=%s\n' "${LOCK_REVS[*]}"
+  printf 'epochs=%s\n' "${LOCK_EPOCHS[*]}"
+  printf 'nrefs=%s\n' "${#LOCK_REFS[@]}"
+)"
+expect_eq 'read_flake_lock：fixture 全字段解析' "$out" 'rc0
+roots=nixpkgs nixpkgs-stable home-manager nixvim
+nodes=nixpkgs nixpkgs-stable home-manager nixvim
+revs=1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 3333333333333333333333333333333333333333 4444444444444444444444444444444444444444
+epochs=1750000000 1750000001 1750000002 1750000003
+nrefs=4'
+out="$(
+  cd "$REPO" || exit 9
+  if read_flake_lock; then printf 'rc0\n'; else printf 'rc1\n'; fi
+  printf 'roots=%s\n' "${ROOT_KEYS[*]}"
+  printf 'nodes=%s\n' "${#LOCK_NAMES[@]}"
+  printf 'rev40=%s/%s\n' "$(printf '%s\n' "${LOCK_REVS[@]}" | grep -c '^[0-9a-f]\{40\}$' || true)" "${#LOCK_NAMES[@]}"
+  j=0
+  while [ "$j" -lt "${#ROOT_KEYS[@]}" ]; do
+    [ "${ROOT_KEYS[$j]}" = home-manager ] && printf 'hm_node=%s\n' "${ROOT_NODES[$j]}"
+    j=$((j + 1))
+  done
+  case " ${LOCK_NAMES[*]} " in
+    *" nixpkgs_2 "*) printf 'has_nixpkgs_2=yes\n' ;;
+    *) printf 'has_nixpkgs_2=no\n' ;;
+  esac
+)"
+expect_sub 'read_flake_lock：真实 lock 解析 rc0' "$out" 'rc0'
+expect_eq 'read_flake_lock：真实 root 输入全集（lock 文件序）' \
+  "$(printf '%s\n' "$out" | sed -n 's/^roots=//p')" \
+  'hermes-agent home-manager nixos-wsl nixpkgs nixpkgs-stable nixvim'
+# 节点数与 40 位 rev 完整性单独断言（sed 提取后算术比较）
+nodes_n="$(printf '%s\n' "$out" | sed -n 's/^nodes=//p')"
+if [ "${nodes_n:-0}" -gt 6 ]; then ok 'read_flake_lock：真实 lock 含传递节点'; else bad "read_flake_lock：传递节点缺失（nodes=${nodes_n}）"; fi
+expect_eq 'read_flake_lock：rev 均为 40 位 hex' "$(printf '%s\n' "$out" | sed -n 's/^rev40=//p')" "$nodes_n/$nodes_n"
+hm_node="$(printf '%s\n' "$out" | sed -n 's/^hm_node=//p')"
+case "$hm_node" in
+  home-manager*) ok "read_flake_lock：home-manager 指向后缀节点（$hm_node）" ;;
+  *) bad "read_flake_lock：home-manager 映射异常：[$hm_node]" ;;
+esac
+expect_eq 'read_flake_lock：nixvim 自带 nixpkgs_2 在节点表' "$(printf '%s\n' "$out" | sed -n 's/^has_nixpkgs_2=//p')" yes
+BADLOCK="$(mktemp -d)"
+: >"$BADLOCK/flake.lock"
+out="$(cd "$BADLOCK" && read_flake_lock 2>/dev/null)"; rc=$?
+expect_rc 'read_flake_lock：空 lock 须拒绝（fail-loud）' 1 "$rc"
+rm -rf "$BADLOCK"
+expect_eq 'lock_date：epoch → UTC 日期（GNU/BSD 双语法其一）' "$(lock_date 1750000000)" 2025-06-15
+expect_eq 'lock_date：epoch 0' "$(lock_date 0)" 1970-01-01
+expect_eq 'lock_date：空 epoch → -' "$(lock_date '')" -
+flk() { # fixture 下跑 cmd_flake（repo_check 打桩——fixture 目录无 flake.nix/meta.json）
+  (
+    cd "$FIX" || exit 9
+    repo_check() { :; }
+    cmd_flake "$@"
+  )
+}
+out="$(flk)"; rc=$?
+expect_rc 'cmd_flake：fixture rc=0' 0 "$rc"
+expect_sub 'cmd_flake：表头' "$out" 'flake 输入（flake.lock 锁定'
+expect_eq 'cmd_flake：fixture 表内容（空白归一）' "$(printf '%s\n' "$out" | grep '^  ' | sed 's/^ *//' | tr -s ' ')" 'nixpkgs 1111111 2025-06-15 - -
+nixpkgs-stable 2222222 2025-06-15 - -
+home-manager 3333333 2025-06-15 - -
+nixvim 4444444 2025-06-15 - -'
+out="$(flk --all)"; rc=$?
+expect_rc 'cmd_flake：--all rc=0' 0 "$rc"
+expect_sub 'cmd_flake：--all 传递输入头（fixture 无传递节点，仅头行）' "$out" '传递输入（上游 flake 自带锁定'
+out="$(flk -a)"; rc=$?
+expect_rc 'cmd_flake：-a 短旗标 rc=0' 0 "$rc"
+expect_sub 'cmd_flake：-a 等价 --all' "$out" '传递输入（上游 flake 自带锁定'
+out="$(cd "$REPO" && cmd_flake)"; rc=$?
+expect_rc 'cmd_flake：仓库真实 lock rc=0' 0 "$rc"
+for k in hermes-agent home-manager nixos-wsl nixpkgs nixpkgs-stable nixvim; do
+  expect_contains "cmd_flake：真实表含 $k" "$out" "$k"
+done
+out="$(cd "$REPO" && cmd_flake --all)"; rc=$?
+expect_rc 'cmd_flake：真实 --all rc=0' 0 "$rc"
+expect_contains 'cmd_flake：--all 含 nixvim 自带 nixpkgs_2' "$out" nixpkgs_2
+out="$(flk --bogus 2>/dev/null)"; rc=$?
+expect_rc 'cmd_flake：未知选项须拒绝' 1 "$rc"
+out="$(flk extra 2>/dev/null)"; rc=$?
+expect_rc 'cmd_flake：位置参数须拒绝' 1 "$rc"
 
 # --- cmd_gc（假 nix-collect-garbage / sudo 经 PATH 打桩，调用参数落 GC_LOG）---
 STUBGC="$(mktemp -d)"

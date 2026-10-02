@@ -9,6 +9,16 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-02 roam flake 子命令：查看 flake.lock 锁定版本（packages/roam.sh + roam-completion + tests/×2 + README/AGENTS/docs×2，AlmaLinux 9.8 / WSL2 standalone，本机）
+
+背景：roam 缺一个「现在锁的是哪些版本」的只读速览——`nix flake metadata` 要走求值且慢；`choose_inputs` 的输入表只在 update 交互里可见，且缺 jq 时降级。要求：快（不求值不触网）、随处可用（不依赖 jq）、维持 macOS Bash 3.2 兼容与「只用 bash 内建 + sed/grep」的既有约束。
+
+改动：①`read_flake_lock`——纯 bash 行循环解析 flake.lock，只锚定 Nix 生成格式的缩进层级（节点名 4 空格 / locked·original·inputs 块 6 / 字段 8），不依赖键序与排序；root 直接输入经 `root.inputs` 解析为「声明名→锁定节点名」（`home-manager` 按声明名显示，实际节点是 `home-manager_2`）；follows 数组元素（10 空格缩进、无 `"key":` 结构）正则天然不中。②`lock_date`——epoch→UTC 日期，GNU `date -d @` / BSD `date -r` 双语法回落（doctor 回避日期运算是因为那只做字符串比较；这里是数值时间戳转换，双语法回落正是为此；都失败打 `-` 不算错）。③`cmd_flake`：缺省列 root 六输入（名称 / 7 位短 rev / 日期 / 声明 ref / owner-repo），`-a|--all` 追加传递输入表（排除 root 已引用节点，节点名带版本后缀）；root 输入解析为空即中止（fail-loud）——lock 版本换代重排缩进时报错而非打印空表。④补全一级清单 + `flake` 旗标；测试 roam-functions 75→104（解析器 fixture 全字段 / 真实 lock 结构断言〔六 root 输入、home-manager 指向后缀节点、rev 40 位 hex、nixpkgs_2 在表〕/ 空 lock 拒绝、lock_date 三例、cmd_flake 表内容空白归一比对 + 真实表成员 + 未知选项与位置参数拒绝）、补全 19→22；roam.sh 头注 / usage、README、AGENTS×2、docs/roam.md（速查条目 + 打包段补全清单）同步。
+
+验证（本机 AlmaLinux 9.8 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` 全过；shellcheck 0.11.0 零告警（`nix shell nixpkgs#shellcheck` 直跑四个改动脚本）；run-all 161/161（roam-functions 104 + prepush-gate 24 + 补全 22 + 脚手架 6 + repo-references 5）；实机 `bash packages/roam.sh flake` / `flake --all` 输出核对（root 六输入齐全、home-manager 按声明名显示、hermes-agent 无声明 ref 显 `-`、传递表含 nixvim 自带 nixpkgs_2）；`nix build` 直建 `checks.x86_64-linux.shellcheck-scripts` + `checks.x86_64-linux.roam-unit-tests` rc=0（沙箱内两关卡）；`nix build --no-link .#homeConfigurations.x86_64-linux.activationPackage` rc=0（roam.sh 过 writeShellApplication 的 bash -n + shellcheck 门）；`git diff --check` 干净。
+
+未验证 / 发现：①`nix flake check` 整体 rc=1——**既有问题，与本批无关**：stash 对照下干净 HEAD 同样在 `.#nixosConfigurations.nixos…toplevel` 求值处拒绝 electron-41.10.7（2f90778 update flake 后 nixpkgs unstable 的 electron 前移，允许清单未跟：共享侧 flake.nix 放行 electron-41.9.1，NixOS unstable 侧在 profiles/nixos-base.nix）；是否放行新版本属 insecure 审批，未擅自处理，留待决定；故第三层以上述直建两 check 替代整体 check。②aarch64 两 check 本机直建被拒（x86_64 无 ARM/模拟执行——既有边界，CI 覆盖）。③macOS Bash 3.2 实机未跑（`[[ =~ ]]` 区间量词 / `${var:0:7}` / 数组 `+=()` 均 3.1+ 原语，按惯例待第二宿主实证）。④已安装的 `bin/roam` 是旧世代，实机验证走 `bash packages/roam.sh flake` 调试路径；`roam switch` 后才进入正式入口。
+
 ## 2026-09-29 门控黑名单反转 + SIGPIPE/空行修正 + 清单静态审计（.githooks/pre-push + tests/prepush-gate.sh + AGENTS/docs·roam + flake.nix 注释，Fedora 44 / WSL2 standalone，本机）
 
 背景（对上条门控的复评发现三点）：①`EVAL_INPUT_RE` 白名单形式与「宁多跑勿漏跑」教义相悖——漏列=误放行，恰是禁止的方向；②`printf | grep -q` 管道在 `set -o pipefail` 下有 SIGPIPE→141→判假的潜伏路径（触发条件苛刻但同属漏放行方向）；③清单只靠头注释提醒人工扩列，是全仓唯一无守卫的不变量（hostnameGuard 已立「约定→断言」先例）。另 `tests/fixtures/flake.lock` 在白名单下被 `(^|/)flake\.lock$` 过度命中（多跑方向无害，属精度损失）。

@@ -36,6 +36,9 @@
 #                          nix flake update + flake.lock 差异摘要；提交与切换保持手动。
 #                          缺省交互选择要更新的输入（回车/EOF=全部），显式输入名或
 #                          --all 跳过交互
+#   roam flake [-a|--all]  只读查看 flake.lock 锁定的输入版本：root 声明输入的
+#                          rev（7 位短形）/日期/ref/来源；--all 追加上游传递输入。
+#                          纯本地解析（只锚定缩进层级，不依赖 jq），不求值不触网
 #   roam info              只读打印宿主探测结论（环境 / 用户守卫 / 将选中的输出）
 #
 # 需在本仓库检出目录下运行（flake 位置参数 '.' 按 cwd 解析）；rollback 与 gc 例外
@@ -71,6 +74,9 @@ usage() {
                      nix flake update 并显示 flake.lock 差异；提交与切换仍手动。
                      缺省时列出 flake 输入供选择：回车（或非交互 EOF）=全部；
                      显式输入名可多个只更新它们；--all 跳过选择直接全量
+  flake [-a|--all]  查看 flake.lock 锁定的输入版本（名称/短 rev/日期/ref/来源）；
+                     --all 附上游传递输入（版本后缀节点）；纯本地解析，
+                     不求值不触网、不依赖 jq
   info               只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
   help               显示本帮助
 EOF
@@ -854,6 +860,172 @@ cmd_update() {
   printf 'roam: 请 review 并提交 flake.lock，再以 roam check / roam switch 验证受影响目标（nix-channel --update 不会更新 flake 依赖）\n'
 }
 
+# --- flake：查看 flake.lock 锁定的输入版本 ---
+# 纯本地只读：不调 nix、不触网、不依赖 jq——choose_inputs 缺 jq 可降级为「全部」，
+# 查看类命令不能降级为空输出。解析只锚定 Nix 生成 lock 的缩进层级（nodes 节点名
+# 4 空格、locked/original/inputs 块 6 空格、块内字段 8 空格），不依赖键序与排序；
+# root 直接输入解析为空即中止（fail-loud）——lock 版本换代（v8+）重排缩进时应报
+# 错而非静默打印空表。
+read_flake_lock() {
+  # 平行数组（按锁定节点）：LOCK_NAMES/REVS/EPOCHS/REFS/SRCS = 节点名 / 完整
+  # rev / lastModified（epoch 字符串）/ 声明 ref / 来源（owner/repo，无则 url）。
+  # root 直接声明的输入另存 ROOT_KEYS→ROOT_NODES——显示名以声明名为准
+  # （如 home-manager → home-manager_2，带后缀的是 lock 内部节点名）。
+  LOCK_NAMES=()
+  LOCK_REVS=()
+  LOCK_EPOCHS=()
+  LOCK_REFS=()
+  LOCK_SRCS=()
+  ROOT_KEYS=()
+  ROOT_NODES=()
+  local line cur='' mode='' name val
+  local f_rev='' f_epoch='' f_ref='' f_owner='' f_repo='' f_url='' f_locked=false
+  flush() {
+    local src=''
+    if [ "$f_locked" = true ] && [ -n "$cur" ]; then
+      if [ -n "$f_owner" ] && [ -n "$f_repo" ]; then src="$f_owner/$f_repo"; else src="$f_url"; fi
+      LOCK_NAMES+=("$cur")
+      LOCK_REVS+=("$f_rev")
+      LOCK_EPOCHS+=("$f_epoch")
+      LOCK_REFS+=("$f_ref")
+      LOCK_SRCS+=("$src")
+    fi
+    f_rev='' f_epoch='' f_ref='' f_owner='' f_repo='' f_url='' f_locked=false
+    return 0
+  }
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      '        '*)
+        # 8 空格字段：locked/original 的键值，或 root inputs 的「输入名: 节点名」。
+        # 更深缩进（inputs 的 follows 数组元素）无「":」结构，正则不中即跳过。
+        [ -n "$cur" ] || continue
+        [[ "$line" =~ ^[[:space:]]{8}\"([^\"]+)\"[[:space:]]*:[[:space:]]*(.*)$ ]] || continue
+        name="${BASH_REMATCH[1]}"
+        val="${BASH_REMATCH[2]}"
+        val="${val%,}"
+        val="${val#\"}"
+        val="${val%\"}"
+        case "$name" in
+          rev) [ "$mode" = L ] && f_rev="$val" ;;
+          lastModified) [ "$mode" = L ] && f_epoch="$val" ;;
+          ref) [ "$mode" = O ] && f_ref="$val" ;;
+          owner) [ "$mode" = O ] && f_owner="$val" ;;
+          repo) [ "$mode" = O ] && f_repo="$val" ;;
+          url) [ "$mode" = O ] && f_url="$val" ;;
+          *)
+            # root inputs 的「声明名: 锁定节点名」；数组值（follows，`[` 开头）不取
+            # ——root 级 follows 在本仓库不存在，出现时宁缺勿错（见头注释 fail-loud）
+            if [ "$cur" = root ] && [ "$mode" = I ] && [ "$val" != '[' ]; then
+              ROOT_KEYS+=("$name")
+              ROOT_NODES+=("$val")
+            fi
+            ;;
+        esac
+        ;;
+      '      '*)
+        # 6 空格块开关：进入 locked/original/inputs 之一；其余（"flake": false、
+        # 块收行）退出字段态
+        case "$line" in
+          *'"locked": {') mode=L; f_locked=true ;;
+          *'"original": {') mode=O ;;
+          *'"inputs": {') mode=I ;;
+          *) mode='' ;;
+        esac
+        ;;
+      '    }'*)
+        # 4 空格收行 = 顶层节点结束：落表并清当前节点
+        flush
+        cur=''
+        mode=''
+        ;;
+      '    '*)
+        # 4 空格节点头 "name": {；nodes 之外的 2 空格键（root/version）不在此列
+        [[ "$line" =~ ^[[:space:]]{4}\"([^\"]+)\" ]] || continue
+        flush
+        cur="${BASH_REMATCH[1]}"
+        mode=''
+        ;;
+    esac
+  done <flake.lock
+  flush
+  [ "${#ROOT_KEYS[@]}" -gt 0 ] || return 1
+  return 0
+}
+
+# epoch → UTC YYYY-MM-DD：GNU date（-d @epoch）与 BSD date（-r epoch）双语法回落
+# （doctor 对世代日期回避运算是因为那只做字符串比较；这里必须转换数值时间戳）。
+# 两种语法都不可用（异常平台）时打印 '-'，不视为错误。
+lock_date() {
+  local d=''
+  d="$(date -u -d "@$1" +%F 2>/dev/null)" || d=''
+  if [ -z "$d" ]; then
+    d="$(date -u -r "$1" +%F 2>/dev/null)" || d=''
+  fi
+  printf '%s' "${d:--}"
+}
+
+cmd_flake() {
+  local all=false j=0 i=0 node idx rev date ref src
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -a | --all) all=true ;;
+      -*) die "flake: 未知选项：$1" ;;
+      *) die "flake: 无位置参数：$1（查看锁定版本用 roam flake，更新用 roam update）" ;;
+    esac
+    shift
+  done
+  repo_check
+  [ -f flake.lock ] || die '当前检出缺 flake.lock（先 nix flake lock / roam update 生成）'
+  read_flake_lock || die 'flake.lock 解析失败：未识别出 root 直接输入（lock 格式变化？请反馈）'
+  # 节点名 → LOCK_* 下标（线性查找；节点数 ~15，无须散列）
+  lock_index() {
+    local k=0
+    while [ "$k" -lt "${#LOCK_NAMES[@]}" ]; do
+      if [ "${LOCK_NAMES[$k]}" = "$1" ]; then
+        printf '%s' "$k"
+        return 0
+      fi
+      k=$((k + 1))
+    done
+    return 1
+  }
+  printf 'flake 输入（flake.lock 锁定；roam update 更新；--all 含传递输入）:\n'
+  while [ "$j" -lt "${#ROOT_KEYS[@]}" ]; do
+    node="${ROOT_NODES[$j]}"
+    if idx="$(lock_index "$node")"; then
+      rev="${LOCK_REVS[$idx]}"
+      rev="${rev:0:7}"
+      date="$(lock_date "${LOCK_EPOCHS[$idx]}")"
+      ref="${LOCK_REFS[$idx]}"
+      src="${LOCK_SRCS[$idx]}"
+      printf '  %-22s %-7s  %-10s  %-15s %s\n' \
+        "${ROOT_KEYS[$j]}" "${rev:--}" "$date" "${ref:--}" "${src:--}"
+    else
+      printf '  %-22s （锁定节点 %s 未解析——lock 结构异常）\n' "${ROOT_KEYS[$j]}" "$node"
+    fi
+    j=$((j + 1))
+  done
+  if [ "$all" = true ]; then
+    printf '传递输入（上游 flake 自带锁定，非本仓库声明；节点名带版本后缀）:\n'
+    while [ "$i" -lt "${#LOCK_NAMES[@]}" ]; do
+      node="${LOCK_NAMES[$i]}"
+      case " ${ROOT_NODES[*]} " in
+        *" $node "*) ;;
+        *)
+          rev="${LOCK_REVS[$i]}"
+          rev="${rev:0:7}"
+          date="$(lock_date "${LOCK_EPOCHS[$i]}")"
+          ref="${LOCK_REFS[$i]}"
+          src="${LOCK_SRCS[$i]}"
+          printf '  %-22s %-7s  %-10s  %-15s %s\n' \
+            "$node" "${rev:--}" "$date" "${ref:--}" "${src:--}"
+          ;;
+      esac
+      i=$((i + 1))
+    done
+  fi
+}
+
 cmd_info() {
   local kind target u current pretty
   pretty="$(sed -n 's/^PRETTY_NAME="\(.*\)"/\1/p' /etc/os-release 2>/dev/null | head -n 1)"
@@ -918,6 +1090,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     gc) cmd_gc "$@" ;;
     check) cmd_check "$@" ;;
     update) cmd_update "$@" ;;
+    flake) cmd_flake "$@" ;;
     info) cmd_info "$@" ;;
     help | -h | --help) usage ;;
     *)
