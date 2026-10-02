@@ -169,10 +169,12 @@ roam check wsl nixos   # 显式核对其它输出，可给多个：nixos / wsl /
                        #（跨主机仅求值；多目标并行求值、全部跑完再退出，任一失败 rc=1）
 roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成。
                        # 可选输入：缺省交互列出（回车=全部），roam update nixpkgs nixvim 只更新指定项，--all 跳过交互
+roam flake             # 查看 flake.lock 锁定的输入版本（名称/短 rev/日期/ref/来源）；
+                       # --all 附上游传递输入；纯本地解析，不求值不触网、不依赖 jq
 roam info              # 只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
 ```
 
-`roam` 自带 bash 补全，随包装进四个安装点：子命令（`roam <TAB>`）、`check` 的目标名与 `--build`、`update` 的 flake 输入名（实时读 `flake.lock`）、`rollback` 的世代号与旗标、`gc` 的旗标。bash-completion（≥2.12）按 `XDG_DATA_DIRS` 自动懒加载，无需额外配置；`switch`/`status`/`doctor`/`info` 无自有参数，不做补全。
+`roam` 自带 bash 补全，随包装进四个安装点：子命令（`roam <TAB>`）、`check` 的目标名与 `--build`、`update` 的 flake 输入名（实时读 `flake.lock`）、`flake` 与 `gc` 的旗标、`rollback` 的世代号与旗标。bash-completion（≥2.12）按 `XDG_DATA_DIRS` 自动懒加载，无需额外配置；`switch`/`status`/`doctor`/`info` 无自有参数，不做补全。
 
 手动垃圾回收（自动识别 NixOS、普通 Linux / WSL 和 macOS；无需在检出目录）：
 
