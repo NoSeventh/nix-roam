@@ -69,14 +69,14 @@
 
       # unstable / stable 实例共用的 nixpkgs config。NixOS unstable 实例的 insecure 列表另在
       # profiles/nixos-base.nix 声明 —— 那是另一实例的刻意差异，不做合并扩权。
-      # （2026-09-17 验证后移除了此处的 electron-38.8.4：五个输出求值 + standalone 构建均不引用；
-      #   若日后 lock 更新再次需要，在此重新添加即可。）
-      # electron-41.9.1（EOL）：2026-09-26 桌面求值需要 —— 桌面闭包经本 config 管辖的实例
-      # 引用该版本（探针验证：移除后桌面求值失败）；standalone 不引用，列表为「允许」语义，
+      # electron-41.10.7（EOL）：桌面闭包经 pkgs-stable 的 electron_41 引用（2026-10-02 探针：
+      # stable electron_41=41.10.7 / unstable=41.10.6，拒评的 41.10.7 只可能来自本 config
+      # 管辖的 stable 实例）。2f90778 update flake 后 stable 前移，自 41.9.1（2026-09-26 引入）
+      # 替换而来——旧版本已无引用者，替换而非累积。standalone 不引用，列表为「允许」语义，
       # 其 drvPath 不受影响（前后一致已验证）。系统 unstable 实例另见 profiles/nixos-base.nix。
       nixpkgsConfig = {
         allowUnfree = true;
-        permittedInsecurePackages = [ "electron-41.9.1" ];
+        permittedInsecurePackages = [ "electron-41.10.7" ];
       };
 
       # 按 system 实例化 unstable 与 stable

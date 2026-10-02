@@ -9,6 +9,16 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-02 insecure 清单随 2f90778 flake 更新补齐：electron-41.10.7（flake.nix + profiles/nixos-base.nix 注释 + AGENTS，AlmaLinux 9.8 / WSL2 standalone，本机）
+
+背景：上一条 VALIDATION 发现的既有断点——2f90778 update flake 后桌面 toplevel 求值拒评 electron-41.10.7（`nix flake check` 与桌面输出全挂）。用户批准按 AGENTS「Handling EOL / insecure packages」流程放行。
+
+改动与过程：①实例归属探针——stable（rev 78e9c78）`electron_41` = 41.10.7、unstable（b4fd65b）`electron_41` = 41.10.6：拒评的 41.10.7 只可能来自 pkgsFor 管辖的 **stable 实例**（桌面闭包经 pkgs-stable 引用 electron_41，与 2026-09-26 引入 41.9.1 同一消费者）→ `flake.nix` 共享清单 electron-41.9.1 **替换**为 electron-41.10.7（旧版本随 stable 前移已无引用者，按 2026-09-17 先例替换不累积）。②nixos-base 侧清理尝试被求值推翻：依据顶点探针（unstable `electron`=43.6.0 / `electron_41`=41.10.6 / `pnpm`=12.3.4）判定 electron-40.10.5、pnpm-10.29.2 已死并移除，桌面求值相继拒评两者（unstable `electron_40` 仍是 40.10.5；GNOME 链仍钉 pnpm 10.29.2），逐条恢复——**顶点属性探针覆盖不了版本化/被钉住的引用面，条目存亡以受影响输出求值为准**（教训已记入两处注释与 AGENTS）。③flake bump 会串行暴露多个拒评（Nix 一次只报一个：先 stable electron，放行后才轮到 unstable electron/pnpm），修到目标通过为止。nixos-base 最终清单与改动前一致，仅注释重写。
+
+验证（本机 AlmaLinux 9.8 / WSL2 standalone x86_64，用户 xuqihao）：五输出 drvPath 求值——桌面 `dz5jzkfp…-nixos-system-nixos-26.11.20260929.b4fd65b.drv`（修前拒评→修后通过）；WSL `nb79nvaz…` 与三个 standalone（`6azf98p…` / `qwais8b8…` / `k0adp9k…`）与改动前基线**逐一相同**（allow-only 语义；WSL 在 nixos-base 清单复原后二次核对仍同路径）；`nix flake check` rc=0（桌面求值解锁 + 当前系统两 check 重建通过；plain flake check 只构建当前系统的 check、aarch64 为求值覆盖，与 CI 同款行为）；`nix build --no-link .#homeConfigurations.x86_64-linux.activationPackage` rc=0；`git diff --check` 干净。
+
+未验证：桌面 toplevel 仅求值未构建未激活（闭包过大，仓库惯例 eval-only——真实 nixos 主机上下一次 `roam switch` 才算激活验证）；aarch64 两 check 依旧仅求值覆盖（本机无 ARM，`--all-systems` 未跑）。
+
 ## 2026-10-02 roam flake 子命令：查看 flake.lock 锁定版本（packages/roam.sh + roam-completion + tests/×2 + README/AGENTS/docs×2，AlmaLinux 9.8 / WSL2 standalone，本机）
 
 背景：roam 缺一个「现在锁的是哪些版本」的只读速览——`nix flake metadata` 要走求值且慢；`choose_inputs` 的输入表只在 update 交互里可见，且缺 jq 时降级。要求：快（不求值不触网）、随处可用（不依赖 jq）、维持 macOS Bash 3.2 兼容与「只用 bash 内建 + sed/grep」的既有约束。

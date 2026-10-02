@@ -96,11 +96,16 @@
   };
 
   nixpkgs.config.allowUnfree = true;
+  # unstable 实例的 insecure 允许清单（2026-10-02 复核，两条仍均被桌面闭包引用）：
+  # - electron-40.10.5：unstable 的 electron_40 仍是该版本（探针 electron/electron_41 =
+  #   43.6.0/41.10.6 会误判此条已死——移除后桌面求值即拒 40.10.5，实测恢复）。
+  # - pnpm-10.29.2：GNOME 模块链（desktop-managers.nix）仍引用，unstable pkgs.pnpm =
+  #   12.3.4 同样不能作为「无引用者」的证据（移除后桌面求值即拒，实测恢复）。
+  # 教训：顶点属性探针覆盖不了版本化/被钉住的引用面，条目存亡以受影响输出的求值为准。
+  # 注意 nixpkgs.config 跨模块浅合并——即使条目只被桌面闭包引用，也不能拆去
+  # profiles/desktop.nix（会在该处形成遮蔽），只能在共享处单点声明。
   nixpkgs.config.permittedInsecurePackages = [
     "electron-40.10.5"
-    # pnpm-10.29.2 仅桌面闭包引用（GNOME 模块链，desktop-managers.nix）；
-    # WSL 不引用但删掉无效也无益——nixpkgs.config 跨模块浅合并，
-    # 拆到 profiles/desktop.nix 会遮蔽 electron 条目，只能在共享处单点声明。
     "pnpm-10.29.2"
   ];
 
