@@ -14,7 +14,9 @@
 # 安装模式（环境变量 NIX_INSTALL_MODE，默认 auto）：
 #     multi  — systemd + sudo 可用（默认路径）：Determinate 安装器多用户安装，镜像信任写 /etc/nix
 #     single — 无 systemd / 无 sudo / 显式指定：官方安装器 --no-daemon 单用户安装，
-#              镜像写用户级 nix.conf（无 daemon 无需信任授权；/nix 前缀仍需一次性 root 创建，见步骤 1）
+#              镜像写用户级 nix.conf（无 daemon 无需信任授权；/nix 前缀仍需一次性 root 创建——
+#              有 sudo 走 sudo，无 sudo 经交互 su 输 root 密码（用户合法但机器没装 sudo 的最小化
+#              发行版/WSL 不必再找管理员），两者皆不可用才打印手动命令退出，见步骤 1 与 run_as_root）
 #
 # 幂等：可安全重复运行。已完成的步骤会跳过；已被 home-manager 托管的文件（symlink）不会重复备份。
 set -euo pipefail
@@ -47,6 +49,30 @@ wsl_conf_merge() {  # $1 = username, $2 = 输入文件（可为 /dev/null）
     [ "$nlines" -eq 0 ] || printf '\n'
     printf '[user]\ndefault=%s\n' "$u"
   fi
+}
+
+# --- 提权前端（单用户安装的一次性 root 步骤用；见步骤 1）---
+#     有 sudo → sudo（可能已缓存/免密）；无 sudo → 交互 su -c（输 root 密码）——
+#     覆盖「登录用户合法但机器没装 sudo」的最小化发行版/WSL（如 Gentoo WSL）。
+#     su 分支要求 stdin 是终端：bash <(curl …) 保留终端 stdin 可交互；curl|bash 等
+#     非交互场景无从输密码，直接返回非零走调用方的 fail-loud 提示。
+run_as_root() {  # $@ = 要以 root 执行的命令
+  if have sudo; then
+    sudo "$@"
+  elif have su && [ -t 0 ]; then
+    su_root "$@"
+  else
+    return 1
+  fi
+}
+# su 封装：su -c 只收一个命令串，参数经 %q 逐个消毒再拼接。独立成函数是因为
+# tests/bootstrap-helpers.sh 要绕开终端条件单独验证拼串（tty 门留在 run_as_root）。
+# %q 对普通词只产生空格/& 等反斜杠转义（POSIX sh 兼容）；本路径不传控制字符，
+# 不会触发 $'…' 形式。
+su_root() {  # $@ = 同上
+  local cmd
+  printf -v cmd '%q ' "$@"
+  su -c "$cmd"
 }
 
 # --- 0. 平台守卫 ---
@@ -261,12 +287,13 @@ if [ "$NIX_INSTALL_MODE" = "multi" ] && [ ! -d /run/systemd/system ]; then
   echo "错误：multi 模式需要 systemd（Determinate 安装器依赖）；本机无 systemd，请用 NIX_INSTALL_MODE=single。" >&2
   exit 1
 fi
-log "安装模式：${NIX_INSTALL_MODE}-user（systemd: $([ -d /run/systemd/system ] && echo yes || echo no)，sudo: $(have sudo && echo yes || echo no)）"
+log "安装模式：${NIX_INSTALL_MODE}-user（systemd: $([ -d /run/systemd/system ] && echo yes || echo no)，sudo: $(have sudo && echo yes || echo no)，su: $(have su && echo yes || echo no)）"
 
 # ---------------------------------------------------------------------------
 # 1/7 安装 Nix
 #     multi ：Determinate Systems 安装器（默认开启 flakes）
-#     single：官方安装器 --no-daemon；/nix 是硬编码前缀，缺失且无 sudo 时给出管理员命令后退出
+#     single：官方安装器 --no-daemon；/nix 是硬编码前缀，一次性 root 创建/属主修正
+#             统一走 run_as_root（sudo → 交互 su → 都不行才给出手动命令退出）
 # ---------------------------------------------------------------------------
 log "1/7 安装 Nix（${NIX_INSTALL_MODE}-user）"
 if have nix; then
@@ -274,17 +301,26 @@ if have nix; then
 else
   if [ "$NIX_INSTALL_MODE" = "single" ]; then
     if [ -d /nix ] && [ ! -w /nix ]; then
-      echo "错误：/nix 已存在但当前用户不可写。请让管理员执行 sudo chown $(id -un) /nix 后重试。" >&2
-      exit 1
+      echo "    /nix 已存在但当前用户不可写，尝试以 root 修正属主（sudo，无则 su 输 root 密码）…"
+      if ! run_as_root chown "$(id -un)" /nix || [ ! -w /nix ]; then
+        echo "错误：/nix 属主修正失败。请以 root 执行 chown $(id -un) /nix（WSL 可从 Windows 侧 wsl -d <发行版> -u root 进入）后重试。" >&2
+        exit 1
+      fi
     fi
-    if [ ! -d /nix ] && ! have sudo; then
-      cat >&2 <<EOF
-错误：单用户安装仍需一次 root 操作创建 /nix（Nix store 前缀硬编码为 /nix）。
-请让管理员执行：
-    sudo mkdir -m 0755 /nix && sudo chown $(id -un) /nix
+    if [ ! -d /nix ]; then
+      # 一次性 root 步骤统一走提权前端：sudo 可用与否不再改变流程（原先交给官方
+      # 安装器内部 sudo），无 sudo 机器经交互 su 完成，不再要求管理员介入
+      if run_as_root sh -c "mkdir -m 0755 /nix && chown $(id -un) /nix" && [ -w /nix ]; then
+        echo "    已创建 /nix 并属当前用户（一次性 root 步骤，此后全程无需 root）"
+      else
+        cat >&2 <<EOF
+错误：无法创建 /nix（Nix store 前缀硬编码为 /nix；无 sudo，且 su 不可用 / 非交互终端 / 密码验证未通过）。
+请以 root 执行（WSL 可从 Windows 侧 wsl -d <发行版> -u root 进入）：
+    mkdir -m 0755 /nix && chown $(id -un) /nix
 之后重新运行本脚本（此后全程无需 root）。若本机有 sudo，可去掉 NIX_INSTALL_MODE=single 走多用户安装。
 EOF
-      exit 1
+        exit 1
+      fi
     fi
     curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon
     # 单用户安装后加载 nix 环境

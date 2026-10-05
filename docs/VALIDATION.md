@@ -9,6 +9,15 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-05 bootstrap 单用户安装的 su 提权前端（bootstrap/linux.sh + tests/bootstrap-helpers.sh〔新〕+ tests/run-all.sh + README/AGENTS/docs·bootstrap + flake.nix 注释；Fedora 44 / WSL2 standalone，本机）
+
+背景：在 Gentoo WSL 上以 `bash <(curl …)` 引导，登录用户与 meta.json 一致但机器没装 sudo——模式判定落入 single，步骤 1 因「/nix 需一次性 root 创建且无 sudo」fail-loud 中止并提示找管理员；而 WSL/普通机上用户自己经 root 密码走 `su` 即可完成这唯一一次提权，不必管理员介入。
+
+改动：①linux.sh 新增提权前端 `run_as_root`（have sudo → sudo；无 sudo 且 stdin 是终端 → `su_root`；皆不可用 → 非零返回，fail-loud 留给调用方）与 `su_root`（`su -c` 只收一个命令串，参数经 `printf %q` 逐个消毒拼接；对普通词只产空格/& 反斜杠转义，POSIX sh 兼容，本路径不触发 `$'…'` 形式）。②步骤 1 single 分支重写：`/nix` 缺失 → `run_as_root sh -c 'mkdir -m 0755 /nix && chown <user> /nix'`（有 sudo 的机器结果不变——原先等价操作交给官方安装器内部 sudo；无 sudo 机器交互输 root 密码完成）；`/nix` 存在但不可写 → 同一前端尝试 chown 后复检；两者皆败的手动命令文案补 WSL `wsl -d <发行版> -u root` 进入方式。su 分支要求 `[ -t 0 ]`：`bash <(curl …)` 保留终端 stdin（README 交互性主张），`curl | bash` 无从输密码、直接落手动命令而非挂起。③0.8 模式日志补 su 可用性。④新测试 `tests/bootstrap-helpers.sh`（sed 提取 `run_as_root`/`su_root` 顶格多行函数体加载——linux.sh 不可整体 source，仓库定位段即开始执行；`have` 单行定义提不出来，测试内等价重定义、分派用例按需覆盖）12 例：sudo/su/皆无三分派、sudo 与 su 的 rc 透传、非终端 stdin 拒走 su（`< /dev/null` 钉死宿主 tty 状态——本条即「断言不得隐含宿主假设」的直接应用）、`su -c` 单串经 shell 重解析还原 argv（空格/& 元字符往返）。两个沙箱发现入注：stub 以 `$BASH` 为 shebang（nix build 沙箱无 `/usr/bin/env`，roam-functions 假 nix 同款手法）；新测试文件必须先 `git add` 才进 flake 源副本，否则沙箱内 run-all 找不到它而本地能跑（flake git-tree 过滤只认索引）。⑤run-all 汇总接入（161→173）、flake.nix scriptChecks 注释、AGENTS（单测手段补 sed 提取约束：两函数保持顶格多行）、README（单用户 `/nix` 一句 + `bash <(...)` 交互性主张补 su 依赖）、docs/bootstrap.md 同步。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` 三脚本过；shellcheck 0.11.0 零告警（`nix shell nixpkgs#shellcheck` 直跑三个改动脚本）；run-all 173/173（roam-functions 104 + prepush-gate 24 + 补全 22 + 脚手架 6 + repo-references 5 + bootstrap-helpers 12）；`nix build` 直建 `checks.x86_64-linux.shellcheck-scripts` 与 `checks.x86_64-linux.roam-unit-tests` rc=0（沙箱内两关卡，后者含新套件与 $BASH stub）；`git diff --check` 干净；**四输出 drvPath 提交前后逐一相同**（干净树对干净树——flake.nix 仅注释变化的「注释级纯重构」主张再实证；初次对比基于 99d4da6，当时桌面两侧同因尚未放行的 electron-41.10.7 拒评不可比〔该断点随后由 ac987f0 解决〕，rebase 到 ac987f0 后复核四输出仍逐一相同）。
+
+未验证 / 发现：①Gentoo WSL 实机重跑——改动即由该场景触发，su 交互路径在真终端的密码提示、建好 `/nix` 后官方安装器 `--no-daemon` 全程未实测；预期直接重跑 `bash ~/nix-roam/bootstrap/bootstrap.sh` 即可走通（或 curl 一键，复用已有克隆）。②tty+su 正路径无合成端到端（单测以 su_root 直测拼串 + 非终端负路径夹逼覆盖；伪终端方案不引入）。③aarch64 两 check 本机直建被拒（x86_64 无 ARM，既有边界，CI 覆盖）。④本批期间本地曾并行做出一份 electron-41.10.7 允许项修复（41.9.1 两存的劣化版，11266ef），push 时撞上远端更完整的 ac987f0（stable 实例替换 + nixos-base 条目求值复核 + flake check/构建验证），rebase 时丢弃该提交，electron 问题以 ac987f0 为准。
 ## 2026-10-02 insecure 清单随 2f90778 flake 更新补齐：electron-41.10.7（flake.nix + profiles/nixos-base.nix 注释 + AGENTS，AlmaLinux 9.8 / WSL2 standalone，本机）
 
 背景：上一条 VALIDATION 发现的既有断点——2f90778 update flake 后桌面 toplevel 求值拒评 electron-41.10.7（`nix flake check` 与桌面输出全挂）。用户批准按 AGENTS「Handling EOL / insecure packages」流程放行。

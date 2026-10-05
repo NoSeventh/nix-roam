@@ -43,9 +43,9 @@
 bash <(curl -fsSL https://gitee.com/qihaoxu/nix-roam/raw/master/bootstrap/bootstrap.sh)
 ```
 
-普通 Linux / WSL 上会自动把仓库取到 `~/nix-roam`（`CLONE_DIR` 环境变量可覆盖；无 git 时退到 Gitee 压缩包）再执行；NixOS 链路需要 root，非 root 运行入口会自动 `sudo` 拾起；standalone Linux 的 flake target 按架构自动选择（x86_64 → `x86_64-linux`，aarch64 → `aarch64-linux`）。有 systemd + sudo 时走多用户 Determinate 安装（镜像信任写 `/etc/nix`）；无 systemd 或无 sudo 时走单用户安装（官方安装器 `--no-daemon`，镜像写用户级 nix.conf；`/nix` 前缀仍需一次性 root 创建，脚本会给出管理员命令）。WSL1 不受支持，会明确报错。
+普通 Linux / WSL 上会自动把仓库取到 `~/nix-roam`（`CLONE_DIR` 环境变量可覆盖；无 git 时退到 Gitee 压缩包）再执行；NixOS 链路需要 root，非 root 运行入口会自动 `sudo` 拾起；standalone Linux 的 flake target 按架构自动选择（x86_64 → `x86_64-linux`，aarch64 → `aarch64-linux`）。有 systemd + sudo 时走多用户 Determinate 安装（镜像信任写 `/etc/nix`）；无 systemd 或无 sudo 时走单用户安装（官方安装器 `--no-daemon`，镜像写用户级 nix.conf；`/nix` 前缀仍需一次性 root 创建——有 sudo 用 sudo，没有则交互输 root 密码走 `su`（用户合法但机器没装 sudo 的最小化发行版/WSL 无需再找管理员），两者都不可用才给出手动命令）。WSL1 不受支持，会明确报错。
 
-`bash <(...)` 的写法保留终端交互（可直接粘贴 GitHub token，sudo 密码提示同理）；换成 `curl ... | bash` 也能运行，但会跳过 token 提示。刚导入、默认以 root 进入且连 curl 都没有的 NixOS-WSL：
+`bash <(...)` 的写法保留终端交互（可直接粘贴 GitHub token，sudo/su 的密码提示同理——单用户安装经 `su` 建 `/nix` 依赖这一点）；换成 `curl ... | bash` 也能运行，但会跳过 token 提示。刚导入、默认以 root 进入且连 curl 都没有的 NixOS-WSL：
 
 ```bash
 nix-env -f '<nixpkgs>' -iA curl && curl -fsSL https://gitee.com/qihaoxu/nix-roam/raw/master/bootstrap/bootstrap.sh -o /tmp/bootstrap.sh && bash /tmp/bootstrap.sh
