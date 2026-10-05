@@ -9,6 +9,16 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-05 单用户安装器先行喂镜像（bootstrap/linux.sh + docs/bootstrap.md；Fedora 44 / WSL2 standalone，本机）
+
+背景：Gentoo WSL 实机跑到 `installing 'nix-2.35.2' → building '…-user-environment.drv'` 长时间不动。该步是官方安装器收尾（本地组装 `~/.nix-profile`，本应秒级），卡点是它先查 substituter——此刻镜像还没写入 nix.conf（原设计步骤 2 才写），安装器内部 nix-env 只有默认 `cache.nixos.org`，而该机到 nixos.org 系为极慢直连（25MB 走 11m44s ≈ 43KB/s），无 connect-timeout 封顶时内核级 TCP 超时是分钟级（疑似叠加 IPv6 黑洞）。
+
+改动：①镜像元数据（`TRUSTED_SUBSTITUTERS` / `CACHIX_PUBLIC_KEY` 的 meta.json 解析 + fail-loud）从步骤 2 前移为新 0.9 节，步骤 2 沿用同源变量（删重复解析）。②步骤 1 single 分支在调官方安装器前 `export NIX_CONFIG`（镜像列表 + cachix 公钥 + `connect-timeout = 5`）——安装器内部 nix-env 即走 NJU 等国内镜像查询，慢路连接等待 5 秒封顶；步骤 2 的会话级 NIX_CONFIG 同步补 `connect-timeout = 5`（此前只在 nix-cn.nix 与 daemon 侧有此约定，bootstrap 会话期是缺口）。③docs/bootstrap.md 两模式段落补记（含实测数据与日期）。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` 过；shellcheck 0.11.0 零告警；run-all 173/173（bootstrap-helpers 的 sed 提取不涉改动区域，12/12 不变）；`git diff --check` 干净。NIX_CONFIG 为环境变量注入，不落盘任何 nix.conf，无输出 drvPath 影响（未改 .nix）。
+
+未验证：Gentoo WSL 实机的卡点复测——当前那次运行若自行放行（查询超时后落本地构建）即与本改动无关；若 Ctrl-C 后带同款 NIX_CONFIG 手工重跑成功，可作本改动的等效实证。安装器对 NIX_CONFIG 的继承按 nix 文档语义（所有 nix 命令读该环境变量）推定，未在真机上单独验证。
+
 ## 2026-10-05 bootstrap 单用户安装的 su 提权前端（bootstrap/linux.sh + tests/bootstrap-helpers.sh〔新〕+ tests/run-all.sh + README/AGENTS/docs·bootstrap + flake.nix 注释；Fedora 44 / WSL2 standalone，本机）
 
 背景：在 Gentoo WSL 上以 `bash <(curl …)` 引导，登录用户与 meta.json 一致但机器没装 sudo——模式判定落入 single，步骤 1 因「/nix 需一次性 root 创建且无 sudo」fail-loud 中止并提示找管理员；而 WSL/普通机上用户自己经 root 密码走 `su` 即可完成这唯一一次提权，不必管理员介入。
