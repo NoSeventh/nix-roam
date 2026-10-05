@@ -289,6 +289,15 @@ if [ "$NIX_INSTALL_MODE" = "multi" ] && [ ! -d /run/systemd/system ]; then
 fi
 log "安装模式：${NIX_INSTALL_MODE}-user（systemd: $([ -d /run/systemd/system ] && echo yes || echo no)，sudo: $(have sudo && echo yes || echo no)，su: $(have su && echo yes || echo no)）"
 
+# --- 0.9 镜像元数据（单源自 meta.json；步骤 1 的安装器与步骤 2 共用）---
+#     提前到步骤 1 之前解析：单用户官方安装器收尾的 nix-env 会先查 substituter 再
+#     本地组装 profile，此刻镜像还没写进 nix.conf（步骤 2 才写），默认只查
+#     cache.nixos.org——国内直连慢路（实测 25MB 走 11m44s）会把收尾卡成分钟级；
+#     以 NIX_CONFIG 环境变量先行喂给安装器，connect-timeout 封顶慢路连接等待。
+TRUSTED_SUBSTITUTERS="$(sed -n 's/.*"substituters": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
+CACHIX_PUBLIC_KEY="$(sed -n 's/.*"nixCommunityCachixKey": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
+[ -n "$TRUSTED_SUBSTITUTERS" ] && [ -n "$CACHIX_PUBLIC_KEY" ] || { echo "错误：无法从 meta.json 解析 substituters / nixCommunityCachixKey（文件缺失或格式变化）。" >&2; exit 1; }
+
 # ---------------------------------------------------------------------------
 # 1/7 安装 Nix
 #     multi ：Determinate Systems 安装器（默认开启 flakes）
@@ -322,6 +331,11 @@ EOF
         exit 1
       fi
     fi
+    # 安装器及其内部 nix-env 经 NIX_CONFIG 走 meta.json 镜像（解析在 0.9），
+    # connect-timeout 封顶慢路；步骤 2 会按模式重设同源配置
+    export NIX_CONFIG="substituters = $TRUSTED_SUBSTITUTERS
+extra-trusted-public-keys = $CACHIX_PUBLIC_KEY
+connect-timeout = 5"
     curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon
     # 单用户安装后加载 nix 环境
     # shellcheck disable=SC1091  # 运行时才存在的已知 nix profile 路径，静态检查无法跟随
@@ -347,12 +361,10 @@ have nix || { echo "错误：nix 仍不可用。请打开新 shell 让 nix 进 P
 #     幂等：两种模式均已配置时跳过；用户 nix.conf 已是 HM 托管 symlink 时不追加（nix-cn.nix 接管同一列表）
 # ---------------------------------------------------------------------------
 log "2/7 配置国内镜像（${NIX_INSTALL_MODE}-user）"
-# 列表/公钥单源：repo 根 meta.json（home/nix-cn.nix 与 modules/fix-network.nix 读同一份）
+# 列表/公钥单源：repo 根 meta.json（home/nix-cn.nix 与 modules/fix-network.nix 读同一份，
+# 解析在 0.9——步骤 1 的安装器已先行经 NIX_CONFIG 用过同一份）
 # cachix 补官方 Hydra 常规任务不构建的路径（如 2026-09 曾全缓存 404 的 rainbow-delimiters-nvim）；
 # 列表自带 cache.nixos.org（官方源默认已受信，trusted-substituters 里重复列出无害）
-TRUSTED_SUBSTITUTERS="$(sed -n 's/.*"substituters": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
-CACHIX_PUBLIC_KEY="$(sed -n 's/.*"nixCommunityCachixKey": *"\([^"]*\)".*/\1/p' "$REPO_ROOT/meta.json" | head -n 1)"
-[ -n "$TRUSTED_SUBSTITUTERS" ] && [ -n "$CACHIX_PUBLIC_KEY" ] || { echo "错误：无法从 meta.json 解析 substituters / nixCommunityCachixKey（文件缺失或格式变化）。" >&2; exit 1; }
 if [ "$NIX_INSTALL_MODE" = "multi" ]; then
   NIX_CUSTOM_CONF="/etc/nix/nix.custom.conf"
   NIX_SYSTEM_CONF="/etc/nix/nix.conf"
@@ -392,9 +404,11 @@ else
       echo "    已写入社区缓存公钥（$NIX_CONF）"
     fi
   fi
-  # 本次会话立即生效（后续 nix profile install / home-manager 拉包直接走国内镜像）
+  # 本次会话立即生效（后续 nix profile install / home-manager 拉包直接走国内镜像；
+  # connect-timeout 沿用 0.9 的封顶——慢路 substituter 查询不再吃内核级 TCP 超时）
   export NIX_CONFIG="substituters = $TRUSTED_SUBSTITUTERS
-extra-trusted-public-keys = $CACHIX_PUBLIC_KEY"
+extra-trusted-public-keys = $CACHIX_PUBLIC_KEY
+connect-timeout = 5"
 fi
 
 # ---------------------------------------------------------------------------
