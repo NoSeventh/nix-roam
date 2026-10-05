@@ -146,7 +146,8 @@
       #   shellcheck-scripts —— 补全文件、tests/bootstrap 脚本与 git 钩子等不经
       #                         writeShellApplication 门的脚本静态检查
       #   roam-unit-tests   —— tests/ 单测（roam.sh 纯函数 source 加载 + 补全 harness +
-      #                         脚手架样例块与旧名残留检查 + pre-push 差异门控单测与审计）
+      #                         脚手架样例块与旧名残留检查 + pre-push 差异门控单测与审计 +
+      #                         bootstrap/linux.sh 提权前端 sed 提取单测）
       # 两个 Linux 系统显式输出（与 standalone 输出同款惯例，不做 forAllSystems 展开）；
       # darwin 不提供——tests 只依赖 bash/jq/shellcheck，两侧行为无差。
       scriptChecks =
