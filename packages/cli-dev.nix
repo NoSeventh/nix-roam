@@ -57,6 +57,16 @@ with pkgs; [
   pkgs-stable.ninja
   pkgs-stable.gdb
   pkgs-stable.pkg-config
+  # autotools 家族 + bison/flex + gettext（2026-10-07 补齐）：手边 autoreconf /
+  # 构建 ./configure 类源码树即取即用；跨平台可构建，无 buildEnv 冲突。
+  # 项目需锁定特定版本时仍走各自的 nix-shell，不放全局。
+  pkgs-stable.autoconf
+  pkgs-stable.automake
+  pkgs-stable.libtool
+  pkgs-stable.m4
+  pkgs-stable.bison
+  pkgs-stable.flex
+  pkgs-stable.gettext
   pkgs-stable.rustc
   pkgs-stable.cargo
   pkgs-stable.go
