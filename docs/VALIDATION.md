@@ -9,6 +9,16 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-07 cli-dev 补齐 autotools 家族 + bison/flex + gettext（packages/cli-dev.nix；Fedora 44 / WSL2 standalone，本机）
+
+背景：GNU 工具链盘点（显式配置仅 gcc/gnumake/gdb 三件，binutils/coreutils 隐式随 stdenv/gcc 闭包）后用户拍板补 autoreconf / ./configure 场景常用件；gnupg / screen / GSL 与 GNU 用户态替换不加（用到再按项目 nix-shell 配）。补前实测十个候选闭包合计约 +535MB 解包 / 161MB 下载，本次七件远小于之（体积大头 gnupg 链未引入；perl 作为 autotools 共享运行时进闭包）。
+
+改动：cli-dev.nix 开发工具链段 pkg-config 后插 7 包，全 `pkgs-stable`（autoconf / automake / libtool / m4 / bison / flex / gettext），无平台 guard——七件 aarch64-darwin 均可构建；不触已知 buildEnv 冲突面（无 bin/ld、无 python3 派生）。四个安装点随共享列表同时获得。
+
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`roam check nixos wsl x86_64-linux aarch64-linux aarch64-darwin` 5/5 通过（各输出 drvPath 变化为预期——新增包进全部安装点闭包，非纯重构对比）；`nix build --no-link .#homeConfigurations.x86_64-linux.activationPackage` rc=0（新路径 NJU 替代获取，buildEnv 组装干净）；构建产物 home-manager-path/bin 抽查 autoconf / autoreconf / automake / libtoolize / m4 / bison / flex / msgfmt / msginit 在位。
+
+未验证：aarch64-linux / aarch64-darwin 实机构建（既有边界，本机与 CI 均仅求值覆盖，待该侧下一次 roam switch 实证）；本机未激活（下次 roam switch 生效，届时 autotools 进 PATH）。
+
 ## 2026-10-05 单用户安装器先行喂镜像（bootstrap/linux.sh + docs/bootstrap.md；Fedora 44 / WSL2 standalone，本机）
 
 背景：Gentoo WSL 实机跑到 `installing 'nix-2.35.2' → building '…-user-environment.drv'` 长时间不动。该步是官方安装器收尾（本地组装 `~/.nix-profile`，本应秒级），卡点是它先查 substituter——此刻镜像还没写入 nix.conf（原设计步骤 2 才写），安装器内部 nix-env 只有默认 `cache.nixos.org`，而该机到 nixos.org 系为极慢直连（25MB 走 11m44s ≈ 43KB/s），无 connect-timeout 封顶时内核级 TCP 超时是分钟级（疑似叠加 IPv6 黑洞）。
