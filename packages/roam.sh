@@ -40,6 +40,18 @@
 #                          rev（7 位短形）/日期/ref/来源；--all 追加上游传递输入。
 #                          纯本地解析（只锚定缩进层级，不依赖 jq），不求值不触网
 #   roam info              只读打印宿主探测结论（环境 / 用户守卫 / 将选中的输出）
+#   roam module init|list|enable|disable [名...|--host K]
+#                          机器本地模块选配（lib/selection.nix 的 bash 前端）：
+#                          init 以当前有效选择为种子生成 local.<主机键>.json
+#                          （gitignored，首次 init 零行为变化）；list 列注册表与
+#                          该机 on/off；enable/disable 校验注册表（未知名/前端不
+#                          适用/darwin 白名单外均拒绝）后改写 local 文件。改完
+#                          roam check <K> 验证、roam switch 生效。
+#
+# 求值语义（2026-10-11 起）：本脚本全部 nix/nh 调用一律用 path:./. 引用——path: 视图
+# 整目录拷贝、能看到 gitignored 的 local.<主机键>.json（本机模块选配）；裸 .#（CI /
+# pre-push / 远端 git+https / 手工求值）是 git 视图、只见入库默认集。两视图机制见
+# lib/selection.nix 与 docs/modules.md。
 #
 # 需在本仓库检出目录下运行（flake 位置参数 '.' 按 cwd 解析）；rollback 与 gc 例外
 # ——rollback 只操作既有 store 世代，gc 是机器操作，均不查仓库。
@@ -75,8 +87,17 @@ usage() {
                      缺省时列出 flake 输入供选择：回车（或非交互 EOF）=全部；
                      显式输入名可多个只更新它们；--all 跳过选择直接全量
   flake [-a|--all]  查看 flake.lock 锁定的输入版本（名称/短 rev/日期/ref/来源）；
-                     --all 附上游传递输入（版本后缀节点）；纯本地解析，
-                     不求值不触网、不依赖 jq
+                    --all 附上游传递输入（版本后缀节点）；纯本地解析，
+                    不求值不触网、不依赖 jq
+  module <动作> [名...] [--host K]
+                    机器本地模块选配（local.<主机键>.json，gitignored）：
+                    init   生成选配文件（以当前有效选择为种子，零行为变化）
+                    list   注册表目录 + 该机 on/off（--host 看其它主机键）
+                    enable <名...> 启用（未知名/前端不适用/darwin 白名单外拒绝）
+                    disable <名...> 停用（未启用为幂等 no-op）
+                    主机键：NixOS = 主机名；standalone = 输出名
+                    （x86_64-linux / aarch64-linux / aarch64-darwin）
+                    改完 roam check <K> 验证、roam switch 生效
   info               只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
   help               显示本帮助
 EOF
@@ -131,12 +152,13 @@ nixos_output() {
 # NixOS 分支切换预检：以一次轻求值换取指向约定的干净报错（错配时 nix/nh 的原始
 # 属性缺失信息难懂）。求值失败 = 无对应输出；值不等 = 配置内 hostName 与输出名
 # 脱节——flake.nix 的 hostnameGuard 断言在 toplevel 求值期也会拦（checkAssertWarn
-# throw），预检的价值是更早一步、报错直接给出约定与修法。
+# throw），预检的价值是更早一步、报错直接给出约定与修法。path:./. 引用 = 含本机
+# local.<主机键>.json 选配的视图（本文件全链路约定，见头注释）。
 nixos_preflight() {
   local short cfg
   short="$(uname -n)"
   short="${short%%.*}"
-  cfg="$(nix eval --raw ".#nixosConfigurations.${short}.config.networking.hostName")" \
+  cfg="$(nix eval --raw "path:./.#nixosConfigurations.${short}.config.networking.hostName")" \
     || die "hostname ${short} 无对应 flake 输出 nixosConfigurations.${short}（约定：hosts/ 目录名 = networking.hostName = 输出属性名；新主机经 bootstrap/nixos.sh adopt --target <名> 脚手架，见 README「NixOS 全新安装与迁移」）"
   [ "$cfg" = "$short" ] \
     || die "nixosConfigurations.${short} 内 networking.hostName=${cfg}，与输出属性名不一致（同一约定；改 hosts/${short}/default.nix 或输出名，两侧对齐）"
@@ -241,7 +263,7 @@ compute_drift() {
   DRIFT_VERDICT=''
   DRIFT_DETAIL=''
   if is_nixos; then
-    DRIFT_EXPECTED="$(nix eval --raw ".#$(host_attr).outPath")" || return 1
+    DRIFT_EXPECTED="$(nix eval --raw "path:./.#$(host_attr).outPath")" || return 1
     DRIFT_CURRENT="$(readlink /run/current-system)" || return 1
     if [ "$DRIFT_EXPECTED" = "$DRIFT_CURRENT" ]; then
       DRIFT_VERDICT='一致（运行环境 = 检出）'
@@ -251,7 +273,7 @@ compute_drift() {
   else
     local j seen_hist=false
     load_hm_generations || return 1
-    DRIFT_EXPECTED="$(nix eval --raw ".#$(host_attr).outPath")" || return 1
+    DRIFT_EXPECTED="$(nix eval --raw "path:./.#$(host_attr).outPath")" || return 1
     DRIFT_CURRENT="${GEN_PATHS[$GEN_CURRENT]}"
     DRIFT_DETAIL="世代 id ${GEN_IDS[$GEN_CURRENT]}（${GEN_DATES[$GEN_CURRENT]}）"
     # 注意：rollback 的 activate 会把旧内容登记为新世代号，因此「检出是否激活过」
@@ -276,13 +298,17 @@ compute_drift() {
 
 # --- 3. 子命令 ---
 cmd_switch() {
-  local rc target u
+  local rc target u short
   repo_check
   if is_nixos; then
     command -v nh >/dev/null 2>&1 \
       || die "未找到 nh（NixOS 侧经 packages/cli-dev.nix 共享列表落系统位；首次进入闭包前可先 sudo nixos-rebuild switch --flake .#<主机名> 自举一次）"
     nixos_preflight
-    if run_logged switch nh os switch --diff always . "$@"; then
+    short="$(uname -n)"
+    short="${short%%.*}"
+    # path:./. 引用让本机 local.<主机键>.json 选配进求值；-H 显式点名输出——
+    # path: 引用下 nh 按引用串推断主机的默认行为不再可靠（目录名约定不再适用）。
+    if run_logged switch nh os switch --diff always -H "$short" path:./. "$@"; then
       return 0
     else
       rc=$?
@@ -300,9 +326,9 @@ cmd_switch() {
   command -v nh >/dev/null 2>&1 \
     || die "未找到 nh（standalone 侧由 packages/cli-dev.nix 提供；首次进入闭包前可先 home-manager switch --flake .#${target} 自举一次）"
   # nh 4.4.2 把裸 .#attr 解析成 packages.<system>.<attr> 简写而非 homeConfigurations
-  # 属性，须用 --configuration 显式点名 + 位置参数 . 传 flake（nh 上游 master 已改，
-  # 以锁定 nixpkgs 的实际行为为准）。
-  if run_logged switch nh home switch --diff always --configuration "$target" . "$@"; then
+  # 属性，须用 --configuration 显式点名 + 位置参数传 flake（nh 上游 master 已改，
+  # 以锁定 nixpkgs 的实际行为为准）。path:./. 引用 = 含本机 local 选配的视图。
+  if run_logged switch nh home switch --diff always --configuration "$target" path:./. "$@"; then
     return 0
   else
     rc=$?
@@ -311,7 +337,7 @@ cmd_switch() {
 }
 
 cmd_status() {
-  local git_line dirty_n
+  local git_line dirty_n mkey mfile mn
   repo_check
   compute_drift || die '漂移计算失败（求值或世代读取不成功）'
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -328,6 +354,17 @@ cmd_status() {
   printf '运行世代  : %s%s\n' "${DRIFT_CURRENT##*/}" "${DRIFT_DETAIL:+  ${DRIFT_DETAIL}}"
   printf '检出求值  : %s\n' "${DRIFT_EXPECTED##*/}"
   printf 'Git       : %s\n' "$git_line"
+  # 模块选配一行速览（选配机制存在与否不影响 status 本体；探测失败静默省略）
+  mkey="$(module_current_key 2>/dev/null || true)"
+  if [ -n "$mkey" ]; then
+    mfile="$(local_file "$mkey")"
+    if [ -f "$mfile" ]; then
+      mn="$(local_selection_read "$mkey" | grep -c . || true)"
+      printf '模块选配  : %s（%s 层启用）\n' "${mfile#./}" "${mn:-0}"
+    else
+      printf '模块选配  : 无 local.%s.json（入库默认集）\n' "$mkey"
+    fi
+  fi
   printf '状态      : %s\n' "$DRIFT_VERDICT"
 }
 
@@ -671,6 +708,305 @@ cmd_gc() {
   fi
 }
 
+# --- module：机器本地模块选配（lib/selection.nix 的 bash 前端）---
+# 注册表 modules/registry.json 与 local.<主机键>.json 均为仓库自持格式；解析用锚定
+# sed/grep（read_flake_lock 同款手法，Bash 3.2 / 无 jq），失败即中止，无静默回落。
+# ROAM_REGISTRY_PATH / ROAM_LOCAL_DIR 供单测重定向（tests/roam-functions.sh 以临时
+# 目录打桩，与 ROAM_SYSTEM_PROFILES_DIR 同款约定）。
+registry_path() { printf '%s' "${ROAM_REGISTRY_PATH:-modules/registry.json}"; }
+local_file() { printf '%s/local.%s.json' "${ROAM_LOCAL_DIR:-.}" "$1"; }
+
+# 填平行数组 REG_NAMES / REG_NIXOS / REG_HOME / REG_DARWIN / REG_DESC。
+# 格式锚点：模块对象括号 4 空格缩进（"    {" / "    },"），字段 6 空格每行一键；
+# 布尔缺行按 false 处理。解析出 0 个模块 = 格式漂移，中止。
+load_registry() {
+  REG_NAMES=()
+  REG_NIXOS=()
+  REG_HOME=()
+  REG_DARWIN=()
+  REG_DESC=()
+  local f="$1" line inmod=false name nixos home darwin desc fld
+  [ -f "$f" ] || die "未找到注册表 $f（须在仓库检出目录运行）"
+  reg_flush() {
+    if [ -n "$name" ]; then
+      REG_NAMES+=("$name")
+      REG_NIXOS+=("$nixos")
+      REG_HOME+=("$home")
+      REG_DARWIN+=("$darwin")
+      REG_DESC+=("$desc")
+    fi
+    name='' nixos=false home=false darwin=false desc=''
+    return 0
+  }
+  name='' nixos=false home=false darwin=false desc=''
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [ "$inmod" = true ]; then
+      case "$line" in
+        '    }'*) reg_flush; inmod=false ;;
+        *)
+          # 逐字段试探：sed 匹配才落位（无条件赋值会把先前已提取的字段清空——
+          # name 行之后再遇 desc 行，name 就被 desc 行上的失败 sed 抹成空串）
+          fld="$(printf '%s\n' "$line" | sed -n 's/^ *"name": *"\([^"]*\)",\{0,1\}$/\1/p')"
+          if [ -n "$fld" ]; then name="$fld"; continue; fi
+          fld="$(printf '%s\n' "$line" | sed -n 's/^ *"nixos": *\(true\|false\),\{0,1\}$/\1/p')"
+          if [ -n "$fld" ]; then nixos="$fld"; continue; fi
+          fld="$(printf '%s\n' "$line" | sed -n 's/^ *"home": *\(true\|false\),\{0,1\}$/\1/p')"
+          if [ -n "$fld" ]; then home="$fld"; continue; fi
+          fld="$(printf '%s\n' "$line" | sed -n 's/^ *"darwin": *\(true\|false\),\{0,1\}$/\1/p')"
+          if [ -n "$fld" ]; then darwin="$fld"; continue; fi
+          fld="$(printf '%s\n' "$line" | sed -n 's/^ *"desc": *"\(.*\)",\{0,1\}$/\1/p')"
+          if [ -n "$fld" ]; then desc="$fld"; fi
+          ;;
+      esac
+    else
+      case "$line" in
+        '    {') inmod=true; name='' nixos=false home=false darwin=false desc='' ;;
+      esac
+    fi
+  done <"$f"
+  reg_flush
+  [ "${#REG_NAMES[@]}" -gt 0 ] || die "注册表解析出 0 个模块（$f 格式变化？）"
+}
+
+# 模块名 → REG_* 下标；找不到返回 1（调用方给文案）
+module_lookup() {
+  local i=0
+  while [ "$i" -lt "${#REG_NAMES[@]}" ]; do
+    if [ "${REG_NAMES[$i]}" = "$1" ]; then
+      REG_IDX=$i
+      return 0
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+
+# 主机键 → 前端：standalone 三键按名映射，其余视为 NixOS 主机名（hosts/<K>/ 须在）。
+# darwin 键走 home-darwin（白名单在 selection.nix 与本文件 enable 校验双重把守）。
+module_front_for_key() {
+  case "$1" in
+    x86_64-linux | aarch64-linux) printf 'home-linux' ;;
+    aarch64-darwin) printf 'home-darwin' ;;
+    *)
+      [ -d "hosts/$1" ] || die "未知主机键：$1（NixOS 主机须有 hosts/<主机名>/ 目录；standalone 键：x86_64-linux / aarch64-linux / aarch64-darwin）"
+      printf 'nixos'
+      ;;
+  esac
+}
+
+# 当前宿主的主机键（与 nixos_output / standalone_target 同源约定）
+module_current_key() {
+  if is_nixos; then
+    local h
+    h="$(uname -n)"
+    printf '%s' "${h%%.*}"
+  else
+    standalone_target
+  fi
+}
+
+# local.<K>.json 的 modules 数组 → 每行一个名字（文件自持格式；任意空白布局均可）。
+# 末尾 || true：空集时 sed/grep 管道无选中行 rc=1，管道赋值在 set -e 下会静默中止
+# （文件存在与否的语义由前置 [ -f ] 的 return 1 承担，解析段不该再带 rc）。
+local_selection_read() {
+  local f
+  f="$(local_file "$1")"
+  [ -f "$f" ] || return 1
+  { sed -n '/"modules"/,/\]/p' "$f" | grep -o '"[^"]*"' | tail -n +2 | tr -d '"'; } || true
+}
+
+# 按自持格式写选配文件（host 自校验字段 + updated 时间戳 + 每模块一行）。
+# 末元素不带尾逗号——文件须是严格合法 JSON（nix fromJSON 不容忍）。
+local_selection_write() {
+  local k="$1" f tmp m i=1 total
+  shift
+  total=$#
+  f="$(local_file "$k")"
+  tmp="${f}.tmp"
+  {
+    printf '{\n'
+    printf '  "host": "%s",\n' "$k"
+    printf '  "updated": "%s",\n' "$(date '+%F %T')"
+    printf '  "modules": ['
+    if [ "$total" -gt 0 ]; then
+      printf '\n'
+      for m in "$@"; do
+        if [ "$i" -lt "$total" ]; then
+          printf '    "%s",\n' "$m"
+        else
+          printf '    "%s"\n' "$m"
+        fi
+        i=$((i + 1))
+      done
+    else
+      printf '\n'
+    fi
+    printf '  ]\n}\n'
+  } >"$tmp" && mv "$tmp" "$f"
+}
+
+# 当前有效选择（local 缺席时 = 入库默认集）：一次轻求值，每行一个名字。
+# 求值失败（如 local 文件本身坏）原样透传 rc，调用方给文案。
+effective_selection() {
+  local k="$1" front="$2" attr
+  case "$front" in
+    nixos) attr="nixosConfigurations.${k}" ;;
+    *) attr="homeConfigurations.${k}" ;;
+  esac
+  nix eval --raw --apply 'xs: builtins.concatStringsSep "\n" xs' \
+    "path:./.#${attr}.config.roam.selectedModules"
+}
+
+sel_has() { printf '%s\n' "$1" | grep -qxF "$2"; }
+
+module_usage() {
+  cat <<'EOF'
+用法：roam module <动作> [名...] [--host K]
+
+  init               生成 local.<主机键>.json（以当前有效选择为种子，首次零行为变化）
+  list               注册表目录 + 该机 on/off（--host K 看其它主机键）
+  enable <名...>     启用模块（未知名 / 前端不适用 / darwin 白名单外 → 拒绝）
+  disable <名...>    停用模块（未启用为幂等 no-op）
+  -h, --help         显示本帮助
+
+主机键：NixOS = 主机名（hosts/<主机名>/）；standalone = 输出名
+（x86_64-linux / aarch64-linux / aarch64-darwin）。缺省 = 当前宿主。
+选配文件 gitignored、只记本机；git 求值视图（CI/远端）见入库默认集。
+改完 roam check <K> 验证，roam switch 生效。
+EOF
+}
+
+cmd_module() {
+  local action='' host_key='' names='' n k front f seed cur changed new_name
+  [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] && { module_usage; return 0; }
+  [ "$#" -ge 1 ] || { module_usage >&2; die 'module: 缺少动作（init / list / enable / disable）'; }
+  action="$1"
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --host)
+        [ "$#" -ge 2 ] || die 'module: --host 需要参数（主机键）'
+        host_key="$2"
+        shift 2
+        ;;
+      -h | --help) module_usage; return 0 ;;
+      -*) die "module: 未知选项：$1" ;;
+      *) names="$names $1" ;;
+    esac
+    shift || true
+  done
+  names="${names# }"
+  [ -n "${ROAM_REGISTRY_PATH:-}" ] || repo_check
+  load_registry "$(registry_path)"
+  [ -n "$host_key" ] || host_key="$(module_current_key)"
+  front="$(module_front_for_key "$host_key")"
+  f="$(local_file "$host_key")"
+  case "$action" in
+    init)
+      [ -z "$names" ] || die 'module init 不接受模块名（种子 = 当前有效选择）'
+      [ -f "$f" ] && die "已存在 $f（要调整用 enable/disable；要重来先删文件）"
+      seed="$(effective_selection "$host_key" "$front")" \
+        || die "当前有效选择求值失败（$host_key 输出不可求值？修好后再 init）"
+      # shellcheck disable=SC2086
+      local_selection_write "$host_key" $seed
+      printf 'roam: 已生成 %s（%s 层，种子 = 当前有效选择，行为无变化）\n' "$f" "$(printf '%s\n' "$seed" | grep -c . || true)"
+      ;;
+    list)
+      local on eff=''
+      if eff="$(effective_selection "$host_key" "$front")"; then
+        :
+      else
+        printf 'roam: ! 有效选择求值失败（local 文件坏或输出不可求值），on/off 列不可用\n' >&2
+        eff=''
+      fi
+      if [ -f "$f" ]; then
+        printf '主机键 %s（前端 %s）· 本机选配 %s（%s 层启用）\n' "$host_key" "$front" "$f" "$(printf '%s\n' "$eff" | grep -c . || true)"
+      else
+        printf '主机键 %s（前端 %s）· 无本机选配（入库默认集）\n' "$host_key" "$front"
+      fi
+      printf '%-4s %-18s %-22s %s\n' 'on?' '模块' '前端' '说明'
+      n=0
+      while [ "$n" -lt "${#REG_NAMES[@]}" ]; do
+        if sel_has "$eff" "${REG_NAMES[$n]}"; then on='✓'; else on='·'; fi
+        printf '%-4s %-18s %-22s %s\n' "$on" "${REG_NAMES[$n]}" \
+          "nixos:${REG_NIXOS[$n]} home:${REG_HOME[$n]} darwin:${REG_DARWIN[$n]}" "${REG_DESC[$n]}"
+        n=$((n + 1))
+      done
+      printf '基座（nixos-base / 桌面基座 / cli-dev CLI 列表）不在此列、不可关。\n'
+      ;;
+    enable | disable)
+      [ -n "$names" ] || die "module $action: 至少给一个模块名（roam module list 查看）"
+      # 校验全部名字后再动文件（要么全成、要么不动）
+      # shellcheck disable=SC2086
+      for new_name in $names; do
+        module_lookup "$new_name" \
+          || die "模块 $new_name 不在注册表（roam module list 查看；名字以 modules/registry.json 为准）"
+        case "$front" in
+          nixos)
+            [ "${REG_NIXOS[$REG_IDX]}" = true ] \
+              || die "模块 $new_name 无 nixos 实现（其用户级能力也不适用于 NixOS 系统级前端）"
+            ;;
+          home-linux)
+            [ "${REG_HOME[$REG_IDX]}" = true ] \
+              || die "模块 $new_name 无 home-linux 实现（系统级专属层，standalone 不可启用）"
+            ;;
+          home-darwin)
+            [ "${REG_HOME[$REG_IDX]}" = true ] \
+              || die "模块 $new_name 无用户级实现（standalone 不可启用）"
+            [ "${REG_DARWIN[$REG_IDX]}" = true ] \
+              || die "模块 $new_name 不在 darwin 白名单（保守边界；放开 = registry 改 darwin=true）"
+            ;;
+        esac
+      done
+      if [ ! -f "$f" ]; then
+        seed="$(effective_selection "$host_key" "$front")" \
+          || die "当前有效选择求值失败（$host_key 输出不可求值？修好后再操作）"
+        # shellcheck disable=SC2086
+        local_selection_write "$host_key" $seed
+        printf 'roam: 已生成 %s（种子 = 当前有效选择）\n' "$f"
+      fi
+      cur="$(local_selection_read "$host_key")"
+      changed=false
+      # shellcheck disable=SC2086
+      for new_name in $names; do
+        if [ "$action" = enable ]; then
+          if sel_has "$cur" "$new_name"; then
+            printf 'roam: %s 已启用，跳过\n' "$new_name"
+          else
+            cur="$(printf '%s\n%s\n' "$cur" "$new_name")"
+            changed=true
+          fi
+        else
+          if sel_has "$cur" "$new_name"; then
+            # grep -v 滤空输出时 rc=1，赋值在 set -e 下会静默中止——|| true 兜住
+            cur="$(printf '%s\n' "$cur" | grep -vxF "$new_name" || true)"
+            changed=true
+          else
+            printf 'roam: %s 未启用，无需停用\n' "$new_name"
+          fi
+        fi
+      done
+      if [ "$changed" = true ]; then
+        cur="$(printf '%s\n' "$cur" | sed '/^$/d')"
+        # shellcheck disable=SC2086
+        local_selection_write "$host_key" $cur
+        printf 'roam: 选配已更新（%s 层启用）。差异：\n' "$(printf '%s\n' "$cur" | grep -c . || true)"
+        # shellcheck disable=SC2086
+        for new_name in $names; do
+          if [ "$action" = enable ]; then printf '  + %s\n' "$new_name"; else printf '  - %s\n' "$new_name"; fi
+        done
+        printf 'roam: 验证 roam check %s，生效 roam switch\n' "$host_key"
+      else
+        printf 'roam: 无变化\n'
+      fi
+      ;;
+    *)
+      module_usage >&2
+      die "module: 未知动作：$action（init / list / enable / disable）"
+      ;;
+  esac
+}
+
 # 目标名 → flake 属性路径（check 显式目标专用；host_attr 是「当前宿主」的同一
 # 映射。未知目标即 die——cmd_check 解析期借它做即时校验）
 check_attr() {
@@ -720,8 +1056,8 @@ cmd_check() {
     # shellcheck disable=SC2086
     for a in $attrs; do
       total=$((total + 1))
-      printf 'roam check: 构建 .#%s\n' "$a"
-      nix build --no-link ".#${a}" || rc=1
+      printf 'roam check: 构建 path:./.#%s\n' "$a"
+      nix build --no-link "path:./.#${a}" || rc=1
     done
   else
     # 目标名均为经校验的标识符（无空格/通配），展开安全
@@ -737,7 +1073,7 @@ cmd_check() {
       i=$((i + 1))
       (
         # 子壳双分支显式写 rc：nix 失败时若不接住，set -e 会在写 rc 前中止子壳
-        if nix eval --raw ".#${a}.drvPath" >"$cktmp/$i.out" 2>"$cktmp/$i.err"; then
+        if nix eval --raw "path:./.#${a}.drvPath" >"$cktmp/$i.out" 2>"$cktmp/$i.err"; then
           printf '0\n' >"$cktmp/$i.rc"
         else
           printf '%s\n' "$?" >"$cktmp/$i.rc"
@@ -748,7 +1084,7 @@ cmd_check() {
     i=0
     for a in "$@"; do
       i=$((i + 1))
-      printf 'roam check: 求值 .#%s\n' "$a"
+      printf 'roam check: 求值 path:./.#%s\n' "$a"
       cat "$cktmp/$i.out"
       if [ -s "$cktmp/$i.out" ]; then printf '\n'; fi
       cat "$cktmp/$i.err" >&2
@@ -1091,6 +1427,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     check) cmd_check "$@" ;;
     update) cmd_update "$@" ;;
     flake) cmd_flake "$@" ;;
+    module) cmd_module "$@" ;;
     info) cmd_info "$@" ;;
     help | -h | --help) usage ;;
     *)

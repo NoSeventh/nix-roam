@@ -2,7 +2,8 @@
 # roam.sh 纯函数单测 —— source 方式加载被测脚本（分发段经 BASH_SOURCE 执行守卫跳过）。
 # 覆盖最脆的解析点：home-manager generations 文本格式、profile 目录 glob、
 # meta.json 提取、choose_inputs 交互解析、read_flake_lock/flake.lock 缩进解析、
-# standalone_target 架构分发、cmd_check 多目标分发与失败汇总。
+# standalone_target 架构分发、cmd_check 多目标分发与失败汇总、模块注册表解析与
+# 选配文件守卫（load_registry / module_front_for_key / cmd_module enable/disable）。
 # 打桩手段：PATH 注入假 home-manager（cat fixture）、ROAM_SYSTEM_PROFILES_DIR
 # 指向临时目录、source 前定义 uname 函数（kernel 在 source 期捕获）、stdin 管道。
 # 运行：检出内 bash tests/roam-functions.sh；或经 flake checks
@@ -370,12 +371,12 @@ out="$(ckr wsl nixos)"; rc=$?
 expect_rc 'check：多目标 rc=0' 0 "$rc"
 # 并行求值：nix 桩在后台子壳里竞争写日志，完成次序不定——排序比对
 expect_eq 'check：多目标都求值（并行次序不定，排序比对）' "$(sort "$CHECK_LOG")" \
-  'eval --raw .#nixosConfigurations.nixos.config.system.build.toplevel.drvPath
-eval --raw .#nixosConfigurations.wsl.config.system.build.toplevel.drvPath'
+  'eval --raw path:./.#nixosConfigurations.nixos.config.system.build.toplevel.drvPath
+eval --raw path:./.#nixosConfigurations.wsl.config.system.build.toplevel.drvPath'
 # 汇报在全部完成后按输入次序打印（稳定可测），头行次序即输入次序
 expect_eq 'check：汇报次序=输入次序' "$(printf '%s\n' "$out" | grep '^roam check: 求值')" \
-  'roam check: 求值 .#nixosConfigurations.wsl.config.system.build.toplevel
-roam check: 求值 .#nixosConfigurations.nixos.config.system.build.toplevel'
+  'roam check: 求值 path:./.#nixosConfigurations.wsl.config.system.build.toplevel
+roam check: 求值 path:./.#nixosConfigurations.nixos.config.system.build.toplevel'
 expect_sub 'check：多目标通过汇总行' "$out" '2 个目标全部通过'
 expect_sub 'check：多目标并行预告行' "$out" '并行求值 2 个目标'
 out="$(ckr wsl wsl)"; rc=$?
@@ -385,11 +386,11 @@ expect_eq 'check：单目标不打汇总行' "$(printf '%s' "$out" | grep -c '�
 out="$(ckr x86_64-linux --build)"; rc=$?
 expect_rc 'check：--build 可后置 rc=0' 0 "$rc"
 expect_eq 'check：--build 走构建命令' "$(cat "$CHECK_LOG")" \
-  'build --no-link .#homeConfigurations.x86_64-linux.activationPackage'
+  'build --no-link path:./.#homeConfigurations.x86_64-linux.activationPackage'
 out="$(ckr)"; rc=$?
 expect_rc 'check：缺省目标 rc=0（standalone 桩）' 0 "$rc"
 expect_contains 'check：缺省=当前宿主（x86_64-linux）' "$(cat "$CHECK_LOG")" \
-  'eval --raw .#homeConfigurations.x86_64-linux.activationPackage.drvPath'
+  'eval --raw path:./.#homeConfigurations.x86_64-linux.activationPackage.drvPath'
 out="$(ckr bogus 2>/dev/null)"; rc=$?
 expect_rc 'check：未知目标须拒绝' 1 "$rc"
 errout="$(ckr bogus 2>&1)"
@@ -404,6 +405,140 @@ errout="$(ckr wsl nixos 2>&1)"
 expect_sub 'check：失败汇总行' "$errout" '存在失败目标'
 FAIL_ATTR=''
 
-rm -rf "$STUBBIN" "$PROF" "$NIXSTUB" "$STUBGC" "$GCLOG_FILE" "$CHECK_LOG"
+# --- 模块选配（load_registry / module_front_for_key / local 读写 / cmd_module 守卫）---
+# registry 解析用夹具（真实注册表另由 tests/module-registry.sh 做一致性门禁）；
+# local 读写与 cmd_module 用临时目录经 ROAM_LOCAL_DIR / ROAM_REGISTRY_PATH 重定向，
+# nix 以函数桩供给 effective_selection 的种子求值（cmd_check 同款手法）。
+MODDIR="$(mktemp -d)"
+mkdir -p "$MODDIR/hosts/myhost"
+
+load_registry "$FIX/registry-good.json"
+expect_eq 'registry：名字齐全' "${REG_NAMES[*]}" 'alpha beta gamma'
+expect_eq 'registry：nixos 旗标' "${REG_NIXOS[*]}" 'true true false'
+expect_eq 'registry：home 旗标' "${REG_HOME[*]}" 'true false true'
+expect_eq 'registry：darwin 旗标' "${REG_DARWIN[*]}" 'false false true'
+expect_eq 'registry：desc 提取' "$REG_DESC" '双前端模块（测试夹具）'
+module_lookup beta
+expect_eq 'registry：module_lookup 命中下标' "$REG_IDX" 1
+module_lookup nonexistent; rc=$?
+expect_rc 'registry：module_lookup 未命中 rc=1' 1 "$rc"
+out="$(load_registry "$FIX/registry-empty.json" 2>/dev/null)"; rc=$?
+expect_rc 'registry：0 模块须中止（fail-loud）' 1 "$rc"
+out="$(load_registry "$FIX/registry-missing.json" 2>/dev/null)"; rc=$?
+expect_rc 'registry：文件缺失须中止' 1 "$rc"
+
+# 前端映射：standalone 三键按名；NixOS 键要求 hosts/<K>/ 在（相对 cwd）
+expect_eq 'front：x86_64-linux → home-linux' "$(module_front_for_key x86_64-linux)" home-linux
+expect_eq 'front：aarch64-darwin → home-darwin' "$(module_front_for_key aarch64-darwin)" home-darwin
+out="$(cd "$MODDIR" && module_front_for_key myhost)"; rc=$?
+expect_rc 'front：hosts/ 在则 NixOS 键 rc=0' 0 "$rc"
+expect_eq 'front：NixOS 键 → nixos' "$out" nixos
+out="$(cd "$MODDIR" && module_front_for_key bogus 2>/dev/null)"; rc=$?
+expect_rc 'front：未知 NixOS 键须拒绝' 1 "$rc"
+
+# local 选配读写往返（自持格式：host 字段 + 每模块一行）
+(
+  ROAM_LOCAL_DIR="$MODDIR"
+  export ROAM_LOCAL_DIR
+  local_selection_write x86_64-linux alpha gamma
+)
+out="$(ROAM_LOCAL_DIR="$MODDIR" local_selection_read x86_64-linux)"
+expect_eq 'local：写读往返' "$out" 'alpha
+gamma'
+expect_sub 'local：host 自校验字段在' "$(cat "$MODDIR/local.x86_64-linux.json")" '"host": "x86_64-linux"'
+jq -e . "$MODDIR/local.x86_64-linux.json" >/dev/null 2>&1
+expect_rc 'local：多元素文件是严格合法 JSON（无尾逗号）' 0 "$?"
+(
+  ROAM_LOCAL_DIR="$MODDIR"
+  export ROAM_LOCAL_DIR
+  local_selection_write aarch64-linux alpha
+)
+jq -e '.modules == ["alpha"]' "$MODDIR/local.aarch64-linux.json" >/dev/null 2>&1
+expect_rc 'local：单元素文件是严格合法 JSON（尾逗号回归）' 0 "$?"
+(
+  ROAM_LOCAL_DIR="$MODDIR"
+  export ROAM_LOCAL_DIR
+  local_selection_write x86_64-linux
+)
+jq -e '.modules == []' "$MODDIR/local.x86_64-linux.json" >/dev/null 2>&1
+expect_rc 'local：空集文件是严格合法 JSON' 0 "$?"
+rm -f "$MODDIR/local.aarch64-linux.json"
+ROAM_LOCAL_DIR="$MODDIR" local_selection_read aarch64-linux; rc=$?
+expect_rc 'local：文件缺失 rc=1' 1 "$rc"
+
+# cmd_module：守卫与幂等（nix 桩供种子求值；ROAM_REGISTRY_PATH 走夹具、
+# ROAM_LOCAL_DIR 走临时目录；--host 显式指定避开宿主探测）
+MODLOG="$(mktemp)"
+MOD_SEED_FILE="$(mktemp)"
+: >"$MOD_SEED_FILE"
+modr() { # 参数 = cmd_module 的参数；种子内容经 MOD_SEED_FILE 传给 nix 桩
+  (
+    cd "$MODDIR" || exit 1
+    ROAM_REGISTRY_PATH="$FIX/registry-good.json"
+    ROAM_LOCAL_DIR="$MODDIR"
+    export ROAM_REGISTRY_PATH ROAM_LOCAL_DIR
+    nix() {
+      printf '%s\n' "$*" >>"$MODLOG"
+      cat "$MOD_SEED_FILE" 2>/dev/null || true
+      return 0
+    }
+    # 生产语义是 set -e：桩内还原，管道赋值类静默中止（disable 滤空 rc=1 一族）
+    # 才会被下面的 rc 断言抓住，而非 set +e 下假通过
+    set -e
+    cmd_module "$@"
+  )
+}
+rm -f "$MODDIR"/local.*.json
+
+out="$(modr enable bogus 2>/dev/null)"; rc=$?
+expect_rc 'module：未知名须拒绝' 1 "$rc"
+errout="$(modr enable bogus 2>&1)"
+expect_sub 'module：未知名报错点名注册表' "$errout" '不在注册表'
+out="$(modr enable beta --host x86_64-linux 2>/dev/null)"; rc=$?
+expect_rc 'module：home-linux 无实现须拒绝（beta）' 1 "$rc"
+errout="$(modr enable beta --host x86_64-linux 2>&1)"
+expect_sub 'module：前端不适用报错点名' "$errout" '无 home-linux 实现'
+out="$(modr enable alpha --host aarch64-darwin 2>/dev/null)"; rc=$?
+expect_rc 'module：darwin 白名单外须拒绝（alpha）' 1 "$rc"
+errout="$(modr enable alpha --host aarch64-darwin 2>&1)"
+expect_sub 'module：darwin 白名单报错点名' "$errout" '不在 darwin 白名单'
+out="$(modr enable alpha --host x86_64-linux)"; rc=$?
+expect_rc 'module：合法启用 rc=0' 0 "$rc"
+expect_eq 'module：启用后选配内容' "$(ROAM_LOCAL_DIR="$MODDIR" local_selection_read x86_64-linux)" 'alpha'
+out="$(modr enable alpha --host x86_64-linux)"; rc=$?
+expect_rc 'module：重复启用幂等 rc=0' 0 "$rc"
+expect_sub 'module：重复启用提示跳过' "$out" '已启用，跳过'
+out="$(modr enable gamma --host x86_64-linux)"; rc=$?
+expect_rc 'module：追加第二层 rc=0' 0 "$rc"
+expect_eq 'module：追加后两项都在（次序=追加序）' "$(ROAM_LOCAL_DIR="$MODDIR" local_selection_read x86_64-linux)" 'alpha
+gamma'
+out="$(modr disable alpha --host x86_64-linux)"; rc=$?
+expect_rc 'module：停用 rc=0' 0 "$rc"
+expect_eq 'module：停用后剩 gamma' "$(ROAM_LOCAL_DIR="$MODDIR" local_selection_read x86_64-linux)" 'gamma'
+out="$(modr disable alpha --host x86_64-linux)"; rc=$?
+expect_rc 'module：停用未启用层幂等 rc=0' 0 "$rc"
+expect_sub 'module：停用未启用层提示' "$out" '未启用，无需停用'
+
+# init：已有文件拒绝；无文件以种子生成（nix 桩回种子一行）
+printf 'beta\n' >"$MOD_SEED_FILE"
+rm -f "$MODDIR/local.aarch64-linux.json"
+out="$(modr init --host aarch64-linux)"; rc=$?
+expect_rc 'module：init rc=0' 0 "$rc"
+expect_eq 'module：init 种子落文件' "$(ROAM_LOCAL_DIR="$MODDIR" local_selection_read aarch64-linux)" 'beta'
+out="$(modr init --host aarch64-linux 2>/dev/null)"; rc=$?
+expect_rc 'module：init 已有文件须拒绝' 1 "$rc"
+# disable 无文件时先种子化再操作（保留默认集语义）
+rm -f "$MODDIR/local.x86_64-linux.json"
+out="$(modr disable gamma --host x86_64-linux)"; rc=$?
+expect_rc 'module：无文件 disable 先种子化 rc=0' 0 "$rc"
+expect_sub 'module：无文件 disable 提示已生成种子' "$out" '种子 = 当前有效选择'
+expect_eq 'module：种子化后停用，剩 beta' "$(ROAM_LOCAL_DIR="$MODDIR" local_selection_read x86_64-linux)" 'beta'
+out="$(modr bogus --host x86_64-linux 2>/dev/null)"; rc=$?
+expect_rc 'module：未知动作须拒绝' 1 "$rc"
+out="$(modr 2>/dev/null)"; rc=$?
+expect_rc 'module：缺动作须拒绝' 1 "$rc"
+rm -f "$MOD_SEED_FILE" "$MODLOG"
+
+rm -rf "$STUBBIN" "$PROF" "$NIXSTUB" "$STUBGC" "$GCLOG_FILE" "$CHECK_LOG" "$MODDIR"
 printf 'roam-functions: %d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

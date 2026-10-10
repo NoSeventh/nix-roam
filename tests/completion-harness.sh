@@ -43,7 +43,7 @@ cd "$REPO" || exit 9
 
 # --- 一级 ---
 got="$(compline roam '' | joined)"
-expect_eq '一级：九子命令 + help' "$got" 'switch status doctor rollback gc check update flake info help -h --help'
+expect_eq '一级：十子命令 + help' "$got" 'switch status doctor rollback gc check update flake module info help -h --help'
 got="$(compline roam ch | joined)"
 expect_eq '前缀 ch → check' "$got" 'check'
 got="$(compline roam fl | joined)"
@@ -83,6 +83,22 @@ got="$(compline roam rollback '' | joined)"
 expect_contains 'rollback：--list' "$got" --list
 expect_contains 'rollback：-y' "$got" -y
 expect_contains 'rollback：--yes' "$got" --yes
+
+# --- module：子动作两级 + 模块名（自 registry.json 实时提取，仓库根跑）---
+got="$(compline roam module '' | joined)"
+expect_eq 'module：子动作' "$got" 'init list enable disable --help'
+got="$(compline roam module in | joined)"
+expect_eq 'module：前缀 in → init' "$got" 'init'
+got="$(compline roam module list '' | joined)"
+expect_eq 'module：list 后只补 --host' "$got" '--host'
+got="$(compline roam module enable '' | joined)"
+expect_contains 'module：enable 补 --host' "$got" '--host'
+expect_contains 'module：enable 补真实模块名 flatpak' "$got" 'flatpak'
+expect_contains 'module：enable 补真实模块名 media' "$got" 'media'
+got="$(compline roam module enable zz | joined)"
+expect_eq 'module：enable 前缀 zz 无匹配为空' "$got" ''
+got="$(compline roam module disable gam | joined)"
+expect_eq 'module：disable 前缀 gam → gaming' "$got" 'gaming'
 
 # --- gc：四旗标与 --older-than 取值 ---
 got="$(compline roam gc '' | joined)"

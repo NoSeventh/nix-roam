@@ -15,7 +15,7 @@
 
 _roam()
 {
-    local cur prev sub i w list n cgen l
+    local cur prev sub i w list n cgen l msub
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [ "$COMP_CWORD" -gt 0 ]; then
         prev="${COMP_WORDS[$((COMP_CWORD - 1))]}"
@@ -38,7 +38,7 @@ _roam()
 
     if [ -z "$sub" ]; then
         # 一级：子命令 + 帮助
-        list="switch status doctor rollback gc check update flake info help -h --help"
+        list="switch status doctor rollback gc check update flake module info help -h --help"
     else
         case "$sub" in
             switch | status | doctor | info | help)
@@ -94,6 +94,38 @@ _roam()
                 ;;
             flake)
                 list="-a --all"
+                ;;
+            module)
+                # module 子命令的子动作：与 roam.sh cmd_module 的 case 保持同步。
+                # 子动作已出现后补模块名——名字自 modules/registry.json 的 "name"
+                # 行提取（roam.sh load_registry 同源数据；sed 失败静默为空，与
+                # update 补全的降级约定一致）。
+                msub=""
+                i=2
+                while [ "$i" -lt "$COMP_CWORD" ]; do
+                    w="${COMP_WORDS[$i]}"
+                    case "$w" in
+                        -*) ;;
+                        *) msub="$w"; break ;;
+                    esac
+                    i=$((i + 1))
+                done
+                case "$msub" in
+                    init | list)
+                        list="--host"
+                        ;;
+                    enable | disable)
+                        list=""
+                        if [ -r modules/registry.json ]; then
+                            list="$(sed -n 's/^ *"name": *"\([^"]*\)",\{0,1\}$/\1/p' \
+                                modules/registry.json | tr '\n' ' ')"
+                        fi
+                        list="--host $list"
+                        ;;
+                    *)
+                        list="init list enable disable --help"
+                        ;;
+                esac
                 ;;
             *)
                 # 未知子命令（多为笔误）：不补，避免误导

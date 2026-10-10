@@ -9,6 +9,16 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-11 roam module 子命令 + path: 全链路（P2：packages/roam.sh + roam-completion.bash + tests/{roam-functions,completion-harness,module-registry〔新〕,run-all} + fixtures/registry-{good,empty}.json〔新〕；Gentoo / WSL2 standalone x86_64，本机）
+
+背景：P1 建立的模块选配机制配上用户操作前端——`roam module init/list/enable/disable` 维护 local.<主机键>.json，roam 全部 nix/nh 调用改 path:./. 引用（本机选配进求值），注册表/选配的 bash 解析与守卫配套单测。
+
+改动：①roam.sh 新增模块段：load_registry（锚定 sed 逐字段试探——**匹配才赋值**，无条件赋值会把已提取字段抹空，xtrace 定位的首版 bug）、module_front_for_key（standalone 三键按名、NixOS 键要求 hosts/<K>/）、local_selection_read/write（自持格式，**末元素无尾逗号**——单元素文件曾产非法 JSON 被 fromJSON 拒）、effective_selection（--raw --apply 列表转行）、cmd_module（init 种子=当前有效选择零行为变化；enable 校验未知名/前端不适用/darwin 白名单后落盘；disable 幂等；无文件先种子化）；**两处 set -e 管道赋值陷阱**（grep -v 滤空 rc=1）以 || true 兜住；status 增模块选配行；usage/头注释更新。②path: 全链路：nixos_preflight / compute_drift / cmd_check 求值与构建 / switch 双侧（nh os 补 -H 显式点名——path: 引用下 nh 的目录名推断不再可靠；nh home 沿用 --configuration）。③补全 module 两级（子动作 + 模块名自 registry 实时提取）。④测试：roam-functions 增 43 例（registry 解析/前端映射/local 读写往返 + **jq 合法性三态断言**（多元素/单元素尾逗号回归/空集）/cmd_module 守卫与幂等；modr 桩内**还原 set -e** 生产语义——set +e 下 disable 滤空 rc=1 会假通过）；新 module-registry.sh 49 例（bash 解析器与 jq 交叉核对三面旗标、旗标↔文件实态互证含 home=false 却有 home.nix 的静默不可达、层目录全数在册、.gitignore 与桌面基座钩子）；completion-harness 增 8 例；run-all 接入（232→272）。
+
+验证（本机 Gentoo / WSL2 standalone x86_64）：bash -n + shellcheck 0.11.0 全过；run-all 272/272；**本机全闭环实测**：module init（0 层种子）→ list（11 层目录 + on/off）→ enable proxy → roam check（path: 求值新 drvPath）→ status（漂移 + 选配行）→ switch（真激活 +155 包 +1.47GiB，mihomo/clash-verge/sing-box 落 ~/.nix-profile/bin）→ status 一致 → disable proxy → switch（回退 -1.47GiB）→ status 一致（机器回基线，留合法空选配文件）。修复过程两 bug 均先在实机暴露再由新断言锁死（尾逗号 JSON / set -e 滤空中止）。
+
+未验证：NixOS 侧实机（nh os 的 path:/-H 组合、module init 在 nixos 前端、WSL stc-exit-4 提示路径——留待桌面/WSL 主机；单测以桩覆盖参数形态）；darwin 实机（白名单空集语义已由求值与单测覆盖）。
+
 ## 2026-10-11 跨前端模块注册表 + 机器本地选配（P1 Nix 侧：modules/registry.json〔新〕+ lib/selection.nix〔新〕+ 11 层文件迁移 modules/<名>/nixos.nix + 6 个 home.nix〔新〕+ profiles/desktop.nix 瘦身 + desktop-lite.nix 删除 + hosts/{nixos,wsl,_template} + flake.nix + home/standalone-{linux,darwin}.nix + .gitignore；Gentoo / WSL2 standalone x86_64，本机）
 
 背景：会话定稿的模块化方案——可选层与 desktop 粒度一致并跨前端（nixos / home-linux / home-darwin），每机选配记在仓库根 local.<主机键>.json（gitignored，roam 维护），git 求值视图落入库内默认集、path: 视图本机选配整体替换。本条为 P1（Nix 侧机制），roam 子命令与 CI 矩阵随后续条目。

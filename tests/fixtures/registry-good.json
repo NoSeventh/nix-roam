@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "name": "alpha",
+      "desc": "双前端模块（测试夹具）",
+      "nixos": true,
+      "home": true,
+      "darwin": false
+    },
+    {
+      "name": "beta",
+      "desc": "仅系统级（测试夹具）",
+      "nixos": true,
+      "home": false,
+      "darwin": false
+    },
+    {
+      "name": "gamma",
+      "desc": "darwin 白名单内（测试夹具）",
+      "nixos": false,
+      "home": true,
+      "darwin": true
+    }
+  ]
+}
