@@ -9,6 +9,16 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-11 跨前端模块注册表 + 机器本地选配（P1 Nix 侧：modules/registry.json〔新〕+ lib/selection.nix〔新〕+ 11 层文件迁移 modules/<名>/nixos.nix + 6 个 home.nix〔新〕+ profiles/desktop.nix 瘦身 + desktop-lite.nix 删除 + hosts/{nixos,wsl,_template} + flake.nix + home/standalone-{linux,darwin}.nix + .gitignore；Gentoo / WSL2 standalone x86_64，本机）
+
+背景：会话定稿的模块化方案——可选层与 desktop 粒度一致并跨前端（nixos / home-linux / home-darwin），每机选配记在仓库根 local.<主机键>.json（gitignored，roam 维护），git 求值视图落入库内默认集、path: 视图本机选配整体替换。本条为 P1（Nix 侧机制），roam 子命令与 CI 矩阵随后续条目。
+
+改动：①11 个层文件 git mv 至 modules/<名>/nixos.nix（内容不变；modules/desktop/ 保留 session/niri/core/locale-zh 为桌面基座）；②新 modules/registry.json（单一事实源：name/desc/nixos/home/darwin 旗标，每字段一行供 bash 锚定解析）+ lib/selection.nix（selection/selectionModule/metaModule：local 文件权威完整选择，未知名/前端不适用/darwin 白名单外/host 字段不符均 throw）；③新 6 个 home.nix 用户级实现（browsers/dev/media/office/proxy/agents——dev 无 clang（buildEnv 规则）、无裸 neovim（nixvim 已供 bin/nvim）、无 helix；office 无 wechat（standalone 的 nixpkgs.overlays 不生效））；④profiles/desktop.nix 瘦身为桌面基座、desktop-lite.nix 删除（其组合 = 主机 default 少列几层）；⑤hosts/nixos（default=11 层全集）、hosts/wsl（default=[]，WSL 获得可选层能力）、hosts/_template 挂 selectionModule；⑥flake.nix mkStandaloneHome 注入 hostKey、standalone 入口 home.packages = cli-dev ++ concatMap 各 home.nix；⑦.gitignore 收录 local.*.json；⑧flake.nix 共享 permittedInsecurePackages 增 electron-40.10.5 + pnpm-10.29.2（standalone unstable 实例启用 agents/全开组合时的拒评，与桌面系统级实例同款依赖对）。
+
+验证（本机 Gentoo / WSL2 standalone x86_64，nix 2.35.2）：①**默认组合五输出 drvPath 与改动前逐字节相同**（HEAD rev 基线 vs 新树，含 nixos 桌面——纯重构等价）；②path: 视图选配生效：x86_64-linux 选 media+dev / dev 单开 / 全开 6 home 模块均求值通过且 drvPath 随选配变化；nixos 选 5 层子集、wsl 开 dev 均通过且 selectedModules 汇报正确；git 视图（裸 .#）selectedModules=[]（默认集）；③守卫四连：未知名 / home-linux 无实现（gaming）/ darwin 白名单外 / host 字段不符均在 drvPath 求值处 throw 预期文案（selectedModules 单独求值因惰性不触发文件解析——守卫落在实际构建路径上）；④darwin 空集合法；⑤nix build --no-link .#homeConfigurations.x86_64-linux.activationPackage rc=0；⑥nix flake check（shellcheck-scripts + roam-unit-tests + 五输出 schema）全过；⑦/tmp 尖刺：路径字面量插值 import（../modules/${名}/home.nix）纯求值合法，而 ../. + 字符串拼接的绝对路径禁止 import（后者即初版实现被换掉的根因）。
+
+未验证：非默认组合的**构建**（全开 home 闭包数 GB，本机未 build；CI 模块矩阵（P3）将构建全开集 x86_64）；aarch64-linux 启用 home 模块（browsers 的 chrome/edge 在 aarch64 的可用性未探，aarch64 仍仅默认集求值覆盖——既有边界）；roam module 子命令与补全（P2）；nh os 的 path:/-H 实机切换（P0 遗留，桌面/WSL 主机待验）。
+
 ## 2026-10-11 机器本地选配机制尖刺：path: 双视图 + nh 透传（无仓库改动；Gentoo / WSL2 standalone x86_64，本机）
 
 背景：跨前端模块注册表 + `local.<主机键>.json`（gitignored）机器本地选配方案（会话定稿）要求 flake 在两种求值视图下行为不同——git 视图（CI / pre-push / 远端 git+https / 裸 `.#`）看不到 local 文件落入库内默认集；`path:./.` 视图（roam 全链路）整目录拷贝、local 文件可见、本机选配生效。机制可行性是整个方案的前置闸门。

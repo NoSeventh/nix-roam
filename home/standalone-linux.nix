@@ -1,15 +1,28 @@
 # home/standalone-linux.nix
 #
 # 非 NixOS Linux 模式下的 Home Manager 入口（Linux / WSL 通用，x86_64 与 aarch64 同一模块）。
-# = common（便携 CLI 核心）+ 跨平台 CLI 工具 + Linux 专用 CLI 工具（home.packages）。
-# 零 GUI。home.username / homeDirectory / stateVersion 由 flake 的 mkStandaloneHome 注入。
-{ config, lib, pkgs, pkgs-stable, ... }:
-
+# = common（便携 CLI 核心）+ 跨平台 CLI 工具 + Linux 专用 CLI 工具（home.packages）
+# + 可选层用户级部分（lib/selection.nix 按机器选配，默认空集 = 与旧组合等价）。
+# home.username / homeDirectory / stateVersion 由 flake 的 mkStandaloneHome 注入；
+# hostKey（= 输出名）亦由 mkStandaloneHome 注入，用于定位 local.<hostKey>.json。
+{ config, lib, pkgs, pkgs-stable, hostKey ? "", ... }:
+let
+  selectionLib = import ../lib/selection.nix;
+  sel = selectionLib.selection {
+    front = "home-linux";
+    key = hostKey;
+    default = [ ];
+  };
+in
 {
   imports = [
     ./common.nix
     ./nix-cn.nix
+    selectionLib.metaModule
   ];
+
+  # 当前有效选择（roam module init / status 读取）
+  roam.selectedModules = sel.modules;
 
   # Token 由 bootstrap/linux.sh 交互写入仓库外的私有文件，避免进入 Git 或 Nix store。
   nix.extraOptions = ''
@@ -69,8 +82,12 @@
   '';
 
   # 共享 CLI 开发工具（用户级安装；与 NixOS 的 modules/desktop/core.nix 同源）
-  # 平台专用包在 cli-dev.nix 内用 stdenv.hostPlatform.isLinux 条件处理。
-  home.packages = import ../packages/cli-dev.nix {
-    inherit pkgs pkgs-stable;
-  };
+  # + 已启用可选层的用户级包列表（modules/<名>/home.nix，纯函数逐个求值后拼接；
+  # buildEnv 冲突规则见 packages/cli-dev.nix 头注释——home 部分不引入 clang、
+  # 裸 python3.withPackages，与基座列表的单列表合并安全）。
+  home.packages =
+    (import ../packages/cli-dev.nix {
+      inherit pkgs pkgs-stable;
+    })
+    ++ builtins.concatMap (f: import f { inherit pkgs pkgs-stable; }) sel.files;
 }

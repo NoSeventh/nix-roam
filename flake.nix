@@ -72,11 +72,19 @@
       # electron-41.10.7（EOL）：桌面闭包经 pkgs-stable 的 electron_41 引用（2026-10-02 探针：
       # stable electron_41=41.10.7 / unstable=41.10.6，拒评的 41.10.7 只可能来自本 config
       # 管辖的 stable 实例）。2f90778 update flake 后 stable 前移，自 41.9.1（2026-09-26 引入）
-      # 替换而来——旧版本已无引用者，替换而非累积。standalone 不引用，列表为「允许」语义，
-      # 其 drvPath 不受影响（前后一致已验证）。系统 unstable 实例另见 profiles/nixos-base.nix。
+      # 替换而来——旧版本已无引用者，替换而非累积。
+      # electron-40.10.5 + pnpm-10.29.2（2026-10-11）：standalone unstable 实例在启用可选层
+      # （agents 层的 cherry-studio 引 electron_40；全开组合另有 unstable 包链引 pnpm-10.29.2
+      # ——与桌面系统级实例的同款依赖对，桌面侧由 profiles/nixos-base.nix 的同名条目放行；
+      # nix 一次只报一个拒评，本对系顺序解锁）。allow-only 语义：不启用相关层的输出不受影响
+      # （默认组合 drvPath 不变，同 41.10.7 的 standalone 无引用者论证）。
       nixpkgsConfig = {
         allowUnfree = true;
-        permittedInsecurePackages = [ "electron-41.10.7" ];
+        permittedInsecurePackages = [
+          "electron-41.10.7"
+          "electron-40.10.5"
+          "pnpm-10.29.2"
+        ];
       };
 
       # 按 system 实例化 unstable 与 stable
@@ -131,6 +139,9 @@
             inherit inputs username;
             isStandalone = true;
             pkgs-stable = channels.stable;
+            # 主机键 = 输出名（x86_64-linux 等）：standalone 入口用它定位机器本地选配
+            # local.<hostKey>.json（见 lib/selection.nix；缺省空串 = 永走入库 default）
+            hostKey = system;
           };
           modules = [
             standaloneModule

@@ -1,10 +1,20 @@
 # WSL boot and integration are provided by NixOS-WSL, not PC hardware config.
+# 可选层（browsers/dev/…）经 lib/selection.nix 选择：入库默认为空集（WSL 保持 CLI
+# 基座），机器本地 local.wsl.json（gitignored，roam module 维护）可整体替换启用。
+let
+  selectionLib = import ../../lib/selection.nix;
+in
 { username, ... }:
 
 {
   imports = [
     ../../profiles/nixos-base.nix
     ../../profiles/cli.nix
+    (selectionLib.selectionModule {
+      front = "nixos";
+      key = "wsl";
+      default = [ ];
+    })
   ];
 
   networking.hostName = "wsl";

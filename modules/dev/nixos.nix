@@ -1,4 +1,4 @@
-# modules/desktop/dev.nix
+# modules/dev/nixos.nix
 #
 # 开发档：编辑器全家、语言工具链与容器工具，以及开发用服务（mysql）。
 # 基础 CLI 工具链（gcc/rust/go/…）在 packages/cli-dev.nix，随 core.nix 走；

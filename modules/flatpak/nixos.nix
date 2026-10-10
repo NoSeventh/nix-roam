@@ -1,4 +1,4 @@
-# modules/desktop/flatpak.nix
+# modules/flatpak/nixos.nix
 #
 # Flatpak/Linyaps 应用商店与国内镜像（2026-09-26 自 flatpak-linyaps.nix 拆出；
 # GNOME/Plasma 备用桌面环境移至 desktop-managers.nix）。

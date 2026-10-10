@@ -1,4 +1,4 @@
-# modules/desktop/gaming.nix
+# modules/gaming/nixos.nix
 #
 # 游戏档：Steam。32 位图形支持（Steam/Wine 的需求）归位于此；
 # virtualization.nix 因 wine 另有一份同值声明（bool 同值多定义合并无冲突）。

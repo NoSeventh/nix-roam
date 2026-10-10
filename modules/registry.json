@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "name": "flatpak",
+      "desc": "Flatpak/Linyaps 应用商店 + SJTU 镜像源（系统服务，无用户级实现）",
+      "nixos": true,
+      "home": false,
+      "darwin": false
+    },
+    {
+      "name": "desktop-managers",
+      "desc": "GNOME/Plasma6 备用桌面环境与扩展（系统级桌面栈，无用户级实现）",
+      "nixos": true,
+      "home": false,
+      "darwin": false
+    },
+    {
+      "name": "browsers",
+      "desc": "专有/实验浏览器：chrome/edge/servo（开源基座 firefox/chromium 在桌面基座 core）",
+      "nixos": true,
+      "home": true,
+      "darwin": false
+    },
+    {
+      "name": "dev",
+      "desc": "编辑器全家（vscode/zed/warp/neovide/emacs/rstudio）+ gitui + biome；系统级另含 clang 与 mysql 服务",
+      "nixos": true,
+      "home": true,
+      "darwin": false
+    },
+    {
+      "name": "media",
+      "desc": "媒体与创作：播放器/图像视频编辑/CAD/录屏/下载娱乐客户端",
+      "nixos": true,
+      "home": true,
+      "darwin": false
+    },
+    {
+      "name": "office",
+      "desc": "办公套件/邮件文献/笔记/中文软件/视频会议/texlive scheme-full（home 部分不含 wechat overlay）",
+      "nixos": true,
+      "home": true,
+      "darwin": false
+    },
+    {
+      "name": "proxy",
+      "desc": "clash 系客户端与内核/sing-box/v2rayn/proxypin（系统级另含 tun/service 模式）",
+      "nixos": true,
+      "home": true,
+      "darwin": false
+    },
+    {
+      "name": "gaming",
+      "desc": "Steam + 32 位图形支持（系统级专属，无用户级实现）",
+      "nixos": true,
+      "home": false,
+      "darwin": false
+    },
+    {
+      "name": "agents",
+      "desc": "AI 工具/IDE/聊天客户端；系统级另含 hermes-agent 服务（home 部分仅 CLI/客户端）",
+      "nixos": true,
+      "home": true,
+      "darwin": false
+    },
+    {
+      "name": "mnt",
+      "desc": "IHEP juno sshfs 用户服务（系统级 systemd 用户单元；home 移植留待后续）",
+      "nixos": true,
+      "home": false,
+      "darwin": false
+    },
+    {
+      "name": "virtualization",
+      "desc": "Docker/libvirtd/waydroid/wine 虚拟化栈（系统级专属，无用户级实现）",
+      "nixos": true,
+      "home": false,
+      "darwin": false
+    }
+  ]
+}

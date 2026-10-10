@@ -1,15 +1,29 @@
 # home/standalone-darwin.nix
 #
 # macOS 模式下的 Home Manager 入口。
-# = common（便携 CLI 核心）+ 跨平台 CLI 工具 + macOS 专用 CLI 工具（home.packages）。
-# 零 GUI。home.username / homeDirectory / stateVersion 由 flake 的 mkStandaloneHome 注入。
-{ config, lib, pkgs, pkgs-stable, ... }:
-
+# = common（便携 CLI 核心）+ 跨平台 CLI 工具 + macOS 专用 CLI 工具（home.packages）
+# + 可选层用户级部分（保守边界：仅注册表 darwin=true 白名单内的模块；当前白名单为空，
+# 即 local.aarch64-darwin.json 只能为空集——放开某模块 = registry 一行改 true）。
+# home.username / homeDirectory / stateVersion 由 flake 的 mkStandaloneHome 注入；
+# hostKey（= aarch64-darwin）亦由 mkStandaloneHome 注入。
+{ config, lib, pkgs, pkgs-stable, hostKey ? "", ... }:
+let
+  selectionLib = import ../lib/selection.nix;
+  sel = selectionLib.selection {
+    front = "home-darwin";
+    key = hostKey;
+    default = [ ];
+  };
+in
 {
   imports = [
     ./common.nix
     ./nix-cn.nix
+    selectionLib.metaModule
   ];
+
+  # 当前有效选择（roam module init / status 读取）
+  roam.selectedModules = sel.modules;
 
   # Token 由 bootstrap/darwin.sh 交互写入仓库外的私有文件，避免进入 Git 或 Nix store。
   nix.extraOptions = ''
@@ -31,8 +45,11 @@
   '';
 
   # 跨平台 CLI 开发工具（用户级安装）
+  # + 已启用可选层的用户级包列表（darwin 白名单当前为空 → 恒等于基座列表）。
   # 平台专用包在 cli-dev.nix 内用 stdenv.hostPlatform.isDarwin 条件处理。
-  home.packages = import ../packages/cli-dev.nix {
-    inherit pkgs pkgs-stable;
-  };
+  home.packages =
+    (import ../packages/cli-dev.nix {
+      inherit pkgs pkgs-stable;
+    })
+    ++ builtins.concatMap (f: import f { inherit pkgs pkgs-stable; }) sel.files;
 }

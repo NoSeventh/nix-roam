@@ -1,4 +1,4 @@
-# modules/desktop/proxy.nix
+# modules/proxy/nixos.nix
 #
 # 代理档：clash 系客户端与内核、sing-box 及配套工具（tun/service 模式随 programs.clash-verge）。
 {

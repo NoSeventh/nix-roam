@@ -1,4 +1,4 @@
-# modules/desktop/desktop-managers.nix
+# modules/desktop-managers/nixos.nix
 #
 # 备用桌面环境：GNOME 与 Plasma6（含 GNOME 扩展、KDE 应用与 mutter 实验特性）。
 # 主会话 niri 见 niri.nix；2026-09-26 自 flatpak-linyaps.nix 拆出。

@@ -4,11 +4,33 @@
 # To add a new machine: create hosts/<hostname>/ with a default.nix like this
 # one (importing the relevant profiles + ./hardware-configuration.nix), then
 # add a nixosConfigurations.<hostname> output in flake.nix.
+let
+  # 可选层默认集（入库）：当前主机的既定组合 = 全部可选层。机器本地 local.nixos.json
+  # （gitignored，roam module 维护）经 path: 求值视图整体替换本列表（见 lib/selection.nix）。
+  selectionLib = import ../../lib/selection.nix;
+in
 { pkgs, pkgs-stable, username, ... }:
 
 {
   imports = [
     ../../profiles/desktop.nix
+    (selectionLib.selectionModule {
+      front = "nixos";
+      key = "nixos";
+      default = [
+        "flatpak"
+        "desktop-managers"
+        "browsers"
+        "dev"
+        "media"
+        "office"
+        "proxy"
+        "gaming"
+        "agents"
+        "mnt"
+        "virtualization"
+      ];
+    })
     ./hardware-configuration.nix
   ];
 

@@ -2,7 +2,7 @@
 #
 # 桌面会话栈：显示管理（GDM，默认会话 niri）、音频（PipeWire）、打印、图形加速与
 # SSH askpass —— 任何桌面主机（全量或 lite）都需要。2026-09-26 自 profiles/desktop.nix
-# 抽出为共享模块，供 profiles/desktop.nix 与 profiles/desktop-lite.nix 共同 import。
+# 抽出为共享模块；2026-10-11 起随桌面基座走（profiles/desktop.nix），可选层另经 lib/selection.nix。
 # compositor/终端在 niri.nix；32 位图形支持在 gaming.nix / virtualization.nix 的需求方。
 {
   pkgs,

@@ -2,6 +2,10 @@
 # Canonical tracked host configs live under hosts/<hostname>/.
 /hardware-configuration.nix
 
+# 机器本地模块选配（roam module 维护）：git 求值视图看不到 → 入库默认集；
+# roam/nix 以 path:./. 引用时可见 → 本机选配（机制见 lib/selection.nix 与 docs/modules.md）。
+local.*.json
+
 .codegraph/
 .cursor/
 .omc/

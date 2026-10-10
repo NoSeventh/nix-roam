@@ -412,7 +412,7 @@ fi
 if grep -q 'profiles/desktop' "$CLONE_DIR/hosts/$TARGET/default.nix" 2>/dev/null; then
   cat <<EOF
 
-  · ⚠️ Hermes Agent 需要目标机器自行提供 /etc/hermes/env（API 密钥，见 modules/desktop/agents.nix）；
+  · ⚠️ Hermes Agent 需要目标机器自行提供 /etc/hermes/env（API 密钥，见 modules/agents/nixos.nix）；
     该文件不随仓库分发，缺失时服务无法以有效凭据启动。
 EOF
 fi

@@ -1,4 +1,4 @@
-# modules/desktop/office.nix
+# modules/office/nixos.nix
 #
 # 办公与中文软件档：办公套件、邮件/文献、笔记、日历、翻译、排版（texlive）、
 # 即时通信与视频会议。
