@@ -9,6 +9,14 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-11 机器本地选配机制尖刺：path: 双视图 + nh 透传（无仓库改动；Gentoo / WSL2 standalone x86_64，本机）
+
+背景：跨前端模块注册表 + `local.<主机键>.json`（gitignored）机器本地选配方案（会话定稿）要求 flake 在两种求值视图下行为不同——git 视图（CI / pre-push / 远端 git+https / 裸 `.#`）看不到 local 文件落入库内默认集；`path:./.` 视图（roam 全链路）整目录拷贝、local 文件可见、本机选配生效。机制可行性是整个方案的前置闸门。
+
+验证（本机 Gentoo / WSL2 standalone x86_64，nix 2.35.2，nh 4.4.2）：①/tmp 最小 git 仓库（flake.nix 进索引、local.test.json 被 .gitignore 忽略）：`nix eval --json .#modules` → `["default-only"]`（git 视图缺席）、`nix eval --json path:./.#modules` → local 文件内容；`pathExists` 两视图 false/true，插值路径 `./local.${key}.json` 行为相同。②真仓库 `nh home build --configuration x86_64-linux path:./.` rc=0（27s，PATHS/SIZE 0 差异，符合无 local 文件预期）——nh 4.4.2 的 INSTALLABLE 即标准 FLAKEREF#ATTRPATH，`path:` 引用原样透传。③`nh os switch -H/--hostname` 旗标在位（"select this hostname from nixosConfigurations"），NixOS 侧将走 `nh os switch -H <主机名> path:./.`。
+
+未验证：nh os 的 path:/-H 组合在真 NixOS 主机上的实机切换（本机 standalone 无法覆盖；留待桌面/WSL 主机下一次变更时实证）。结论：机制 A（检出内 gitignored + path: 求值）成立，无需回退方案 B（skip-worktree）。
+
 ## 2026-10-07 cli-dev 补齐 autotools 家族 + bison/flex + gettext（packages/cli-dev.nix；Fedora 44 / WSL2 standalone，本机）
 
 背景：GNU 工具链盘点（显式配置仅 gcc/gnumake/gdb 三件，binutils/coreutils 隐式随 stdenv/gcc 闭包）后用户拍板补 autoreconf / ./configure 场景常用件；gnupg / screen / GSL 与 GNU 用户态替换不加（用到再按项目 nix-shell 配）。补前实测十个候选闭包合计约 +535MB 解包 / 161MB 下载，本次七件远小于之（体积大头 gnupg 链未引入；perl 作为 autotools 共享运行时进闭包）。
