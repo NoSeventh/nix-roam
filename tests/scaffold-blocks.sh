@@ -25,7 +25,7 @@ expect_count '样例块共两块（桌面 + CLI）' "$body" 'nixosConfigurations
 expect_count '两块都带 hostnameGuard 守卫' "$body" '(hostnameGuard "__HOSTNAME__")' 2
 expect_count '桌面块用 home/default.nix' "$body" '(nixosHome ./home/default.nix)' 1
 expect_count 'CLI 块用 home/nixos-cli.nix' "$body" '(nixosHome ./home/nixos-cli.nix)' 1
-expect_count 'Hermes 只在桌面块' "$body" 'inputs.hermes-agent.nixosModules.default' 1
+expect_count 'Hermes 两块都挂（agents 层选项在任一 NixOS 主机可用）' "$body" 'inputs.hermes-agent.nixosModules.default' 2
 expect_count '每块接线 ./hosts/<target>（模块 + variables）' "$body" './hosts/__HOSTNAME__' 4
 
 printf 'scaffold-blocks: %d passed, %d failed\n' "$PASS" "$FAIL"

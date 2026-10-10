@@ -218,6 +218,9 @@
           inputs.nixos-wsl.nixosModules.default
           ./hosts/wsl
           home-manager.nixosModules.home-manager
+          # hermes 模块与桌面输出同挂（import ≠ enable，默认不启用服务）——agents
+          # 可选层的 services.hermes-agent 选项在任何 NixOS 主机启用时都须存在
+          inputs.hermes-agent.nixosModules.default
           (hostnameGuard "wsl")
           (nixosHome ./home/nixos-cli.nix)
         ];

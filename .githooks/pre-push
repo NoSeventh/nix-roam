@@ -59,6 +59,11 @@ gate_needed() {
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   cd "$(git rev-parse --show-toplevel)"
   if gate_needed; then
+    # 检出内若有机器本地选配 local.*.json（gitignored）：不随本次 push 上传，但
+    # roam check 已按 path: 视图把它们的求值结果包含进本门槛（本机视图的等价校验）
+    if ls local.*.json >/dev/null 2>&1; then
+      printf 'pre-push: 检出含本机选配 %s（gitignored，不随 push 上传）；求值已含其视图\n' "$(echo local.*.json)"
+    fi
     exec bash packages/roam.sh check nixos wsl x86_64-linux aarch64-linux aarch64-darwin
   fi
   printf 'pre-push: 推送增量全部为已知非求值输入（README/AGENTS/LICENSE 与 docs/ tests/ bootstrap/ .github/ .githooks/），跳过五输出求值\n'

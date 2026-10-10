@@ -6,6 +6,13 @@ name: Evaluate flake outputs
 # 失效两天无人发现）；构建拦截求值发现不了的问题（HM buildEnv 冲突，如 gcc+clang、
 # 双 python3.withPackages —— 历史坑全是构建期错误）。NixOS toplevel 仍只求值（闭包过大）。
 #
+# module-matrix job（2026-10-11）：模块选配机制的验证层——eval job 只覆盖入库默认集
+# （git 求值视图看不到 gitignored 的 local.*.json），本 job 主动写 local 文件后以
+# path:./. 引用求值，覆盖非默认组合：每模块单开隔离求值（nixos 前端在 nixos 主机、
+# home 前端在 x86_64-linux）+ wsl 全开 + darwin 白名单负例 + 全开集 x86_64 构建
+# （非默认组合的 buildEnv 冲突兜底）。矩阵清单直接解析 modules/registry.json，
+# 无静态清单可漂移。
+#
 # 注意（见 .github/SYNC.md）：
 #   - 该 workflow 在 Gitee 同步到 GitHub 之后运行，属于事后报警而非事前拦截；
 #     push 前想本地拦截可运行同样的五条 nix eval + 一条 nix build。
@@ -66,3 +73,70 @@ jobs:
         # 第三层：仓库脚本关卡。构建 checks（shellcheck-scripts + roam-unit-tests，
         # 即补全文件静态检查与 tests/ 单测）并对全部输出求值。
         run: nix flake check
+
+  module-matrix:
+    if: github.repository == 'NoSeventh/nix-roam'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space (all-on build ~25GB store)
+        # 全开集闭包远大于默认集（media/office/dev 的 GUI 与 texlive 全进）：
+        # 预装项之外再清 docker 镜像层与 node_modules，尽量清出 25GB+ 余量
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af >/dev/null 2>&1 || true
+          sudo rm -rf /usr/local/lib/node_modules /usr/local/share/boost /opt/ghc
+          sudo df -h /
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Evaluate each nixos-front module in isolation (desktop host)
+        # 单开隔离：只开基座+该模块，模块自身的求值死亡（缺选项/缺包）不被其它层掩盖。
+        # 写 local.<K>.json + path:./. 引用 = 模拟该机本机选配的求值视图。
+        run: |
+          for m in $(jq -r '.modules[] | select(.nixos==true) | .name' modules/registry.json); do
+            echo "---- nixos isolation: $m ----"
+            printf '{ "host": "nixos", "modules": ["%s"] }\n' "$m" > local.nixos.json
+            nix eval --raw path:./.#nixosConfigurations.nixos.config.system.build.toplevel.drvPath
+            rm -f local.nixos.json
+          done
+
+      - name: Evaluate each home-front module in isolation (x86_64-linux)
+        run: |
+          for m in $(jq -r '.modules[] | select(.home==true) | .name' modules/registry.json); do
+            echo "---- home-linux isolation: $m ----"
+            printf '{ "host": "x86_64-linux", "modules": ["%s"] }\n' "$m" > local.x86_64-linux.json
+            nix eval --raw path:./.#homeConfigurations.x86_64-linux.activationPackage.drvPath
+            rm -f local.x86_64-linux.json
+          done
+
+      - name: Evaluate WSL host with all nixos-front modules enabled
+        # wsl 上下文与桌面主机不同（无硬件配置、nixos-wsl 模块在）——全开集在 wsl
+        # 输出上求值一遍，拦截仅在该上下文暴露的断裂（如模块引用 wsl 缺席的选项）。
+        run: |
+          mods=$(jq -r '[.modules[] | select(.nixos==true) | .name] | map("\"" + . + "\"") | join(", ")' modules/registry.json)
+          printf '{ "host": "wsl", "modules": [%s] }\n' "$mods" > local.wsl.json
+          nix eval --raw path:./.#nixosConfigurations.wsl.config.system.build.toplevel.drvPath
+          rm -f local.wsl.json
+
+      - name: Darwin whitelist negative test
+        # darwin 保守边界：白名单外模块必须被 lib/selection.nix throw（期望求值失败）
+        run: |
+          printf '{ "host": "aarch64-darwin", "modules": ["dev"] }\n' > local.aarch64-darwin.json
+          if nix eval --raw path:./.#homeConfigurations.aarch64-darwin.activationPackage.drvPath 2>/dev/null; then
+            echo "::error::darwin 白名单负例未被拦截（dev 应被 throw）"; exit 1
+          fi
+          echo "darwin 白名单负例如预期被拦"
+          rm -f local.aarch64-darwin.json
+
+      - name: Build all-on home selection (x86_64)
+        # 非默认组合的构建期兜底（buildEnv 冲突历史坑）；顺带持续验证 path: 机制
+        run: |
+          mods=$(jq -r '[.modules[] | select(.home==true) | .name] | map("\"" + . + "\"") | join(", ")' modules/registry.json)
+          printf '{ "host": "x86_64-linux", "modules": [%s] }\n' "$mods" > local.x86_64-linux.json
+          nix build --no-link path:./.#homeConfigurations.x86_64-linux.activationPackage
+          rm -f local.x86_64-linux.json

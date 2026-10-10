@@ -9,6 +9,16 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-11 CI 模块矩阵 + 钩子提示 + 文档对齐（P3：.github/workflows/eval.yml + .githooks/pre-push + flake.nix（wsl 挂 hermes 模块）+ bootstrap/nixos.sh 样例 B + tests/scaffold-blocks.sh + AGENTS.md + docs/modules.md〔新〕+ docs/roam.md + README；Gentoo / WSL2 standalone x86_64，本机）
+
+背景：模块选配机制（P1/P2）的验证闭环——git 视图 CI 只见入库默认集，非默认组合需要专属矩阵；同时文档全面对齐新架构。
+
+改动：①eval.yml 新 job `module-matrix`（与 eval 并行）：逐模块单开隔离求值（nixos 前端在 nixos 主机、home 前端在 x86_64-linux）+ wsl 主机全开求值 + darwin 白名单负例（期望 throw）+ 全开集 x86_64 activationPackage 构建（非默认组合 buildEnv 兜底；矩阵直接解析 registry.json，无静态清单）；构建步磁盘清理加码（全开集 ~25GB）。②flake.nix wsl 输出挂 hermes NixOS 模块（import ≠ enable——agents 层的 services.hermes-agent 选项在任一 NixOS 主机启用时都须存在，否则 wsl 开 agents 撞「选项不存在」）；bootstrap 样例 B 同步；scaffold-blocks 断言 Hermes 1→2。③pre-push 钩子：检出含 local.*.json 时打印提示（本机选配不随 push，但 roam check 的 path: 求值已含其视图）。④文档：AGENTS（新「module registry」架构节、目录结构、Module loading 节改写、新机步骤、WSL 节、CI 段、Quick rules、roam 描述 path:/-H）；docs/modules.md（新：机制/双视图/复现边界/darwin 白名单/CI 覆盖/五条踩坑）；docs/roam.md（nh 双侧 path: 表述、module 子命令速查、补全清单）；README（roam 命令表补 module 系列、desktop-lite 句改选配表述、目录结构）。
+
+验证（本机 Gentoo / WSL2 standalone x86_64）：①workflow YAML 解析过；②矩阵核心步骤本机等价实跑：wsl 全开（11 层）求值通过（含 hermes 挂载修复——修复前 agents 在 wsl 上下文无选项）、darwin 白名单负例如预期被拦、逐模块隔离求值形态与 P1 的 6×home + P3 的 nixos 形态一致（单开求值在 P1 守卫验证中已覆盖同代码路径）；③hermes import 零影响：对 HEAD（P2 提交）树与当前树求值 wsl/standalone drvPath 逐一相同（import ≠ enable 的 drvPath 中立实证）；P2 的 roam.sh 变更使五输出相对 P1 基线整体移动属预期（roam 包进全部闭包），非本批回归；④run-all 272/272（scaffold-blocks 含新断言 6/6）、nix flake check 全过、shellcheck 全过、git diff --check 干净。
+
+未验证：module-matrix job 在 GitHub Actions 上的实际运行（含全开集构建的 runner 磁盘余量——~25GB 闭包按清理后余量估可行，若 OOM 磁盘需再瘦身或拆半构建，属事后报警层）；NixOS 主机实机 nh os path:/-H（P0 遗留边界不变）。
+
 ## 2026-10-11 roam module 子命令 + path: 全链路（P2：packages/roam.sh + roam-completion.bash + tests/{roam-functions,completion-harness,module-registry〔新〕,run-all} + fixtures/registry-{good,empty}.json〔新〕；Gentoo / WSL2 standalone x86_64，本机）
 
 背景：P1 建立的模块选配机制配上用户操作前端——`roam module init/list/enable/disable` 维护 local.<主机键>.json，roam 全部 nix/nh 调用改 path:./. 引用（本机选配进求值），注册表/选配的 bash 解析与守卫配套单测。

@@ -107,7 +107,7 @@ sudo bash bootstrap/nixos.sh          # 等价于 adopt 子命令
 
 ### NixOS 桌面
 
-NixOS 桌面模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。当前机器的配置位于 `hosts/nixos/` 并纳入版本控制，以保证 Git Flake 可以纯求值和重复构建；其他机器应建立独立的 `hosts/<hostname>/`（从 `hosts/_template/` 模板复制，或用 bootstrap 的 `--target` 脚手架），不要直接复用现有硬件配置。较轻量的第二台桌面主机可改用 `profiles/desktop-lite.nix`（core + dev + office + flatpak + browsers + agents，不含 media/proxy/gaming/虚拟化/IHEP 挂载与 GNOME/Plasma 备用桌面）。
+NixOS 桌面模式是针对特定机器的个人系统配置，需要配套的 `hardware-configuration.nix`。当前机器的配置位于 `hosts/nixos/` 并纳入版本控制，以保证 Git Flake 可以纯求值和重复构建；其他机器应建立独立的 `hosts/<hostname>/`（从 `hosts/_template/` 模板复制，或用 bootstrap 的 `--target` 脚手架），不要直接复用现有硬件配置。可选软件层（browsers/dev/media/office/proxy/agents/…）按机器经 `roam module` 启停：入库默认集写在主机入口的 `default` 列表（模板默认全集，轻量机删减即可——原 desktop-lite 组合即一份较短的默认列表），本机再改动记在 gitignored 的 `local.<hostname>.json`，见 [`docs/modules.md`](docs/modules.md)。
 
 在已准备好硬件配置的目标机器上：
 
@@ -156,17 +156,21 @@ home-manager switch --flake .#aarch64-darwin
 日常操作可用本仓库自带的统一 CLI `roam`（随共享工具列表装进四个安装点，按宿主自动分发；需在仓库检出目录下运行，等价命令见下文各节；机制细节——nh 语义、世代/回滚语义、WSL 陷阱、补全与测试——见 [`docs/roam.md`](docs/roam.md)）：
 
 ```bash
-roam switch            # 按宿主切换：NixOS → nh os switch --diff always .，standalone →
-                       # nh home switch --diff always --configuration <系统输出> .
+roam switch            # 按宿主切换：NixOS → nh os switch --diff always -H <主机名> path:./.，
+                       # standalone → nh home switch --diff always --configuration <系统输出> path:./.
                        # （含 meta.json 用户守卫与 NixOS 分支的 hostname 约定预检；两侧同一
-                       #   nh 前端，切换后打包差异）
-roam status            # 漂移检测：检出求值 vs 运行世代（一致/已回滚/漂移），附 git 状态
+                       #   nh 前端，切换后打包差异；path:. 引用让本机模块选配进求值）
+roam status            # 漂移检测：检出求值 vs 运行世代（一致/已回滚/漂移），附 git 状态与模块选配
 roam doctor            # 只读体检：磁盘/世代/镜像可达/守卫/漂移/失败单元；结果落日志
 roam rollback          # 回滚上一内容世代（--list 查看，N 跳转；NixOS 走 nixos-rebuild）
 roam gc --dry-run      # 清理旧世代与无引用路径（--older-than/--all/--system；无需检出目录）
 roam check             # 求值当前宿主目标（CI 第一层）；--build 时构建（CI 第二层）
 roam check wsl nixos   # 显式核对其它输出，可给多个：nixos / wsl / 三个系统名
                        #（跨主机仅求值；多目标并行求值、全部跑完再退出，任一失败 rc=1）
+roam module init       # 生成机器本地模块选配 local.<主机键>.json（种子=当前有效选择，零行为变化）
+roam module list       # 模块注册表目录 + 本机 on/off（--host <键> 看其它机器）
+roam module enable media   # 启用模块（未知名/前端不适用/darwin 白名单外会拒绝；可给多个）
+roam module disable media  # 停用模块（幂等）；改完 roam check 验证、roam switch 生效
 roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成。
                        # 可选输入：缺省交互列出（回车=全部），roam update nixpkgs nixvim 只更新指定项，--all 跳过交互
 roam flake             # 查看 flake.lock 锁定的输入版本（名称/短 rev/日期/ref/来源）；
@@ -174,7 +178,9 @@ roam flake             # 查看 flake.lock 锁定的输入版本（名称/短 re
 roam info              # 只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
 ```
 
-`roam` 自带 bash 补全，随包装进四个安装点：子命令（`roam <TAB>`）、`check` 的目标名与 `--build`、`update` 的 flake 输入名（实时读 `flake.lock`）、`flake` 与 `gc` 的旗标、`rollback` 的世代号与旗标。bash-completion（≥2.12）按 `XDG_DATA_DIRS` 自动懒加载，无需额外配置；`switch`/`status`/`doctor`/`info` 无自有参数，不做补全。
+`roam` 自带 bash 补全，随包装进四个安装点：子命令（`roam <TAB>`）、`check` 的目标名与 `--build`、`update` 的 flake 输入名（实时读 `flake.lock`）、`module` 的子动作与模块名（实时读 `modules/registry.json`）、`flake` 与 `gc` 的旗标、`rollback` 的世代号与旗标。bash-completion（≥2.12）按 `XDG_DATA_DIRS` 自动懒加载，无需额外配置；`switch`/`status`/`doctor`/`info` 无自有参数，不做补全。
+
+模块选配说明：可选软件层（browsers/dev/media/office/proxy/agents 等）与 NixOS 桌面同粒度、跨 NixOS/WSL/standalone 前端，由 `roam module` 按机器启停，记录在仓库根 `local.<主机键>.json`（gitignored，只记本机）；基座（CLI 列表、桌面基座、NixOS 系统基座）不可选。远端 `git+https` 装机得到入库默认集，装后 `roam module init` 本地化。机制细节（path: 双视图求值、darwin 白名单、CI 矩阵）见 [`docs/modules.md`](docs/modules.md)。
 
 手动垃圾回收（自动识别 NixOS、普通 Linux / WSL 和 macOS；无需在检出目录）：
 
@@ -229,8 +235,8 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 │   ├── nixos/                  # 当前 NixOS 主机入口（机器专属设置）与硬件配置
 │   ├── wsl/                    # NixOS-WSL 主机入口
 │   └── _template/              # 新主机模板（bootstrap 脚手架由此复制）
-├── profiles/                   # 显式导入的共享 profiles：基础、桌面、桌面轻量（desktop-lite）、locale、CLI
-├── modules/                    # 共享 NixOS 模块；modules/desktop/ 为桌面专属模块
+├── profiles/                   # 显式导入的共享 profiles：基础、桌面基座（desktop）、locale、CLI
+├── modules/                    # 模块层：modules/<名>/{nixos,home}.nix 可选层 + registry.json 注册表；modules/desktop/ 桌面基座
 ├── home/
 │   ├── common.nix              # 两种模式共享的纯 CLI Home Manager 配置
 │   ├── default.nix             # NixOS Home Manager 入口，包含 GUI 配置

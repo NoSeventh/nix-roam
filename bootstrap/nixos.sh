@@ -286,7 +286,7 @@ EOF
         ];
       };
 
-    ---- 样例 B：CLI 服务器（nixos-base + cli + CLI HM，无 Hermes）----
+    ---- 样例 B：CLI 服务器（nixos-base + cli + CLI HM；Hermes 模块同挂，默认不启用）----
       nixosConfigurations.__HOSTNAME__ = nixpkgs.lib.nixosSystem {
         system = nixosSystem;
         specialArgs = {
@@ -297,6 +297,7 @@ EOF
         modules = [
           ./hosts/__HOSTNAME__
           home-manager.nixosModules.home-manager
+          inputs.hermes-agent.nixosModules.default
           (hostnameGuard "__HOSTNAME__")
           (nixosHome ./home/nixos-cli.nix)
         ];
