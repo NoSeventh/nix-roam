@@ -18,11 +18,7 @@
 
 表中验证状态来自历史记录，不代表当前提交的全部输出已重新构建；具体验证环境（发行版 / 主机）以各条验证记录为准，状态表不钉住易变的发行版名。macOS 仅支持 Apple Silicon（aarch64-darwin），standalone Linux 提供 x86_64 与 aarch64 两个显式输出（NixOS 输出仍为 x86_64-linux）。
 
-2026-09-14 在 NixOS 26.11 / WSL2 验证运行时拆分：WSL 系统闭包与 standalone Linux activation package 构建通过，桌面系统 derivation 与 standalone Darwin activation derivation 求值通过；桌面/WSL 运行时路径一致，WSL 构建产物的 Node/npm/pnpm/uv、15 个 Python 模块导入及通过 PyROOT/rpy2 调用的 ROOT/R 计算通过。恢复共享 C++ ROOT 后重新构建 WSL 与 standalone Linux，并从 standalone 构建产物执行 C++ ROOT 计算通过。未激活本次修改；桌面完整构建曾因 QQ 下载失败中止，按用户要求未继续排查或调整 QQ；未验证桌面启动或 Darwin 构建。
-
-2026-09-17 边界拓展在 Ubuntu 26.04 / WSL2 standalone Nix 实机验证：新增 `xuqihao-aarch64`（aarch64-linux）输出，共享 Linux-only 包在锁定 rev 上确认 aarch64 可用（root 非 broken、在 platforms 内）；`hms` 别名与统一入口 `bootstrap/bootstrap.sh` 按架构自动选择 target；standalone Linux 激活时幂等追加 zsh/fish 会话环境加载段（在该 Ubuntu 26.04 distro 实测生成了带守卫的 `~/.zshrc` 段）；`bootstrap/linux.sh` 增加 WSL1 拒绝、单用户安装分支（无 systemd / 无 sudo 时官方安装器 `--no-daemon`，镜像写用户级 nix.conf）与 HM symlink 跳过守卫。五个输出全部求值通过；nixos/wsl toplevel 与改动前逐字节一致，darwin 输出一致，x86_64 standalone 因 hms 文本与激活块按预期变化。统一入口在该 distro 端到端跑通（非交互会话自动落入单用户分支，实测其幂等守卫；激活为 generation 2）；调度器分支以桩测覆盖（Darwin / WSL1 / 架构 / 非 bash / 显式参数）。未验证：aarch64 实机构建、真实无 root 机器上的单用户安装、macOS。
-
-2026-09-17 后续修订在 Fedora 44 / WSL2 standalone Nix 验证：`bootstrap/bootstrap.sh` 补齐执行位（此前误提交为 644，其余脚本均为 755）；zsh 会话环境追加段改为与 fish 同款的「实际使用」门控（登录 shell 是 zsh 或 `~/.zshrc` 已存在才追加），bash-only 的机器激活后不再凭空创建 `~/.zshrc`；验证记录的环境表述规范化（显式注明 distro，状态表不再钉住发行版名——日常在用的 standalone 主机是 Fedora 44 / WSL2，与边界拓展激活测试所用的 Ubuntu 26.04 distro 是两套环境）。五个输出在当前 lock 重新求值通过，bootstrap 脚本全部通过 `bash -n`；带门控的激活块尚未在任何主机实机激活。
+详细的历史验证环境与限制见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
 ## 主要内容
 
@@ -174,7 +170,7 @@ roam module disable media  # 停用模块（幂等）；改完 roam check 验证
 roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成。
                        # 可选输入：缺省交互列出（回车=全部），roam update nixpkgs nixvim 只更新指定项，--all 跳过交互
 roam flake             # 查看 flake.lock 锁定的输入版本（名称/短 rev/日期/ref/来源）；
-                       # --all 附上游传递输入；纯本地解析，不求值不触网、不依赖 jq
+                       # --all 附上游传递输入；纯本地解析，不求值不触网、使用共享清单中的 jq
 roam info              # 只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
 ```
 
@@ -236,15 +232,17 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 │   ├── wsl/                    # NixOS-WSL 主机入口
 │   └── _template/              # 新主机模板（bootstrap 脚手架由此复制）
 ├── profiles/                   # 显式导入的共享 profiles：基础、桌面基座（desktop）、locale、CLI
-├── modules/                    # 模块层：modules/<名>/{nixos,home}.nix 可选层 + registry.json 注册表；modules/desktop/ 桌面基座
+├── modules/                    # 模块层：modules/<名>/{nixos,home,packages}.nix 可选层 + registry.json 注册表；modules/desktop/ 桌面基座
 ├── home/
 │   ├── common.nix              # 两种模式共享的纯 CLI Home Manager 配置
 │   ├── default.nix             # NixOS Home Manager 入口，包含 GUI 配置
 │   ├── nixos-cli.nix           # NixOS CLI 用户配置入口
 │   ├── standalone-linux.nix    # 普通 Linux / WSL 入口
 │   ├── standalone-darwin.nix   # macOS 入口
+│   ├── nixvim/                 # 按功能拆分的 Neovim 配置，由 nixvim.nix 显式导入
 │   └── nix-cn.nix              # Nix 镜像/缓存配置（列表与公钥单源于根 meta.json）
 ├── packages/cli-dev.nix        # 各入口共享的 CLI 软件列表
+├── packages/roam/              # roam 命令库，入口为 packages/roam.sh
 ├── tests/                      # 脚本级测试：roam.sh 单测 + 补全 harness + 脚手架样例块/旧名残留检查（flake checks / CI）
 ├── .githooks/                  # pre-push 钩子：差异门控 + 五输出求值门槛（core.hooksPath 启用，见 .github/SYNC.md）
 ├── bootstrap/
@@ -265,6 +263,8 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五�
 - NixOS 桌面 / NixOS-WSL：`environment.systemPackages`，因此 `sudo` 环境也能找到相关命令
 - 普通 Linux / WSL：Home Manager 的 `home.packages`
 - macOS：Home Manager 的 `home.packages`
+
+Linux CLI 清单包含 bubblewrap（`bwrap`），供需要进程隔离的开发工具使用；macOS 不安装。可选层的共用应用列表放在各自的 `packages.nix`，系统服务仍由 NixOS 端声明。
 
 需要 Home Manager 托管配置文件的 CLI 放在 `home/common.nix`；GUI Home Manager 配置只放在 `home/default.nix`，避免给 WSL 和 macOS 引入桌面依赖。
 
@@ -291,6 +291,8 @@ uv run python -c 'import numpy; print(numpy.__version__)'
 提交 `pyproject.toml`、`uv.lock` 和 `.python-version`，不提交 `.venv`；其他机器用 `uv sync --locked` 恢复环境。独立命令行工具用 `uv tool install <工具>`。从旧 Nix Python 迁移的虚拟环境应保留依赖清单并重新创建，不能假设旧 `.venv` 已脱离 Nix store。
 
 需要 ROOT、R、复杂 C/C++ 动态库的科研项目可优先考虑 conda-forge + micromamba，或者实验组提供的容器/CVMFS 环境；只读取 ROOT 文件时先考虑 uv + uproot。uv 并不自动解决所有系统库、CUDA 或外部科研软件依赖。上述 uv 下载解释器方案针对普通 Linux，不应直接当作 NixOS 的通用方案；NixOS 项目需要额外依赖时优先使用项目级 `nix develop`。
+
+编辑 Nix 文件后可用 `nix fmt <文件...>` 格式化；它使用仓库已经提供的 `nixpkgs-fmt`。
 
 更完整的架构说明和维护约定见 [`AGENTS.md`](AGENTS.md)。
 

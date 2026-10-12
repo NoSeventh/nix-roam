@@ -111,6 +111,7 @@ with pkgs; [
   pkgs-stable.aria2
 ] ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
   # --- Linux-only 包 ---
+  bubblewrap
   pkgs-stable.valgrind
   # C++ ROOT application; PyROOT is configured separately on NixOS.
   pkgs-stable.root

@@ -1,10 +1,9 @@
 # modules/proxy/nixos.nix
 #
 # 代理档：clash 系客户端与内核、sing-box 及配套工具（tun/service 模式随 programs.clash-verge）。
-{
-  pkgs,
-  pkgs-stable,
-  ...
+{ pkgs
+, pkgs-stable
+, ...
 }:
 
 {
@@ -15,12 +14,5 @@
     autoStart = false;
   };
 
-  environment.systemPackages = with pkgs; [
-    pkgs-stable.mihomo
-    pkgs-stable.clash-verge-rev
-    pkgs-stable.clash-nyanpasu
-    pkgs-stable.sing-box
-    pkgs-stable.v2rayn
-    pkgs-stable.proxypin
-  ];
+  environment.systemPackages = (import ./packages.nix { inherit pkgs pkgs-stable; });
 }

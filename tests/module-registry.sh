@@ -2,8 +2,8 @@
 # 注册表一致性门禁：modules/registry.json 是模块选配的单一事实源（flake 的
 # lib/selection.nix 与 roam.sh load_registry 两路消费），本关卡钉住它与仓库实态
 # 互相不漂移：
-#   1. roam.sh 的 bash 解析器与 jq 交叉核对（名字与三面旗标逐一相等）——
-#      两路解析器任何一边漂移（格式微调 / 锚定失效）都当场暴露；
+#   1. roam 的解析结果与注册表字段交叉核对（名字与三面旗标逐一相等）——
+#      解析输出与文件内容不一致时当场暴露；
 #   2. 旗标与文件实态互证：nixos/home=true 的层必有对应实现文件，false 的层
 #      不得有 home.nix（有文件却标 false = 静默不可达，最危险的漂移形态）；
 #   3. 反向：modules/ 下每个层目录都在注册表里（desktop/ 基座除外）；
@@ -24,7 +24,7 @@ command -v jq >/dev/null 2>&1 \
 REG="$REPO/modules/registry.json"
 [ -f "$REG" ] || { printf 'module-registry: 缺 %s\n' "$REG" >&2; exit 1; }
 
-# 1. bash 解析器（roam.sh 源内实现）vs jq 交叉核对
+# 1. roam 命令库解析结果 vs 注册表字段
 # shellcheck source=/dev/null
 . "$REPO/packages/roam.sh"
 set +e

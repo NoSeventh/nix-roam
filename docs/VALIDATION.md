@@ -9,6 +9,14 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-12 bubblewrap、JSON 解析与配置结构整理（Gentoo / WSL2 standalone x86_64）
+
+改动：bubblewrap 归入共享 CLI 的 Linux 分支，dev 系统层去掉重复安装；roam 的 meta/注册表/选配/lock 解析改用 jq，接受紧凑排版与字段换序，拒绝多 JSON 文档、坏类型和错机选配并保留原文件。roam 分发入口与命令库拆开，打包固定库的 store 路径；NixVim 按功能显式拆分。六个可选层抽取共享 packages.nix，保留系统端服务和工具差异；selectedModules 标记 readOnly。显式提供三系统 nixpkgs-fmt formatter，修正 Gentoo 单引号 os-release 的信息显示；清理 AGENTS/README 失效说明，历史快照移入主题文档。
+
+验证：本机脚本测试 301/301、ShellCheck、格式/语法与 git diff --check 通过；五个默认输出的 drvPath 求值通过；排除预期改变的 roam 包后，五个目标及全开 x86_64 home 组合的包路径多重集与加入 bubblewrap 后的基线一致，NixVim derivation 逐字节一致。全开 home activation derivation 求值通过；flake checks 构建通过；当前空选配的 x86_64 standalone activationPackage 构建并激活通过。已安装 roam 从仓库外可加载 store 命令库，info/flake 冒烟通过；bwrap 0.12.0 的用户命名空间、只读根与独立 /tmp 隔离冒烟通过。
+
+边界：未构建或激活 NixOS、ARM、macOS；全开 GUI home 组合仅求值与包集合对比，未完整构建或激活。未改变本机 local 选配，flake.lock 未更新；未推送远端。
+
 ## 2026-10-11 CI 模块矩阵 + 钩子提示 + 文档对齐（P3：.github/workflows/eval.yml + .githooks/pre-push + flake.nix（wsl 挂 hermes 模块）+ bootstrap/nixos.sh 样例 B + tests/scaffold-blocks.sh + AGENTS.md + docs/modules.md〔新〕+ docs/roam.md + README；Gentoo / WSL2 standalone x86_64，本机）
 
 背景：模块选配机制（P1/P2）的验证闭环——git 视图 CI 只见入库默认集，非默认组合需要专属矩阵；同时文档全面对齐新架构。

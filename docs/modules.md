@@ -7,7 +7,8 @@
 ```
 modules/registry.json            # 注册表（单一事实源）：模块名 + nixos/home/darwin 三面旗标 + 描述
 modules/<名>/nixos.nix           # 系统级实现（nixos 与 NixOS-WSL 主机共用，原 modules/desktop/<名>.nix 迁入）
-modules/<名>/home.nix            # 用户级实现（standalone；纯包列表函数，cli-dev.nix 同款形态）
+modules/<名>/home.nix            # 用户级包列表入口（standalone）
+modules/<名>/packages.nix        # 两前端共享的纯应用列表；系统工具/服务留在 nixos.nix
 modules/desktop/                 # 桌面基座（session/niri/core/locale-zh），不可选、不在注册表
 lib/selection.nix                # 选择解析器：selection / selectionModule / metaModule
 local.<主机键>.json               # 机器本地选配（gitignored，roam module 生成维护）
@@ -33,7 +34,7 @@ fail-loud 守卫（`lib/selection.nix` throw，`roam module` 同规则前置拒�
 ## 复现边界（如实记录）
 
 - **远端 `git+https` 装机得到的是入库默认集**（git 视图看不到目标机的 local 文件）；装机后 `roam module init` 以当前有效选择为种子生成 local 文件（首次零行为变化），再 enable/disable 本地化。
-- pre-push 门控与 CI eval job 验证默认集；本机选配由 roam 的 path: 求值与 CI module-matrix（写 local 文件后以 path: 引用）覆盖。检出内存在 local.*.json 时 pre-push 会提示。
+- CI eval job 验证默认集；pre-push 与 roam 使用 path: 求值验证检出中的本机选配，CI module-matrix 写 local 文件覆盖非默认组合。检出内存在 local.*.json 时 pre-push 会提示。
 - 手工裸用 `nix build .#attr` = git 视图 = 默认集；要本机选配语义请用 `path:./.#attr` 或直接 `roam`。
 - 一台机器一个检出 = 一份选配（local 文件在检出内、随检出走）；同一检出可为他机预配置（`roam module enable X --host <键>`，NixOS 键要求 `hosts/<键>/` 在）。
 
@@ -56,3 +57,28 @@ darwin 输出读 local 文件，但仅接受注册表 `darwin: true` 的模块�
 3. **EOL 顺序拒评**：standalone unstable 实例全开组合先拒 electron-40.10.5（cherry-studio → electron_40）、放行后再拒 pnpm-10.29.2——nix 一次只报一个，与桌面系统级实例同款依赖对，共享 config 补齐两条（allow-only，无引用者 drvPath 不变）。
 4. **local 文件严格 JSON**：写入选配的末元素不能带尾逗号（`fromJSON` 不容忍）；`roam.sh local_selection_write` 的产出由单测以 jq 三态断言（多元素/单元素/空集）锁死。
 5. **set -e 管道赋值**：`cur="$(printf … | grep -vxF x)"` 在滤空输出时 rc=1，函数静默中止——`|| true` 兜住；单测桩内须还原 `set -e` 生产语义否则假通过。
+
+## 共享列表与 JSON 接口
+
+可选层的 `packages.nix` 返回两前端共享的应用列表；`home.nix` 转发该函数，
+`nixos.nix` 安装同一列表并声明系统服务及额外工具。dev 的 clang、裸 neovim、
+distrobox 与 MySQL 仍只在系统端；wechat overlay 仍随 office 的系统端启停。
+这次抽取保留现有包选择，不把基础 CLI 或开发服务进一步拆成新开关。
+
+roam 在安装后使用共享 CLI 清单提供的 jq；注册表与本地选配可经过标准 JSON
+格式化或压缩，含义不变。本地选配写入前检查模块数组类型和 host 一致性，
+坏文件原样保留并报错。bootstrap 在安装 Nix/jq 前仍用自持 meta.json 的轻量
+读取方式。Shell 守卫、注册表结构与文件实态由 tests/ 验证。
+
+## 通道异常的历史依据
+
+2026-10-02 snapshot (current allowlists live in `flake.nix` and `profiles/nixos-base.nix`):
+
+| nixpkgs instance | Location | `permittedInsecurePackages` |
+|---|---|---|
+| Stable **and** standalone unstable (shared) | `flake.nix` → `nixpkgsConfig` (consumed by `pkgsFor` for both channels) | `electron-41.10.7` (successor of `electron-41.9.1`, added 2026-09-26, bumped 2026-10-02: the 2f90778 flake update moved stable's `electron_41`, and the desktop closure consumes stable `electron_41` — probe: stable `electron_41` = 41.10.7, unstable's = 41.10.6, so the refused 41.10.7 could only come from this config's stable instance. Replaced, not accumulated: the old version has no referents left. Standalone doesn't reference it; allow-only semantics leave its drvPath unchanged, byte-identical verified) |
+| NixOS unstable, desktop/WSL | `profiles/nixos-base.nix` | `electron-40.10.5`, `pnpm-10.29.2` (both re-verified still load-bearing 2026-10-02: removing either breaks desktop eval — unstable's `electron_40` is still 40.10.5 and the GNOME chain still pins pnpm 10.29.2, even though top-level probes say `electron`/`electron_41` = 43.6.0/41.10.6 and `pnpm` = 12.3.4 — versioned/pinned references are invisible to top-level attr probes; entry liveness is proven by evaluating the affected outputs, nothing else) |
+
+These lists deliberately differ (per-instance needs). Add an approved exact package/version exception to every affected instance in both files as needed; do not assume one edit covers every output or expand permissions just to make documentation match. Validate the affected package/target after changing exceptions. Note that a flake bump can surface **multiple sequential refusals** (Nix reports one at a time — the 2026-10-02 fix unblocked stable's electron first, then unstable's electron/pnpm appeared behind it); keep re-evaluating until the target passes.
+
+`pnpm-10.29.2` on system unstable is referenced only by the desktop closure (GNOME module chain via `services.desktopManager.gnome`); the WSL toplevel derivation is byte-identical without it (verified 2026-09-14). It must still be declared in the shared `profiles/nixos-base.nix`: `nixpkgs.config` merges shallowly across modules, so a second `permittedInsecurePackages` list in `profiles/desktop.nix` would shadow the `electron-40.10.5` entry instead of extending it.

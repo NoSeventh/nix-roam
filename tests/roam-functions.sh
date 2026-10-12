@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # roam.sh 纯函数单测 —— source 方式加载被测脚本（分发段经 BASH_SOURCE 执行守卫跳过）。
 # 覆盖最脆的解析点：home-manager generations 文本格式、profile 目录 glob、
-# meta.json 提取、choose_inputs 交互解析、read_flake_lock/flake.lock 缩进解析、
+# meta.json 提取、choose_inputs 交互解析、read_flake_lock/flake.lock 结构解析、
 # standalone_target 架构分发、cmd_check 多目标分发与失败汇总、模块注册表解析与
 # 选配文件守卫（load_registry / module_front_for_key / cmd_module enable/disable）。
 # 打桩手段：PATH 注入假 home-manager（cat fixture）、ROAM_SYSTEM_PROFILES_DIR
@@ -537,6 +537,52 @@ out="$(modr bogus --host x86_64-linux 2>/dev/null)"; rc=$?
 expect_rc 'module：未知动作须拒绝' 1 "$rc"
 out="$(modr 2>/dev/null)"; rc=$?
 expect_rc 'module：缺动作须拒绝' 1 "$rc"
+# JSON interoperability: external formatters and compact CI files are valid inputs.
+JSONDIR="$(mktemp -d)"
+jq -c . "$FIX/registry-good.json" >"$JSONDIR/registry.json"
+out="$(load_registry "$JSONDIR/registry.json"; printf '%s' "${REG_NAMES[*]}")"; rc=$?
+expect_rc 'registry：紧凑 JSON 可读' 0 "$rc"
+expect_eq 'registry：紧凑 JSON 模块不丢失' "$out" 'alpha beta gamma'
+jq '.modules += [.modules[0]]' "$FIX/registry-good.json" >"$JSONDIR/registry.json"
+out="$(load_registry "$JSONDIR/registry.json" 2>/dev/null)"; rc=$?
+expect_rc 'registry：重复名字须拒绝' 1 "$rc"
+jq '.modules[0].home = "true"' "$FIX/registry-good.json" >"$JSONDIR/registry.json"
+out="$(load_registry "$JSONDIR/registry.json" 2>/dev/null)"; rc=$?
+expect_rc 'registry：字符串旗标须拒绝' 1 "$rc"
+jq -cS '.nodes.workspace = .nodes.root | del(.nodes.root) | .root = "workspace"' "$FIX/flake.lock" >"$JSONDIR/flake.lock"
+out="$(cd "$JSONDIR" && read_flake_lock && printf '%s' "${ROOT_KEYS[*]}")"; rc=$?
+expect_rc 'lock：紧凑排版及非默认 root 可读' 0 "$rc"
+expect_eq 'lock：按 root 字段读取输入映射' "$out" 'home-manager nixpkgs nixpkgs-stable nixvim'
+printf '%s\n' '{"host":"x86_64-linux","modules":["alpha","gamma"]}' >"$MODDIR/local.x86_64-linux.json"
+out="$(ROAM_LOCAL_DIR="$MODDIR" local_selection_read x86_64-linux)"; rc=$?
+expect_rc 'local：紧凑 JSON 可读' 0 "$rc"
+expect_eq 'local：只读取数组，不混入 host/字段名' "$out" 'alpha
+gamma'
+printf '%s\n' '{"modules":[],"host":"x86_64-linux"}' >"$MODDIR/local.x86_64-linux.json"
+out="$(ROAM_LOCAL_DIR="$MODDIR" local_selection_read x86_64-linux)"; rc=$?
+expect_rc 'local：字段换序及空集可读' 0 "$rc"
+expect_eq 'local：空集为空输出' "$out" ''
+for invalid in '{"modules":["alpha"]} {"modules":["gamma"]}' '{"host":"other","modules":["alpha"]}' '{"modules":"alpha"}' '{"modules":[7]}' '{"modules":['; do
+  printf '%s\n' "$invalid" >"$MODDIR/local.x86_64-linux.json"
+  out="$(modr enable gamma --host x86_64-linux 2>/dev/null)"; rc=$?
+  expect_rc "module：坏选配须拒绝 [$invalid]" 1 "$rc"
+  expect_eq 'module：坏选配原样保留' "$(cat "$MODDIR/local.x86_64-linux.json")" "$invalid"
+done
+cat "$FIX/registry-good.json" "$FIX/registry-good.json" >"$JSONDIR/registry.json"
+out="$(load_registry "$JSONDIR/registry.json" 2>/dev/null)"; rc=$?
+expect_rc 'registry：多个 JSON 文档须拒绝' 1 "$rc"
+cat "$FIX/flake.lock" "$FIX/flake.lock" >"$JSONDIR/flake.lock"
+out="$(cd "$JSONDIR" && read_flake_lock 2>/dev/null)"; rc=$?
+expect_rc 'lock：多个 JSON 文档须拒绝' 1 "$rc"
+for label in '"Test Linux"' "'Test Linux'" 'Test Linux'; do
+  printf 'PRETTY_NAME=%s\n' "$label" >"$JSONDIR/os-release"
+  expect_eq 'os-release：单双引号及无引号均可读' "$(os_pretty_name "$JSONDIR/os-release")" 'Test Linux'
+done
+: >"$JSONDIR/os-release"
+expect_eq 'os-release：字段缺失时允许回落内核名称' "$(os_pretty_name "$JSONDIR/os-release")" ''
+expect_eq 'os-release：文件缺失时允许回落（Darwin）' "$(os_pretty_name "$JSONDIR/missing")" ''
+rm -rf "$JSONDIR"
+
 rm -f "$MOD_SEED_FILE" "$MODLOG"
 
 rm -rf "$STUBBIN" "$PROF" "$NIXSTUB" "$STUBGC" "$GCLOG_FILE" "$CHECK_LOG" "$MODDIR"

@@ -2,7 +2,7 @@
 #
 # 单一事实源 modules/registry.json：模块名 → 各前端实现文件 + darwin 白名单旗标。
 # 机器本地选配 local.<key>.json（仓库根、gitignored、由 roam module 维护）：
-#   - git 求值视图（CI / pre-push / 远端 git+https / 裸 `.#`）看不到 gitignored 文件
+#   - git 求值视图（CI 默认求值 / 远端 git+https / 裸 `.#`）看不到 gitignored 文件
 #     → 走调用方显式给出的入库 default（默认集在各主机入口可见，延续 explicit-imports）；
 #   - `path:./.` 求值视图（roam 全链路、CI 模块矩阵）整目录拷贝、local 文件可见
 #     → 其 modules 列表为权威完整选择（整体替换 default，不做增量合并）。
@@ -26,10 +26,12 @@ rec {
     let
       registry = builtins.fromJSON (builtins.readFile ../modules/registry.json);
       byName = builtins.listToAttrs (
-        map (m: {
-          name = m.name;
-          value = m;
-        }) registry.modules
+        map
+          (m: {
+            name = m.name;
+            value = m;
+          })
+          registry.modules
       );
 
       # pathExists 对源视图中不存在的路径返回 false（尖刺 2026-10-11 实证：git 视图
@@ -85,6 +87,7 @@ rec {
       options.roam.selectedModules = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];
+        readOnly = true;
         description = "本输出经 lib/selection.nix 解析后的可选模块集（机器本地 local.<key>.json 优先于入库默认集）";
       };
     };

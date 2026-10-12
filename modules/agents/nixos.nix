@@ -26,27 +26,5 @@
   users.users.${username}.extraGroups = lib.mkAfter [ "hermes" ];
 
   # --- 4. AI 相关工具/IDE ---
-  environment.systemPackages = with pkgs; [
-    # --- 4.1 AI 编辑器/IDE ---
-    code-cursor
-    cursor-cli
-
-    # --- 4.2 AI Agent 工具 ---
-    cc-switch
-    agent-browser
-    claude-code
-    codex
-    github-copilot-cli
-    # antigravity
-    # crush
-    # opencode 已移至 packages/cli-dev.nix （共享） 
-    opencode-desktop
-
-    # --- 4.3 AI 聊天客户端 ---
-    cherry-studio
-    # chatbox  # removed from nixpkgs (bundled EOL electron)
-    sillytavern
-    # lmstudio
-
-  ];
+  environment.systemPackages = (import ./packages.nix { inherit pkgs; });
 }

@@ -48,13 +48,12 @@
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      nixpkgs-stable,
-      home-manager,
-      hermes-agent,
-      ...
+    { self
+    , nixpkgs
+    , nixpkgs-stable
+    , home-manager
+    , hermes-agent
+    , ...
     }@inputs:
     let
       # 本地用户名单点定义：仓库根 meta.json（bootstrap 脚本在装 Nix 之前也要读，不能只放 Nix 表达式里）。
@@ -125,14 +124,15 @@
       };
 
       # 构造 standalone home-manager 配置（非 NixOS）
-      mkStandaloneHome = {
-        system,
-        homeDirectory,
-        standaloneModule ? ./home/standalone-linux.nix,
-      }:
-      let
-        channels = pkgsFor system;
-      in
+      mkStandaloneHome =
+        { system
+        , homeDirectory
+        , standaloneModule ? ./home/standalone-linux.nix
+        ,
+        }:
+        let
+          channels = pkgsFor system;
+        in
         home-manager.lib.homeManagerConfiguration {
           pkgs = channels.unstable;
           extraSpecialArgs = {
@@ -164,21 +164,23 @@
       scriptChecks =
         pkgs':
         {
-          shellcheck-scripts = pkgs'.runCommand "shellcheck-scripts" {
-            nativeBuildInputs = [ pkgs'.shellcheck ];
-          } ''
+          shellcheck-scripts = pkgs'.runCommand "shellcheck-scripts"
+            {
+              nativeBuildInputs = [ pkgs'.shellcheck ];
+            } ''
             cd ${self.outPath}
             # packages/roam.sh 另有 writeShellApplication 构建期门，此处重复纳入：
             # nix flake check 单独跑时也能拦住它（双重覆盖，非冗余失误）
             # .githooks/pre-push 无 .sh 后缀，显式列出
-            shellcheck packages/roam.sh packages/roam-completion.bash tests/*.sh bootstrap/*.sh .githooks/pre-push || exit 1
+            shellcheck packages/roam.sh packages/roam/*.sh packages/roam-completion.bash tests/*.sh bootstrap/*.sh .githooks/pre-push || exit 1
             touch $out
           '';
-          roam-unit-tests = pkgs'.runCommand "roam-unit-tests" {
-            # bashInteractive：沙箱 PATH 上的 bash 是 stdenv 的极简构建（无 progcomp，
-            # compgen 不可用）；补全 harness 需要完整 bash（2026-09-28 沙箱实测发现）。
-            nativeBuildInputs = [ pkgs'.jq pkgs'.bashInteractive ];
-          } ''
+          roam-unit-tests = pkgs'.runCommand "roam-unit-tests"
+            {
+              # bashInteractive：沙箱 PATH 上的 bash 是 stdenv 的极简构建（无 progcomp，
+              # compgen 不可用）；补全 harness 需要完整 bash（2026-09-28 沙箱实测发现）。
+              nativeBuildInputs = [ pkgs'.jq pkgs'.bashInteractive ];
+            } ''
             ROAM_TEST_REPO=${self.outPath} bash ${./tests}/run-all.sh || exit 1
             touch $out
           '';
@@ -245,6 +247,10 @@
         homeDirectory = "/Users/${username}";
         standaloneModule = ./home/standalone-darwin.nix;
       };
+
+      formatter.x86_64-linux = (pkgsFor "x86_64-linux").unstable.nixpkgs-fmt;
+      formatter.aarch64-linux = (pkgsFor "aarch64-linux").unstable.nixpkgs-fmt;
+      formatter.aarch64-darwin = (pkgsFor "aarch64-darwin").unstable.nixpkgs-fmt;
 
       # --- 4. 仓库自有脚本关卡（两个 Linux 系统；见上方 scriptChecks 注释）---
       checks.x86_64-linux = scriptChecks (pkgsFor "x86_64-linux").unstable;
