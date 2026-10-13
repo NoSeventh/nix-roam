@@ -167,12 +167,13 @@ cmd_module() {
         [ "$#" -ge 2 ] || die 'module: --host 需要参数（主机键）'
         host_key="$2"
         shift 2
+        continue
         ;;
       -h | --help) module_usage; return 0 ;;
       -*) die "module: 未知选项：$1" ;;
       *) names="$names $1" ;;
     esac
-    shift || true
+    shift
   done
   names="${names# }"
   [ -n "${ROAM_REGISTRY_PATH:-}" ] || repo_check

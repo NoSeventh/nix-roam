@@ -154,16 +154,46 @@
         };
 
       # 仓库自有脚本关卡（nix flake check；CI eval.yml 第三层）：
+      #   selection-metadata —— 五输出选配元信息可读，且不可被第二次赋值覆盖
       #   shellcheck-scripts —— 补全文件、tests/bootstrap 脚本与 git 钩子等不经
       #                         writeShellApplication 门的脚本静态检查
       #   roam-unit-tests   —— tests/ 单测（roam.sh 纯函数 source 加载 + 补全 harness +
-      #                         脚手架样例块与旧名残留检查 + pre-push 差异门控单测与审计 +
+      #                         脚手架样例块与旧名残留检查 + pre-push 门控/快照测试与审计 +
       #                         bootstrap/linux.sh 提权前端 sed 提取单测）
       # 两个 Linux 系统显式输出（与 standalone 输出同款惯例，不做 forAllSystems 展开）；
-      # darwin 不提供——tests 只依赖 bash/jq/shellcheck，两侧行为无差。
+      # darwin 不提供——脚本关卡在 Linux 运行；macOS 实机边界见 VALIDATION.md。
       scriptChecks =
         pkgs':
         {
+          # 元信息不一定被 activationPackage/toplevel 强制求值，需单独覆盖。
+          selection-metadata =
+            let
+              selectionLib = import ./lib/selection.nix;
+              names = [ "dev" ];
+              metadataModules = [
+                selectionLib.metaModule
+                { roam.selectedModules = names; }
+              ];
+              metadata = (pkgs'.lib.evalModules { modules = metadataModules; }).config.roam.selectedModules;
+              overridden = builtins.tryEval (
+                (pkgs'.lib.evalModules {
+                  modules = metadataModules ++ [{ roam.selectedModules = [ "media" ]; }];
+                }).config.roam.selectedModules
+              );
+              outputMetadata = [
+                self.nixosConfigurations.nixos.config.roam.selectedModules
+                self.nixosConfigurations.wsl.config.roam.selectedModules
+                self.homeConfigurations.x86_64-linux.config.roam.selectedModules
+                self.homeConfigurations.aarch64-linux.config.roam.selectedModules
+                self.homeConfigurations.aarch64-darwin.config.roam.selectedModules
+              ];
+            in
+            assert metadata == names;
+            assert !overridden.success;
+            assert builtins.deepSeq outputMetadata true;
+            pkgs'.runCommand "selection-metadata" { } ''
+              touch $out
+            '';
           shellcheck-scripts = pkgs'.runCommand "shellcheck-scripts"
             {
               nativeBuildInputs = [ pkgs'.shellcheck ];
@@ -179,7 +209,8 @@
             {
               # bashInteractive：沙箱 PATH 上的 bash 是 stdenv 的极简构建（无 progcomp，
               # compgen 不可用）；补全 harness 需要完整 bash（2026-09-28 沙箱实测发现）。
-              nativeBuildInputs = [ pkgs'.jq pkgs'.bashInteractive ];
+              # git：推送快照测试创建临时真仓库与 annotated tag，不依赖宿主检出状态。
+              nativeBuildInputs = [ pkgs'.jq pkgs'.bashInteractive pkgs'.git ];
             } ''
             ROAM_TEST_REPO=${self.outPath} bash ${./tests}/run-all.sh || exit 1
             touch $out
@@ -252,7 +283,7 @@
       formatter.aarch64-linux = (pkgsFor "aarch64-linux").unstable.nixpkgs-fmt;
       formatter.aarch64-darwin = (pkgsFor "aarch64-darwin").unstable.nixpkgs-fmt;
 
-      # --- 4. 仓库自有脚本关卡（两个 Linux 系统；见上方 scriptChecks 注释）---
+      # --- 4. 仓库自有关卡（两个 Linux 系统；见上方 scriptChecks 注释）---
       checks.x86_64-linux = scriptChecks (pkgsFor "x86_64-linux").unstable;
       checks.aarch64-linux = scriptChecks (pkgsFor "aarch64-linux").unstable;
     };

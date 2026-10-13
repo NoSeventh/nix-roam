@@ -113,8 +113,10 @@ maintains it. Host key is NixOS hostname or standalone output name. A present
 file is the complete authoritative selection, replacing the tracked default;
 absence uses the explicit default in each host/standalone entry. Defaults are
 all 11 tiers for desktop and empty for WSL/standalone. Git evaluation and remote
-`git+https` cannot see ignored files. Roam, pre-push, and CI module-matrix use
-`path:./.`; CI's default eval uses Git. See [`docs/modules.md`](docs/modules.md).
+`git+https` cannot see ignored files. Roam and CI module-matrix use `path:./.`;
+CI's default eval and pre-push commit snapshots use Git. Local switch/build
+and recovery examples must use `path:./.` to retain selections.
+See [`docs/modules.md`](docs/modules.md).
 
 ## Host wiring
 
@@ -199,15 +201,18 @@ nonexistent inputs or reintroduce removed chaotic/master inputs casually.
   and `.githooks/pre-push`'s guard must remain sourceable for tests. Keep Bash
   3.2 compatibility. The package pins its command-library store path; jq and
   other runtime tools come from the install sites, without runtimeInputs.
-- `nix flake check` builds shellcheck-scripts and roam-unit-tests; every command
+- `nix flake check` builds selection-metadata, shellcheck-scripts, and roam-unit-tests; every command
   library file is statically checked. Test stubs use $BASH shebangs, and completion
   checks require bashInteractive. Run tests/run-all.sh for local script checks.
 - CI evaluates five outputs, builds x86_64 standalone, and runs flake checks.
   The registry-driven module-matrix covers per-tier isolation, all-on WSL,
   Darwin rejection, and all-on x86_64 standalone build. NixOS/ARM/macOS build
   and activation claims must reflect the actual validation performed.
-- Opt-in pre-push (`git config core.hooksPath .githooks`) diff-gates a concurrent
-  five-output roam check. EVAL_SKIP_RE is a blacklist of known non-inputs:
+- Opt-in pre-push (`git config core.hooksPath .githooks`) diff-gates concurrent
+  default five-output evals of each pushed commit from the stdin protocol.
+  Pin `git+file` to that SHA, peel annotated tags, and deduplicate commits;
+  never substitute HEAD, the index, working-tree changes, or local selections.
+  Check all required snapshots before returning failure. EVAL_SKIP_RE is a blacklist of known non-inputs:
   docs/tests/bootstrap/.github/.githooks and root README/AGENTS/LICENSE/.gitignore.
   Unknown paths require eval; test audits forbid Nix references into skip-listed
   paths except the sanctioned tests check. Bypass once with --no-verify.

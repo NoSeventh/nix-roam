@@ -62,7 +62,7 @@ home-manager switch --flake "git+https://gitee.com/qihaoxu/nix-roam.git#x86_64-l
 ```bash
 git clone https://gitee.com/qihaoxu/nix-roam.git nix-roam
 cd nix-roam
-home-manager switch --flake .#x86_64-linux
+home-manager switch --flake path:./.#x86_64-linux
 ```
 
 ### 全新的 Linux / WSL
@@ -108,7 +108,7 @@ NixOS 桌面模式是针对特定机器的个人系统配置，需要配套的 `
 在已准备好硬件配置的目标机器上：
 
 ```bash
-sudo nixos-rebuild switch --flake .#nixos
+sudo nixos-rebuild switch --flake path:./.#nixos
 ```
 
 ### NixOS-WSL
@@ -116,7 +116,7 @@ sudo nixos-rebuild switch --flake .#nixos
 先按 [NixOS-WSL 官方安装说明](https://nix-community.github.io/NixOS-WSL/install.html) 安装 NixOS 发行版，再在其中克隆本仓库并执行：
 
 ```bash
-sudo nixos-rebuild switch --flake .#wsl
+sudo nixos-rebuild switch --flake path:./.#wsl
 ```
 
 刚导入的发行版也可以直接运行 `sudo bash bootstrap/nixos.sh`：脚本会识别 WSL 走 adopt 链路，完成克隆与切换。全新导入的发行版连 curl 都没有，直接用一键安装小节的最后一条命令（先经 `nixpkgs` 通道装 curl，下载后以 root 运行）。
@@ -140,7 +140,7 @@ bash <(curl -fsSL https://gitee.com/qihaoxu/nix-roam/raw/master/bootstrap/darwin
 已有 Nix + Home Manager 的机器，在仓库根目录手动激活：
 
 ```bash
-home-manager switch --flake .#aarch64-darwin
+home-manager switch --flake path:./.#aarch64-darwin
 ```
 
 这个入口只管理用户 CLI 环境，不管理 macOS 系统服务和 GUI，也不安装 nix-darwin；不要运行 Linux 引导脚本（统一入口 `bootstrap/bootstrap.sh` 会自动派发，无需手动区分）。flake 仅提供 aarch64-darwin 输出，Intel Mac 不受支持。
@@ -195,31 +195,33 @@ roam gc --all            # 清理全部非当前世代，失去这些世代的�
 
 ```bash
 git pull --ff-only
-home-manager switch --flake .#x86_64-linux   # aarch64 机器用 .#aarch64-linux；或直接用 roam switch 自动选择
+home-manager switch --flake path:./.#x86_64-linux   # aarch64 机器用 path:./.#aarch64-linux；或直接用 roam switch 自动选择
 ```
 
 上面的更新使用仓库锁定的依赖版本。需要升级依赖时，运行 `nix flake update`，检查 `flake.lock` 差异并构建验证，再提交锁文件；`nix-channel --update` 不会更新 flake 依赖。
 
+本地命令统一使用 `path:./.`，包含当前检出的 `local.*.json` 选配；裸 `.#` 用于核对入库默认集，远端 Git 安装也使用默认集。
+
 只验证构建、不激活：
 
 ```bash
-nix build --no-link .#homeConfigurations.x86_64-linux.activationPackage
+nix build --no-link path:./.#homeConfigurations.x86_64-linux.activationPackage
 ```
 
 aarch64 输出需在 ARM 实机上构建；x86_64 主机（以及 CI）只做求值验证：
 
 ```bash
-nix eval --raw .#homeConfigurations.aarch64-linux.activationPackage.drvPath
+nix eval --raw path:./.#homeConfigurations.aarch64-linux.activationPackage.drvPath
 ```
 
 验证 NixOS 系统闭包：
 
 ```bash
-nix build --no-link .#nixosConfigurations.nixos.config.system.build.toplevel
-nix build --no-link .#nixosConfigurations.wsl.config.system.build.toplevel
+nix build --no-link path:./.#nixosConfigurations.nixos.config.system.build.toplevel
+nix build --no-link path:./.#nixosConfigurations.wsl.config.system.build.toplevel
 ```
 
-GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）在做上述五条求值之外，还会实际构建 x86_64 standalone activation package——求值拦不住的 Home Manager buildEnv 冲突（如 gcc+clang、双 `python3.withPackages`）在这一层才会暴露。最后一步 `nix flake check` 构建仓库自有 checks：`shellcheck-scripts`（补全文件、tests/bootstrap 脚本与 git 钩子等 writeShellApplication 门之外脚本的静态检查）与 `roam-unit-tests`（`tests/` 的 roam.sh 纯函数单测 + 补全 harness + 脚手架样例块与旧名残留检查）。它在 Gitee 同步之后运行，属事后报警；push 前本地拦截可启用仓库内钩子（`git config core.hooksPath .githooks`——pre-push 先做差异门控：纯文档/脚本增量直接放行，碰到求值输入才跑五输出**并行**求值，等价 CI 第一层，见 [同步说明](.github/SYNC.md)）。NixOS toplevel 与 aarch64 仍只做求值。按日期的验证记录见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
+GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）验证 Git 视图的默认五输出，并实际构建 x86_64 standalone activation package——求值拦不住的 Home Manager buildEnv 冲突（如 gcc+clang、双 `python3.withPackages`）在这一层才会暴露。最后一步 `nix flake check` 构建仓库自有 checks：`selection-metadata`（五输出选配元信息读取与只读约束）、`shellcheck-scripts`（脚本静态检查）与 `roam-unit-tests`（roam、补全、脚手架、注册表与推送快照测试）。它在 Gitee 同步之后运行，属事后报警；push 前可启用仓库内钩子（`git config core.hooksPath .githooks`）：差异门控通过后，按待推送 commit SHA **并行**求值默认五输出；多 ref 逐个检查、相同 commit 去重，未提交修改与本机选配不能掩盖提交错误。本机选配另外用 `roam check` 核对，见 [同步说明](.github/SYNC.md)。NixOS toplevel 与 aarch64 仍只做求值。按日期的验证记录见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
 ## 目录结构
 

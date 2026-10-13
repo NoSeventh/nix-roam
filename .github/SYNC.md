@@ -14,8 +14,12 @@ GitHub 侧 `eval` workflow 在同步之后运行，属事后报警。仓库自�
 git config core.hooksPath .githooks
 ```
 
-钩子即一条 `roam check nixos wsl x86_64-linux aarch64-linux aarch64-darwin`
-（多目标求值，秒级；任一输出求值失败即拦下本次 push，全部跑完才退出）。
+钩子按 pre-push stdin 协议中的 local SHA 检查待推送 Git 快照：纯已知非输入
+增量、删除与空差异跳过；求值输入、新分支或远端 SHA 缺失则检查该提交的
+默认五输出（并行求值，不构建）。多 ref 全部处理，相同 commit 去重，
+annotated tag 先解析到 commit；任一输出失败即拦 push，全部检查完才退出。
+未提交修改、当前 HEAD 与 ignored `local.*.json` 不能替代待推送快照；
+本机选配另外运行 `roam check`。机制见 [roam.md](../docs/roam.md#pre-push验证推送快照)。
 `core.hooksPath` 是本机配置，不随提交同步，每台推送机各自启用一次；
 `git push --no-verify` 跳过一次。`.githooks/` 现仅含 pre-push（仓库原本不用
 其它本地钩子）。注意：双推工作流文件变更（本文件所在目录的改动）也过同一

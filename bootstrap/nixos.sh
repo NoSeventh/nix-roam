@@ -365,12 +365,12 @@ fi
 #     adopt：系统与集成 Home Manager 一起激活，无需单独运行 home-manager。
 # ---------------------------------------------------------------------------
 if [ "$MODE" = install ]; then
-  log "5/7 安装 NixOS（nixos-install → .#${TARGET}）"
+  log "5/7 安装 NixOS（nixos-install → path:${CLONE_DIR}#${TARGET}）"
   # 结束时会交互式提示设置 root 密码：保留作 TTY 救急通道，日常登录用目标用户
-  nixos-install --root /mnt --flake "${CLONE_DIR}#${TARGET}"
+  nixos-install --root /mnt --flake "path:${CLONE_DIR}#${TARGET}"
 else
-  log "5/7 切换系统配置（nixos-rebuild switch → .#${TARGET}）"
-  nixos-rebuild switch --flake "${CLONE_DIR}#${TARGET}"
+  log "5/7 切换系统配置（nixos-rebuild switch → path:${CLONE_DIR}#${TARGET}）"
+  nixos-rebuild switch --flake "path:${CLONE_DIR}#${TARGET}"
 fi
 
 # ---------------------------------------------------------------------------
@@ -397,7 +397,7 @@ if [ "$MODE" = install ]; then
   · ${NIXOS_USER} 的登录密码已设置；root 密码在 nixos-install 结尾设置（TTY 救急用）。
   · hosts/${TARGET}/hardware-configuration.nix 已按本次磁盘重新生成（原版备份在同目录 *.bak-${TS}），
     确认无误后请提交回 Gitee，保持仓库可复现构建。
-  · 以后更新配置：cd ${CLONE_DIR} && sudo nixos-rebuild switch --flake .#${TARGET}
+  · 以后更新配置：cd ${CLONE_DIR} && sudo nixos-rebuild switch --flake path:./.#${TARGET}
 EOF
 else
   cat <<EOF
@@ -406,7 +406,7 @@ else
 
   · 以 ${NIXOS_USER} 注销重登（WSL：从 Windows 重新进入发行版）后，Home Manager 用户配置生效。
   · 原配置目录（若有被替换）备份在：${CLONE_DIR}.bak-${TS}
-  · 以后更新配置：cd ${CLONE_DIR} && sudo nixos-rebuild switch --flake .#${TARGET}
+  · 以后更新配置：cd ${CLONE_DIR} && sudo nixos-rebuild switch --flake path:./.#${TARGET}
 EOF
 fi
 # 桌面主机（import 了 profiles/desktop.nix）才有 Hermes 模块；CLI/WSL 变体没有

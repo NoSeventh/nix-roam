@@ -492,7 +492,7 @@ have home-manager || { echo "错误：home-manager 安装失败。" >&2; exit 1;
 #     -b backup：任何残留冲突文件自动加 .backup 后缀（兜底，避免激活中途失败）
 # ---------------------------------------------------------------------------
 log "7/7 激活 flake target: ${FLAKE_TARGET}"
-home-manager switch -b backup --flake ".#${FLAKE_TARGET}"
+home-manager switch -b backup --flake "path:./.#${FLAKE_TARGET}"
 
 # 激活后自检（fail-loud）：HM 接管 bash 登录链后，单用户安装在用户 dotfile 里写下的
 # PATH 钩子会随之失效 —— standalone-linux.nix 的 home.sessionPath 负责补上；此处用
@@ -518,5 +518,5 @@ cat <<EOF
   · 实际使用 zsh / fish 时（登录 shell 是它，或对应 rc 文件已存在）：激活会幂等追加
     带守卫的 HM 会话环境加载段（fish 无 bass 时仅加 PATH，完整变量需 bash/zsh 或安装 bass）；
     bash-only 的机器不会凭空创建这些 rc 文件。
-  · 以后更新配置： cd ${REPO_ROOT} && home-manager switch --flake .#${FLAKE_TARGET}
+  · 以后更新配置： cd ${REPO_ROOT} && home-manager switch --flake path:./.#${FLAKE_TARGET}
 EOF

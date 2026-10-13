@@ -15,14 +15,14 @@ local.<主机键>.json               # 机器本地选配（gitignored，roam mo
 ```
 
 - **基座不可选**：`profiles/nixos-base.nix`（系统基座 + 运行时 + GC）、桌面基座（session/niri/locale-zh/core，经 `profiles/desktop.nix`）、`profiles/cli.nix`（WSL 的 CLI 列表）、standalone 的 `common.nix + cli-dev.nix`。`packages/cli-dev.nix` 仍是不拆的四安装点共享 CLI 列表——模块层叠在其上。
-- 注册表是**双消费源**：Nix 侧 `lib/selection.nix` 用 fromJSON，bash 侧 `roam.sh load_registry` 用锚定 sed——两路解析器由 `tests/module-registry.sh` 与 jq 交叉核对，旗标↔文件实态互证（home=false 却有 home.nix 的"静默不可达"是重点盯防形态）。
+- 注册表是**双消费源**：Nix 侧 `lib/selection.nix` 用 fromJSON，bash 侧 `roam.sh load_registry` 用 jq——两路消费者不依赖 JSON 排版；`tests/module-registry.sh` 核对旗标与文件实态（home=false 却有 home.nix 的"静默不可达"是重点盯防形态）。
 - 文件位置按约定派生（`modules/<名>/{nixos,home}.nix`），注册表只记名字与旗标——**必须用路径字面量插值**构造（`../modules/${名}/home.nix`）：`../. + 字符串` 拼出的绝对路径在纯求值下禁止 import（2026-10-11 /tmp 尖刺实证）。
 
 ## 两视图求值语义（核心机制）
 
 | 视图 | 谁在用 | local 文件 | 生效选择 |
 |---|---|---|---|
-| git 视图（裸 `.#`） | CI eval job、pre-push 之外的远端 `git+https` 装机、手工 `nix build .#` | 不可见 | 入库默认集 |
+| git 视图（裸 `.#` / 锁定 `rev` 的 Git 引用） | CI eval job、pre-push 推送快照、远端 `git+https` 装机、手工 `nix build .#` | 不可见 | 入库默认集 |
 | `path:./.` 视图 | **roam 全链路**（switch/status/doctor/check）、CI module-matrix | 可见 | 本机选配 |
 
 `local.<主机键>.json` 存在时其 `modules` 列表是**权威完整选择**（整体替换默认集，不做增量合并）；不存在时走调用方显式给出的入库默认集（写在 `hosts/<主机名>/default.nix` / standalone 入口的 `default = []`——延续 explicit-imports 精神，默认组合在 git 里可见可审）。`hosts/nixos` 默认 = 11 层全集（= 原 profiles/desktop.nix），`hosts/wsl` 与 standalone 默认 = 空集（= 原组合）。
@@ -31,10 +31,15 @@ local.<主机键>.json               # 机器本地选配（gitignored，roam mo
 
 fail-loud 守卫（`lib/selection.nix` throw，`roam module` 同规则前置拒绝）：未知名 / 该前端无实现 / darwin 白名单外 / local 文件 `host` 字段与输出名不符（防输出改名后旧文件静默生效）。
 
+`roam.selectedModules` 是只读元信息，由每个入口唯一赋值。option 本身不设
+default：Nix 模块系统在 readOnly 检查中把 default 也计作一次定义，会与入口
+赋值冲突。构建路径未必消费元信息，因此 `checks.<system>.selection-metadata` 单独
+强制读取五输出元信息，并验证非空值可读、第二次赋值被拒绝。
+
 ## 复现边界（如实记录）
 
 - **远端 `git+https` 装机得到的是入库默认集**（git 视图看不到目标机的 local 文件）；装机后 `roam module init` 以当前有效选择为种子生成 local 文件（首次零行为变化），再 enable/disable 本地化。
-- CI eval job 验证默认集；pre-push 与 roam 使用 path: 求值验证检出中的本机选配，CI module-matrix 写 local 文件覆盖非默认组合。检出内存在 local.*.json 时 pre-push 会提示。
+- CI eval job 验证默认集；pre-push 使用 stdin 协议中的待推送 commit SHA 验证默认集，未提交修改与 local 选配不进入该快照；roam 使用 path: 验证检出中的本机选配，CI module-matrix 写 local 文件覆盖非默认组合。见 [roam 的推送快照机制](roam.md#pre-push验证推送快照)。
 - 手工裸用 `nix build .#attr` = git 视图 = 默认集；要本机选配语义请用 `path:./.#attr` 或直接 `roam`。
 - 一台机器一个检出 = 一份选配（local 文件在检出内、随检出走）；同一检出可为他机预配置（`roam module enable X --host <键>`，NixOS 键要求 `hosts/<键>/` 在）。
 

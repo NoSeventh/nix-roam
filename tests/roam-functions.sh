@@ -519,6 +519,50 @@ out="$(modr disable alpha --host x86_64-linux)"; rc=$?
 expect_rc 'module：停用未启用层幂等 rc=0' 0 "$rc"
 expect_sub 'module：停用未启用层提示' "$out" '未启用，无需停用'
 
+# --host 在名字之前/之间/之后均须保留全部名字；坏参数不得改文件。
+for position in before middle after; do
+  rm -f "$MODDIR/local.x86_64-linux.json"
+  case "$position" in
+    before) out="$(modr enable --host x86_64-linux alpha gamma)"; rc=$? ;;
+    middle) out="$(modr enable alpha --host x86_64-linux gamma)"; rc=$? ;;
+    after) out="$(modr enable alpha gamma --host x86_64-linux)"; rc=$? ;;
+  esac
+  expect_rc "module：--host $position 启用 rc=0" 0 "$rc"
+  expect_eq 'module：所有模块均启用，无参数被跳过' \
+    "$(ROAM_LOCAL_DIR="$MODDIR" local_selection_read x86_64-linux)" 'alpha
+gamma'
+  case "$position" in
+    before) out="$(modr disable --host x86_64-linux alpha gamma)"; rc=$? ;;
+    middle) out="$(modr disable alpha --host x86_64-linux gamma)"; rc=$? ;;
+    after) out="$(modr disable alpha gamma --host x86_64-linux)"; rc=$? ;;
+  esac
+  expect_rc "module：--host $position 停用 rc=0" 0 "$rc"
+  expect_eq 'module：所有模块均停用' \
+    "$(ROAM_LOCAL_DIR="$MODDIR" local_selection_read x86_64-linux)" ''
+done
+before="$(cat "$MODDIR/local.x86_64-linux.json")"
+out="$(modr enable alpha --host 2>/dev/null)"; rc=$?
+expect_rc 'module：--host 缺参数须拒绝' 1 "$rc"
+out="$(modr enable --host x86_64-linux alpha bogus 2>/dev/null)"; rc=$?
+expect_rc 'module：--host 后的未知模块须拒绝，不能被跳过' 1 "$rc"
+expect_eq 'module：参数校验失败时选配原样保留' \
+  "$(cat "$MODDIR/local.x86_64-linux.json")" "$before"
+
+# NixOS-WSL 失败路径只打桩 nh，恢复提示必须沿用本机选配视图。
+errout="$(
+  repo_check() { :; }
+  nixos_preflight() { :; }
+  is_nixos() { return 0; }
+  is_wsl() { return 0; }
+  uname() { printf 'wsl\n'; }
+  nh() { return 4; }
+  run_logged() { shift; "$@"; }
+  cmd_switch 2>&1
+)"; rc=$?
+expect_rc 'switch：WSL nh 失败退出码透传' 4 "$rc"
+expect_sub 'switch：WSL 恢复命令保留本机选配' "$errout" \
+  'sudo nixos-rebuild switch --flake path:./.#wsl'
+
 # init：已有文件拒绝；无文件以种子生成（nix 桩回种子一行）
 printf 'beta\n' >"$MOD_SEED_FILE"
 rm -f "$MODDIR/local.aarch64-linux.json"

@@ -9,6 +9,16 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-13 参数解析、本机求值视图与推送快照修复（Gentoo / WSL2 standalone x86_64）
+
+改动：修复 `roam module --host` 分支重复 shift 吞掉后续模块名，覆盖 enable/disable 的选项前置、中置、后置与失败不落盘。README、本地 bootstrap 激活/更新命令、roam 自举和 WSL 恢复提示统一使用 `path:`，保留本机选配。pre-push 完整读取 stdin 协议，按每个需要检查的 commit SHA 固定 `git+file` 快照、peel annotated tag 并去重；每个快照并行求值默认五输出，多个快照全部检查后汇总失败，不用 HEAD/索引/工作树/local 选配替代。
+
+冒烟追加修复：`roam.selectedModules` 同时有 option default 与入口赋值，readOnly 在优先级过滤前把两者都计作定义，读取元信息失败但 toplevel/activationPackage 构建未强制读取它。移除 option default、保留只读约束；新增 `selection-metadata` check，验证非空赋值可读、二次赋值被拒，并强制读取五个实际输出的元信息。新 check 在修复前如预期失败，修复后通过。
+
+验证：本机脚本测试 338/338；`tests/prepush-snapshots.sh --real-nix` 20/20（临时真 Git + 无外部输入 flake，含非 HEAD 祖先的分叉提交、annotated tag、空格及 URI 特殊字符路径、坏提交被本地修复/local 掩盖的负例、坏工作树不污染好提交、多 ref 失败不中断与去重、缺 SHA、文档/删除/空 stdin）。真实仓库以 HEAD `417ebf1` 的模拟推送协议运行当前钩子，锁定该 SHA 的默认五输出求值通过；当前改动的五输出 `path:` drvPath 求值及元信息读取通过。Nix 格式化/解析、ShellCheck、`git diff --check` 通过；`nix flake check --offline path:./.` 构建三项 x86_64 checks 通过；x86_64 standalone activationPackage 构建通过，构建产物的 `roam module list --host x86_64-linux` 冒烟通过。首次构建遇 NJU 缓存 502 超时，重试仅在命令上选择现有 USTC/TUNA/官方缓存，构建成功；仓库镜像配置未修改。
+
+边界：未激活、未真实 push、未重跑装机脚本；NixOS/ARM/macOS 未构建或激活（无 ARM/macOS 硬件，保留既有边界）。本机 local 选配与 flake.lock 未改变；本批验证完成后直接提交，未推送。
+
 ## 2026-10-12 bubblewrap、JSON 解析与配置结构整理（Gentoo / WSL2 standalone x86_64）
 
 改动：bubblewrap 归入共享 CLI 的 Linux 分支，dev 系统层去掉重复安装；roam 的 meta/注册表/选配/lock 解析改用 jq，接受紧凑排版与字段换序，拒绝多 JSON 文档、坏类型和错机选配并保留原文件。roam 分发入口与命令库拆开，打包固定库的 store 路径；NixVim 按功能显式拆分。六个可选层抽取共享 packages.nix，保留系统端服务和工具差异；selectedModules 标记 readOnly。显式提供三系统 nixpkgs-fmt formatter，修正 Gentoo 单引号 os-release 的信息显示；清理 AGENTS/README 失效说明，历史快照移入主题文档。

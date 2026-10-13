@@ -86,7 +86,7 @@ rec {
     {
       options.roam.selectedModules = lib.mkOption {
         type = lib.types.listOf lib.types.str;
-        default = [ ];
+        # readOnly 把 option default 也算作一次定义；值由各入口唯一赋予。
         readOnly = true;
         description = "本输出经 lib/selection.nix 解析后的可选模块集（机器本地 local.<key>.json 优先于入库默认集）";
       };

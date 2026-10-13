@@ -7,7 +7,7 @@ cmd_switch() {
   repo_check
   if is_nixos; then
     command -v nh >/dev/null 2>&1 \
-      || die "未找到 nh（NixOS 侧经 packages/cli-dev.nix 共享列表落系统位；首次进入闭包前可先 sudo nixos-rebuild switch --flake .#<主机名> 自举一次）"
+      || die "未找到 nh（NixOS 侧经 packages/cli-dev.nix 共享列表落系统位；首次进入闭包前可先 sudo nixos-rebuild switch --flake path:./.#<主机名> 自举一次）"
     nixos_preflight
     short="$(uname -n)"
     short="${short%%.*}"
@@ -19,7 +19,7 @@ cmd_switch() {
       rc=$?
       if is_wsl; then
         printf 'roam: nh 退出码 %s。NixOS-WSL 下 stc exit 4 时世代可能未落盘：\n' "$rc" >&2
-        printf '  Windows 侧 wsl --shutdown 后重试；或 sudo nixos-rebuild switch --flake .#wsl 补落世代（见 AGENTS.md）\n' >&2
+        printf '  Windows 侧 wsl --shutdown 后重试；或 sudo nixos-rebuild switch --flake path:./.#wsl 补落世代（见 AGENTS.md）\n' >&2
       fi
       return "$rc"
     fi
@@ -29,7 +29,7 @@ cmd_switch() {
     || die "当前用户是 $(id -un)，不是 $u；拒绝切换（本地用户名在 meta.json 单点定义）"
   target="$(standalone_target)"
   command -v nh >/dev/null 2>&1 \
-    || die "未找到 nh（standalone 侧由 packages/cli-dev.nix 提供；首次进入闭包前可先 home-manager switch --flake .#${target} 自举一次）"
+    || die "未找到 nh（standalone 侧由 packages/cli-dev.nix 提供；首次进入闭包前可先 home-manager switch --flake path:./.#${target} 自举一次）"
   # nh 4.4.2 把裸 .#attr 解析成 packages.<system>.<attr> 简写而非 homeConfigurations
   # 属性，须用 --configuration 显式点名 + 位置参数传 flake（nh 上游 master 已改，
   # 以锁定 nixpkgs 的实际行为为准）。path:./. 引用 = 含本机 local 选配的视图。

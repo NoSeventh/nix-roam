@@ -259,7 +259,7 @@ have home-manager || { echo "错误：home-manager 安装失败。" >&2; exit 1;
 #     -b backup：任何残留冲突文件自动加 .backup 后缀（兜底，避免激活中途失败）
 # ---------------------------------------------------------------------------
 log "7/7 激活 flake target: ${FLAKE_TARGET}"
-home-manager switch -b backup --flake ".#${FLAKE_TARGET}"
+home-manager switch -b backup --flake "path:./.#${FLAKE_TARGET}"
 
 cat <<EOF
 
@@ -273,5 +273,5 @@ cat <<EOF
   · ⚠️ programs.ssh 用 enableDefaultConfig=false，新 ~/.ssh/config 只含 HM 定义的 host。
     如果你旧 ssh config（备份在 ~/.ssh/config.bak-${TS}）里还有别的 host，需要手动合并回
     home/common.nix 的 programs.ssh。
-  · 以后更新配置： cd ${REPO_ROOT} && home-manager switch --flake .#${FLAKE_TARGET}
+  · 以后更新配置： cd ${REPO_ROOT} && home-manager switch --flake path:./.#${FLAKE_TARGET}
 EOF
