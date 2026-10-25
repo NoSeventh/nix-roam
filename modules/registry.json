@@ -17,14 +17,14 @@
     },
     {
       "name": "browsers",
-      "desc": "专有/实验浏览器：chrome/edge/servo（开源基座 firefox/chromium 在桌面基座 core）",
+      "desc": "实验浏览器：servo（开源基座 firefox/chromium 在桌面基座 core）",
       "nixos": true,
       "home": true,
       "darwin": false
     },
     {
       "name": "dev",
-      "desc": "编辑器全家（vscode/zed/warp/neovide/emacs/rstudio）+ gitui + biome；系统级另含 clang 与 mysql 服务",
+      "desc": "开源编辑器（zed/warp/neovide/emacs/rstudio）+ gitui + biome；系统级另含 clang 与 mysql 服务",
       "nixos": true,
       "home": true,
       "darwin": false
@@ -38,7 +38,7 @@
     },
     {
       "name": "office",
-      "desc": "办公套件/邮件文献/笔记/中文软件/视频会议/texlive scheme-full（home 部分不含 wechat overlay）",
+      "desc": "开源办公套件/邮件文献/笔记/中文软件/视频会议/texlive scheme-full",
       "nixos": true,
       "home": true,
       "darwin": false
@@ -52,14 +52,14 @@
     },
     {
       "name": "gaming",
-      "desc": "Steam + 32 位图形支持（系统级专属，无用户级实现）",
+      "desc": "Wine 等开源程序的 32 位图形兼容支持（系统级专属，无用户级实现）",
       "nixos": true,
       "home": false,
       "darwin": false
     },
     {
       "name": "agents",
-      "desc": "AI 工具/IDE/聊天客户端；系统级另含 hermes-agent 服务（home 部分仅 CLI/客户端）",
+      "desc": "开源 AI 工具/IDE/聊天客户端；系统级另含 hermes-agent 服务（home 部分仅 CLI/客户端）",
       "nixos": true,
       "home": true,
       "darwin": false

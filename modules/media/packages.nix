@@ -21,11 +21,9 @@ with pkgs;
   pkgs-stable.digikam
   pkgs-stable.darktable
   pkgs-stable.blender
-  pkgs-stable.xnconvert
 
   # 录屏（截图在桌面基座 core）
   obs-studio
-  snipaste
 
   # --- 3. 3D/工程软件 ---
   pkgs-stable.freecad

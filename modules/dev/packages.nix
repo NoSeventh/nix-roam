@@ -3,7 +3,6 @@
 with pkgs;
 [
   # 编辑器
-  vscode
   zed-editor
   warp-terminal
   pkgs-stable.neovide

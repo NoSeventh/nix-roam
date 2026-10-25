@@ -5,10 +5,9 @@
 # 使轻量主机仅 import 本档即可获得无专有依赖的可用桌面。
 # 编辑器与重型开发件在 dev.nix；媒体创作在 media.nix；办公与中文软件在 office.nix；
 # 会话栈（niri/终端/输入法）在 niri.nix 与 locale-zh.nix。
-{
-  pkgs,
-  pkgs-stable,
-  ...
+{ pkgs
+, pkgs-stable
+, ...
 }:
 
 {
@@ -30,7 +29,7 @@
   #   signal.relayHosts = [ "your-relay.example.org" ];
   # };
 
-  # --- 2. 开源浏览器（programs.* 包装；chrome/edge/servo 见 browsers.nix）---
+  # --- 2. 开源浏览器（programs.* 包装；servo 见 browsers.nix）---
   programs.firefox.enable = true;
   programs.chromium.enable = true;
 

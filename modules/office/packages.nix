@@ -9,7 +9,6 @@ with pkgs;
   pkgs-stable.zotero
 
   # 中文办公软件
-  wpsoffice-cn
   onlyoffice-desktopeditors
 
   # --- 2. 笔记/知识管理 ---
@@ -20,13 +19,9 @@ with pkgs;
   dialect
 
   # --- 4. 中文软件 ---
-  pkgs-stable.qq
-  pkgs-stable.wemeet
-  pkgs-stable.qqmusic
   pkgs-stable.wordbook
 
   # --- 5. 视频会议 ---
-  pkgs-stable.zoom-us
   pkgs-stable.mattermost-desktop
 
   # --- 6. 排版 ---

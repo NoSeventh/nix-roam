@@ -9,6 +9,25 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-26 桌面闭源包清理（Gentoo 2.18 / WSL2 standalone x86_64）
+
+改动：从桌面及共享可选层移除锁定 nixpkgs 中标记为 `unfree` 或
+`unfreeRedistributable` 的 Chrome、Edge、VSCode、Snipaste、XnConvert、WPS、
+QQ/腾讯会议/QQ 音乐、Zoom、Cursor、Claude、Copilot 与 Steam；删除仅为
+WeChat AppImage 服务的 NixOS overlay。保留 Warp、Zed、RStudio、OnlyOffice、
+Siyuan、开源代理工具、Wine 与 Docker/libvirt 等开源或仍有其他用途的组件。
+`allowUnfree` 基础设置仍保留，供未接线的 NVIDIA 硬件 profile 等系统级扩展使用；
+默认桌面闭包不再引用上述闭源包。gaming 层改为仅提供开源程序所需的 32 位图形兼容性。
+
+验证：编辑文件通过 `nixpkgs-fmt --check`、`nix-instantiate --parse` 与 JSON
+解析；NixOS desktop、NixOS-WSL 和 standalone x86_64 的 drvPath 求值通过；
+桌面系统包列表没有命中被移除的包名；`nix flake check --offline path:./.`
+通过（shellcheck 与 roam 单测全部通过）；`git diff --check` 干净。
+
+边界：未构建或激活 NixOS desktop/WSL，未构建 ARM、Darwin 或非默认选配组合；
+Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDarwin` 弃用警告，
+未影响本次结果。
+
 ## 2026-10-25 mnt 跨 Home Manager 前端适配（Gentoo 2.18 / WSL2 standalone Linux，本机）
 
 改动：`mnt` 注册表层从仅 NixOS 扩展为 home 与 darwin 可选层；standalone Linux
