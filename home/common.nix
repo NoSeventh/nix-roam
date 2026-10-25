@@ -43,6 +43,8 @@ in
       # 轻量 fastfetch：ff 极简列表（无 packages/publicip 等慢模块）；ffn 无配置默认样式（带 logo）
       ff = "fastfetch --structure 'title:os:kernel:uptime:shell:cpu:memory:disk'";
       ffn = "fastfetch -c none";
+      axonlogin = "axon-cli login -g wss://portal.axon-ai.cn/g/bes -u xuqihao";
+      axonnode = "nohup axon-cli node start > axon-node.log 2>&1 &";
       shh = "ssh xuqihao@lxlogin.ihep.ac.cn";
       shhfs = "sshfs -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 xuqihao@lxlogin.ihep.ac.cn:/ ~/mnt/juno/";
       afs = "cd ~/mnt/juno/afs/ihep.ac.cn/users/x/xuqihao";
