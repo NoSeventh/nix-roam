@@ -66,10 +66,10 @@
     },
     {
       "name": "mnt",
-      "desc": "IHEP juno sshfs 用户服务（系统级 systemd 用户单元；home 移植留待后续）",
+      "desc": "IHEP juno sshfs 用户服务（NixOS systemd、standalone Linux systemd、Darwin launchd）",
       "nixos": true,
-      "home": false,
-      "darwin": false
+      "home": true,
+      "darwin": true
     },
     {
       "name": "virtualization",

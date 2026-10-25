@@ -9,6 +9,20 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-25 mnt 跨 Home Manager 前端适配（Gentoo 2.18 / WSL2 standalone Linux，本机）
+
+改动：`mnt` 注册表层从仅 NixOS 扩展为 home 与 darwin 可选层；standalone Linux
+通过 Home Manager 用户 systemd 单元自动挂载 IHEP Juno sshfs，standalone Darwin
+通过 launchd agent 实现同等的登录启动与网络重连，两个入口均在激活时创建
+`~/mnt/juno`，并由 `modules/mnt/home.nix` 提供 sshfs 包。
+
+验证：主机模式按仓库要求确认 `/etc/os-release` 为 Gentoo 2.18、WSL2 内核且
+`/etc/NIXOS` 不存在；standalone Linux 与 Darwin Home Manager 输出求值通过；
+模块注册表一致性测试与完整 `tests/run-all.sh` 通过。
+
+未验证：Linux 用户服务实际激活与远端 IHEP SSHFS 挂载；macOS 实机、macFUSE
+安装状态、launchd 激活与 ARM Darwin 构建。
+
 ## 2026-10-13 参数解析、本机求值视图与推送快照修复（Gentoo / WSL2 standalone x86_64）
 
 改动：修复 `roam module --host` 分支重复 shift 吞掉后续模块名，覆盖 enable/disable 的选项前置、中置、后置与失败不落盘。README、本地 bootstrap 激活/更新命令、roam 自举和 WSL 恢复提示统一使用 `path:`，保留本机选配。pre-push 完整读取 stdin 协议，按每个需要检查的 commit SHA 固定 `git+file` 快照、peel annotated tag 并去重；每个快照并行求值默认五输出，多个快照全部检查后汇总失败，不用 HEAD/索引/工作树/local 选配替代。
