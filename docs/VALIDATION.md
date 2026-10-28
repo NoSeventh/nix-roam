@@ -9,11 +9,36 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-28 NixOS/macOS mnt 懒加载配置
+
+改动：NixOS 的 `sshfs-remote` 从登录自动启动的用户服务改为同路径的
+systemd user mount/automount；登录只注册 automount，首次访问 `~/mnt/juno`
+才连接，空闲五分钟后卸载。macOS 移除 `launchd RunAtLoad` SSHFS agent，改为
+生成 autofs map 和一次性 sudo 注册脚本；Home Manager 激活不隐式请求 root。
+standalone Linux/WSL 在用户 bus 可用时也使用 automount，无 bus 时保留 fallback。
+
+验证边界：本次配置尚未在真实 NixOS 或 macOS 主机激活；需在 NixOS 上确认
+`fuse.sshfs` mount helper 与用户 automount 行为，在 macOS 上确认 macFUSE、
+autofs map 语法及一次性注册脚本。
+
+## 2026-10-28 standalone Linux/WSL 条件式 mnt 懒加载
+
+改动：standalone Linux 的 Home Manager `mnt` 层增加用户级
+`systemd.user.mounts.sshfs-remote` 与 `systemd.user.automounts.sshfs-remote`。
+`roam mnt start` 在用户 bus 可用时只启动 `sshfs-remote.automount`，访问
+`~/mnt/juno` 才建立 SSHFS；用户 bus 不可用时继续使用原有锁保护的后台 SSHFS
+fallback。`stop` 会同时处理 automount/mount 和 fallback 挂载，`status` 能区分
+已挂载与已注册但尚未触发的 automount。WSL 不再因为缺少用户 manager 而失去挂载能力。
+
+验证边界：Home Manager 配置与三个 standalone 输出完成求值；当前 Gentoo WSL
+仍无 `/run/user/1000/bus`，因此本机只实测 fallback，未实测用户 bus 存在时的
+真实 automount 触发和 `fuse.sshfs` helper。
+
 ## 2026-10-28 mnt 的 Gentoo WSL 无用户 systemd 适配（本机）
 
 问题：WSL 重启后确认 `/etc/wsl.conf` 已设置 `systemd=true` 且 PID 1 为 systemd，
 但 Gentoo 没有创建 `/run/user/1000` 和用户 D-Bus，总线不可用，Home Manager
-生成的 `systemd.user.services.sshfs-remote` 因此不会启动，`~/mnt/juno` 保持空目录。
+生成的 `systemd.user` automount 因此不会启动，`~/mnt/juno` 保持空目录。
 
 改动：`roam mnt [start|stop|status]` 直接实现用户 systemd 与 WSL fallback；
 交互式 Bash 启动时调用 `roam mnt start`，不再生成或安装第二个命令。总线存在则启动 systemd 单元，不存在则通过锁文件幂等地

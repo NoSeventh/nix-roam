@@ -168,7 +168,9 @@ roam module list       # 模块注册表目录 + 本机 on/off（--host <键> �
 roam module enable media   # 启用模块（未知名/前端不适用/darwin 白名单外会拒绝；可给多个）
  roam module disable media  # 停用模块（幂等）；改完 roam check 验证、roam switch 生效
 roam mnt status          # 查看 IHEP Juno SSHFS 挂载状态（无需仓库目录）
-roam mnt start           # 启动挂载；stop 停止挂载
+roam mnt start           # 有用户 systemd 时仅注册懒加载；否则 standalone Linux/WSL 直接启动
+                         # NixOS/macOS 访问目录时懒加载
+                         # macOS 首次启用 mnt 后运行 ~/.config/nix-roam/enable-autofs-mnt
 roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成。
                        # 可选输入：缺省交互列出（回车=全部），roam update nixpkgs nixvim 只更新指定项，--all 跳过交互
 roam flake             # 查看 flake.lock 锁定的输入版本（名称/短 rev/日期/ref/来源）；

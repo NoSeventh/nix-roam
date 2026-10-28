@@ -2,6 +2,7 @@
 
 let
   mountPoint = "/home/${username}/mnt/juno";
+  mountUnit = "home-${username}-mnt-juno";
   # IHEP 集群账号（远程身份），与本地用户名无关，不随 username 单点定义联动
   remote = "xuqihao@lxlogin.ihep.ac.cn:/";
 in
@@ -14,23 +15,34 @@ in
     "d ${mountPoint} 0755 ${username} users -"
   ];
 
-  # 3. 定义用户 systemd 服务
-  systemd.user.services.sshfs-remote = {
-    description = "SSHFS mount for lxlogin";
-    # 网络就绪后再启动
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
-    # 用户登录后自动启动
-    wantedBy = [ "default.target" ];
+  # 3. 用户级 systemd automount：登录时只注册触发器，访问挂载点时才连接 SSHFS。
+  # NixOS 没有 systemd.user.mounts/automounts 高层选项，因此使用受支持的
+  # systemd.user.units 原始 unit 定义；mount 单元不加入 default.target。
+  systemd.user.units = {
+    "${mountUnit}.mount".text = ''
+      [Unit]
+      Description=SSHFS mount for lxlogin
+      After=network-online.target
+      Wants=network-online.target
 
-    serviceConfig = {
-      Type = "simple";
-      # 挂载命令（使用你的 SSH 密钥，无需额外指定 IdentityFile）
-      ExecStart = "${pkgs-stable.sshfs}/bin/sshfs ${remote} ${mountPoint} -o reconnect,ServerAliveInterval=15,idmap=user";
-      ExecStop = "${pkgs-stable.fuse}/bin/fusermount -u ${mountPoint}";
-      RemainAfterExit = true;
-      # 确保目录存在（如果 tmpfiles 没来得及创建）
-      ExecStartPre = "${pkgs-stable.coreutils}/bin/mkdir -p ${mountPoint}";
+      [Mount]
+      What=${remote}
+      Where=${mountPoint}
+      Type=fuse.sshfs
+      Options=_netdev,reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,idmap=user
+      TimeoutSec=30s
+    '';
+
+    "${mountUnit}.automount" = {
+      wantedBy = [ "default.target" ];
+      text = ''
+        [Unit]
+        Description=On-demand SSHFS automount for lxlogin
+
+        [Automount]
+        Where=${mountPoint}
+        TimeoutIdleSec=5min
+      '';
     };
   };
 }

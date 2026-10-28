@@ -628,8 +628,10 @@ expect_eq 'os-release：文件缺失时允许回落（Darwin）' "$(os_pretty_na
 # --- mnt: direct backend dispatch outside the checkout and guards ---
 # shellcheck disable=SC2016
 printf '#!%s\n[ "${MNT_MOUNTED:-1}" = 1 ]\n' "$BASH" >"$STUBBIN/mountpoint"
+# shellcheck disable=SC2016
 printf '#!%s\nprintf "sshfs:%%s\\n" "$*" >>"$MNT_LOG"\n' "$BASH" >"$STUBBIN/sshfs"
 printf '#!%s\nexit 0\n' "$BASH" >"$STUBBIN/flock"
+# shellcheck disable=SC2016
 printf '#!%s\nprintf "fusermount:%%s\\n" "$*" >>"$MNT_LOG"\nexit "${MNT_FUSERMOUNT_RC:-0}"\n' "$BASH" >"$STUBBIN/fusermount3"
 chmod +x "$STUBBIN/mountpoint" "$STUBBIN/sshfs" "$STUBBIN/flock" "$STUBBIN/fusermount3"
 mntr() {

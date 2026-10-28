@@ -5,9 +5,9 @@ mnt_usage() {
   cat <<'EOF'
 用法：roam mnt [动作]（无需仓库检出目录）
 
-  start               启动 IHEP Juno SSHFS 挂载
-  stop                停止 IHEP Juno SSHFS 挂载
-  status              查看挂载状态（默认）
+  start               注册懒加载；无用户 systemd 时直接启动 SSHFS
+  stop                停止懒加载并卸载 SSHFS
+  status              查看挂载或懒加载状态（默认）
   -h, --help          显示本帮助
 
 当前后端由 mnt 模块提供；SSHFS 与 FUSE 工具须在 PATH 中。
@@ -27,17 +27,22 @@ mnt_is_mounted() {
   mountpoint -q "$mnt_mount_point"
 }
 
+mnt_user_systemd_available() {
+  [ -S "${XDG_RUNTIME_DIR:-}/bus" ] \
+    && command -v systemctl >/dev/null 2>&1
+}
+
 mnt_start() {
   local lock_file log_file
   mnt_require mountpoint
   mnt_require sshfs
   mkdir -p "$mnt_mount_point" "$mnt_state_dir"
+  mnt_is_mounted && return 0
 
-  if [ -S "${XDG_RUNTIME_DIR:-}/bus" ] && command -v systemctl >/dev/null 2>&1 &&
-    systemctl --user start sshfs-remote.service >/dev/null 2>&1; then
+  if mnt_user_systemd_available &&
+    systemctl --user start sshfs-remote.automount >/dev/null 2>&1; then
     return 0
   fi
-  mnt_is_mounted && return 0
 
   mnt_require flock
   mnt_require nohup
@@ -56,9 +61,9 @@ mnt_start() {
 
 mnt_stop() {
   mnt_require mountpoint
-  if [ -S "${XDG_RUNTIME_DIR:-}/bus" ] && command -v systemctl >/dev/null 2>&1 &&
-    systemctl --user stop sshfs-remote.service >/dev/null 2>&1; then
-    return 0
+  if mnt_user_systemd_available &&
+    systemctl --user stop sshfs-remote.automount sshfs-remote.mount >/dev/null 2>&1; then
+    :
   fi
   mnt_is_mounted || return 0
   if command -v fusermount3 >/dev/null 2>&1; then
@@ -73,6 +78,9 @@ mnt_status() {
   mnt_require mountpoint
   if mnt_is_mounted; then
     printf '%s\n' "mounted: $mnt_mount_point"
+  elif mnt_user_systemd_available &&
+    systemctl --user is-active --quiet sshfs-remote.automount >/dev/null 2>&1; then
+    printf '%s\n' "automount ready: $mnt_mount_point (not mounted)"
   else
     printf '%s\n' "not mounted: $mnt_mount_point"
     return 1
