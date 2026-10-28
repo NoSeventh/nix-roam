@@ -49,8 +49,10 @@ in
       shhfs = "sshfs -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 xuqihao@lxlogin.ihep.ac.cn:/ ~/mnt/juno/";
       afs = "cd ~/mnt/juno/afs/ihep.ac.cn/users/x/xuqihao";
       scratchfs = "cd ~/mnt/juno/scratchfs/juno/xuqihao";
+      scratchfs2 = "cd ~/mnt/juno/scratchfs2/juno/xuqihao";
       junofs = "cd ~/mnt/juno/junofs/users/xuqihao";
       workfs = "cd ~/mnt/juno/workfs2/juno/xuqihao";
+      lustrefs = "cd ~/mnt/juno/lustrefs/juno26/users/xuqihao";
       root = "root -l";
     } // lib.optionalAttrs isLinux {
       # Linux 专用：macOS 上无 distrobox，不注入避免误用

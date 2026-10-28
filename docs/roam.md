@@ -5,7 +5,7 @@
 ## 打包与安装位
 
 `packages/roam.sh` 是保持 sourceable 的分发入口，命令实现位于
-`packages/roam/`：core、generations、switch、rollback、gc、modules、check、inputs。
+`packages/roam/`：core、generations、switch、rollback、gc、modules、mnt、check、inputs。
 直接运行从入口旁加载命令库；Nix 打包固定 `ROAM_LIB_DIR` 到库的 store 路径，
 因此安装后不依赖 checkout 中的脚本路径。`writeShellApplication` 检查入口，
 flake 的 shellcheck-scripts 检查每个命令文件。补全仍随 symlinkJoin 成对安装。
@@ -44,6 +44,7 @@ nh home semantics (read against nh 4.4.2 upstream source): nh home builds the `a
 - `roam update [input...|--all]` lists the inputs locked in `flake.lock` (jq) for an interactive pick — Enter/EOF means all (default), numbers and names mix freely — while explicit input names or `--all` skip the prompt and update only the chosen inputs via `nix flake update <input>...`; it prints the `flake.lock` diff but never commits or switches.
 - `roam flake [-a|--all]` reads flake.lock locally with jq, follows its root-to-node mappings, and prints names/revisions/dates/refs/sources. `--all` includes transitive nodes. It does not evaluate or fetch inputs; malformed/unsupported lock structures fail clearly.
 - `roam module init|list|enable|disable [names...|--host K]` (added 2026-10-11) maintains the machine-local module selection `local.<hostKey>.json` — the bash front end of `lib/selection.nix` (mechanism: [`modules.md`](modules.md)). `init` seeds from the current effective selection (one light eval of `config.roam.selectedModules`), so a fresh init changes nothing; `list` prints the registry with per-machine on/off; `enable`/`disable` validate against the registry first (unknown name / front-not-applicable / darwin-non-whitelisted die before any file is touched — mirroring the Nix-side throws), seed from the effective selection when no local file exists, then rewrite the file (idempotent; disable of a not-enabled tier is a no-op note) and print the delta with `roam check <K>`/`roam switch` hints. The registry and selection files are parsed structurally with jq, independent of indentation/key order; `tests/module-registry.sh` checks output fields and file applicability; the selection file is strict JSON (no trailing comma — `fromJSON` rejects it) with a `host` self-check field. hostKey: hostname on NixOS, output name on standalone.
+- `roam mnt [start|stop|status]` is the mnt mount entry and works outside the checkout. No argument means `status`; it returns the mount status without writing logs. `start`/`stop` are logged under `~/.local/state/nix-roam/`, preserving backend failure codes. The command itself owns both the systemd-user path and the WSL fallback; Home Manager only adds the interactive Bash startup hook and the systemd unit. Enable `mnt` and apply it with `roam switch` first; the current fallback is intended for standalone Linux/WSL.
 - `roam info` prints the host detection read-only.
 
 ## pre-push：验证推送快照

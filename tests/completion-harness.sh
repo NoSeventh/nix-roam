@@ -43,7 +43,7 @@ cd "$REPO" || exit 9
 
 # --- 一级 ---
 got="$(compline roam '' | joined)"
-expect_eq '一级：十子命令 + help' "$got" 'switch status doctor rollback gc check update flake module info help -h --help'
+expect_eq '一级：十一子命令 + help' "$got" 'switch status doctor rollback gc check update flake module mnt info help -h --help'
 got="$(compline roam ch | joined)"
 expect_eq '前缀 ch → check' "$got" 'check'
 got="$(compline roam fl | joined)"
@@ -99,6 +99,14 @@ got="$(compline roam module enable zz | joined)"
 expect_eq 'module：enable 前缀 zz 无匹配为空' "$got" ''
 got="$(compline roam module disable gam | joined)"
 expect_eq 'module：disable 前缀 gam → gaming' "$got" 'gaming'
+
+# --- mnt ---
+got="$(compline roam mnt '' | joined)"
+expect_eq 'mnt：动作' "$got" 'start stop status --help'
+got="$(compline roam mnt sta | joined)"
+expect_eq 'mnt：sta 前缀' "$got" 'start status'
+got="$(compline roam mnt start '' | joined)"
+expect_eq 'mnt：动作后无额外参数' "$got" ''
 
 # --- gc：四旗标与 --older-than 取值 ---
 got="$(compline roam gc '' | joined)"

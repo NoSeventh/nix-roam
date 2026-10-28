@@ -3,7 +3,7 @@
 # shellcheck disable=SC2034
 usage() {
   cat <<'EOF'
-用法：roam <子命令> [参数]（本仓库统一 CLI；除 rollback、gc 外需在仓库检出目录下运行）
+用法：roam <子命令> [参数]（本仓库统一 CLI；rollback、gc、mnt、info 无需仓库检出目录）
 
   switch [args...]   按宿主切换：NixOS → nh os switch --diff always path:./.
                      standalone → nh home switch --diff always --configuration <系统输出> path:./.
@@ -39,6 +39,8 @@ usage() {
                     主机键：NixOS = 主机名；standalone = 输出名
                     （x86_64-linux / aarch64-linux / aarch64-darwin）
                     改完 roam check <K> 验证、roam switch 生效
+  mnt [动作]        管理 mnt 模块的 IHEP Juno SSHFS 挂载：
+                     start / stop / status（默认）；无需检出目录
   info               只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
   help               显示本帮助
 EOF

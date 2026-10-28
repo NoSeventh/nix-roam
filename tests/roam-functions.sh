@@ -625,6 +625,48 @@ done
 : >"$JSONDIR/os-release"
 expect_eq 'os-release：字段缺失时允许回落内核名称' "$(os_pretty_name "$JSONDIR/os-release")" ''
 expect_eq 'os-release：文件缺失时允许回落（Darwin）' "$(os_pretty_name "$JSONDIR/missing")" ''
+# --- mnt: direct backend dispatch outside the checkout and guards ---
+# shellcheck disable=SC2016
+printf '#!%s\n[ "${MNT_MOUNTED:-1}" = 1 ]\n' "$BASH" >"$STUBBIN/mountpoint"
+printf '#!%s\nprintf "sshfs:%%s\\n" "$*" >>"$MNT_LOG"\n' "$BASH" >"$STUBBIN/sshfs"
+printf '#!%s\nexit 0\n' "$BASH" >"$STUBBIN/flock"
+printf '#!%s\nprintf "fusermount:%%s\\n" "$*" >>"$MNT_LOG"\nexit "${MNT_FUSERMOUNT_RC:-0}"\n' "$BASH" >"$STUBBIN/fusermount3"
+chmod +x "$STUBBIN/mountpoint" "$STUBBIN/sshfs" "$STUBBIN/flock" "$STUBBIN/fusermount3"
+mntr() {
+  (
+    cd "$STUBBIN" || exit 9
+    export PATH="$STUBBIN:$PATH" XDG_RUNTIME_DIR="$STUBBIN/no-runtime"
+    export ROAM_MNT_MOUNT_POINT="$STUBBIN/mnt"
+    export ROAM_MNT_STATE_DIR="$STUBBIN/state" MNT_LOG="$STUBBIN/mnt.log"
+    "$BASH" "$REPO/packages/roam.sh" mnt "$@"
+  )
+}
+out="$(mntr)"; rc=$?
+expect_rc 'mnt: default status outside checkout' 0 "$rc"
+expect_eq 'mnt: status output without log wrapper' "$out" "mounted: $STUBBIN/mnt"
+out="$(export MNT_MOUNTED=1; mntr start)"; rc=$?
+expect_rc 'mnt: start dispatch' 0 "$rc"
+expect_eq 'mnt: start avoids duplicate mount' "$(cat "$STUBBIN/mnt.log" 2>/dev/null)" ''
+out="$(export MNT_MOUNTED=0; mntr start)"; rc=$?
+expect_rc 'mnt: WSL fallback start' 0 "$rc"
+expect_sub 'mnt: direct sshfs invocation' "$(cat "$STUBBIN/mnt.log")" 'sshfs:'
+out="$(export MNT_MOUNTED=1; mntr stop)"; rc=$?
+expect_rc 'mnt: stop dispatch' 0 "$rc"
+expect_sub 'mnt: direct fusermount invocation' "$(cat "$STUBBIN/mnt.log")" 'fusermount:'
+out="$(export MNT_MOUNTED=1 MNT_FUSERMOUNT_RC=7; mntr stop 2>/dev/null)"; rc=$?
+expect_rc 'mnt: stop preserves failure code' 7 "$rc"
+out="$(mntr --help)"; rc=$?
+expect_rc 'mnt: help succeeds' 0 "$rc"
+expect_sub 'mnt: help documents entry' "$out" 'roam mnt'
+out="$(mntr bogus 2>/dev/null)"; rc=$?
+expect_rc 'mnt: reject unknown action' 1 "$rc"
+out="$(mntr start extra 2>/dev/null)"; rc=$?
+expect_rc 'mnt: reject extra arguments' 1 "$rc"
+mkdir -p "$STUBBIN/no-tools"
+out="$(PATH="$STUBBIN/no-tools" ROAM_MNT_MOUNT_POINT="$STUBBIN/mnt" cmd_mnt status 2>&1)"; rc=$?
+expect_rc 'mnt: missing mountpoint tool fails' 1 "$rc"
+expect_sub 'mnt: missing tool explains activation' "$out" 'roam switch'
+
 rm -rf "$JSONDIR"
 
 rm -f "$MOD_SEED_FILE" "$MODLOG"

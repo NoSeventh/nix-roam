@@ -9,6 +9,28 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-28 mnt 的 Gentoo WSL 无用户 systemd 适配（本机）
+
+问题：WSL 重启后确认 `/etc/wsl.conf` 已设置 `systemd=true` 且 PID 1 为 systemd，
+但 Gentoo 没有创建 `/run/user/1000` 和用户 D-Bus，总线不可用，Home Manager
+生成的 `systemd.user.services.sshfs-remote` 因此不会启动，`~/mnt/juno` 保持空目录。
+
+改动：`roam mnt [start|stop|status]` 直接实现用户 systemd 与 WSL fallback；
+交互式 Bash 启动时调用 `roam mnt start`，不再生成或安装第二个命令。总线存在则启动 systemd 单元，不存在则通过锁文件幂等地
+后台启动 sshfs，并提供 `start`、`stop`、`status` 子命令。激活脚本在挂载点已
+挂载时跳过 `chmod`，避免 FUSE 拒绝配置切换。这样 WSL 不需要依赖
+logind/PAM user session 或 linger。
+
+验证：修复后的 Home Manager 配置求值和 activation package 构建通过；在本机仍无
+`/run/user/1000`、无用户 D-Bus 的实际环境中激活后，`roam mnt start`
+成功建立 `~/mnt/juno`，`findmnt` 显示远端 `xuqihao@lxlogin.ihep.ac.cn:/`；
+`roam switch` 在已有挂载状态下成功激活，仓库外的 `roam mnt` 与默认
+`roam mnt status` 均报告已挂载；完整 `tests/run-all.sh` 通过（roam 单测
+207 项，补全 33 项）。
+
+边界：未验证有用户 D-Bus 的 Linux 分支实际启动 systemd 单元；未验证 macOS
+launchd 和其他 Linux 发行版。
+
 ## 2026-10-26 桌面闭源包清理（Gentoo 2.18 / WSL2 standalone x86_64）
 
 改动：从桌面及共享可选层移除锁定 nixpkgs 中标记为 `unfree` 或

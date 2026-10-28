@@ -18,6 +18,8 @@ source "$roam_lib_dir/gc.sh"
 # shellcheck source=/dev/null
 source "$roam_lib_dir/modules.sh"
 # shellcheck source=/dev/null
+source "$roam_lib_dir/mnt.sh"
+# shellcheck source=/dev/null
 source "$roam_lib_dir/check.sh"
 # shellcheck source=/dev/null
 source "$roam_lib_dir/inputs.sh"
@@ -40,6 +42,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     update) cmd_update "$@" ;;
     flake) cmd_flake "$@" ;;
     module) cmd_module "$@" ;;
+    mnt) cmd_mnt "$@" ;;
     info) cmd_info "$@" ;;
     help | -h | --help) usage ;;
     *)

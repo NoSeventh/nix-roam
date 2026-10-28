@@ -166,7 +166,9 @@ roam check wsl nixos   # 显式核对其它输出，可给多个：nixos / wsl /
 roam module init       # 生成机器本地模块选配 local.<主机键>.json（种子=当前有效选择，零行为变化）
 roam module list       # 模块注册表目录 + 本机 on/off（--host <键> 看其它机器）
 roam module enable media   # 启用模块（未知名/前端不适用/darwin 白名单外会拒绝；可给多个）
-roam module disable media  # 停用模块（幂等）；改完 roam check 验证、roam switch 生效
+ roam module disable media  # 停用模块（幂等）；改完 roam check 验证、roam switch 生效
+roam mnt status          # 查看 IHEP Juno SSHFS 挂载状态（无需仓库目录）
+roam mnt start           # 启动挂载；stop 停止挂载
 roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成。
                        # 可选输入：缺省交互列出（回车=全部），roam update nixpkgs nixvim 只更新指定项，--all 跳过交互
 roam flake             # 查看 flake.lock 锁定的输入版本（名称/短 rev/日期/ref/来源）；
@@ -174,7 +176,7 @@ roam flake             # 查看 flake.lock 锁定的输入版本（名称/短 re
 roam info              # 只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
 ```
 
-`roam` 自带 bash 补全，随包装进四个安装点：子命令（`roam <TAB>`）、`check` 的目标名与 `--build`、`update` 的 flake 输入名（实时读 `flake.lock`）、`module` 的子动作与模块名（实时读 `modules/registry.json`）、`flake` 与 `gc` 的旗标、`rollback` 的世代号与旗标。bash-completion（≥2.12）按 `XDG_DATA_DIRS` 自动懒加载，无需额外配置；`switch`/`status`/`doctor`/`info` 无自有参数，不做补全。
+`roam` 自带 bash 补全，随包装进四个安装点：子命令（`roam <TAB>`）、`check` 的目标名与 `--build`、`update` 的 flake 输入名（实时读 `flake.lock`）、`module` 的子动作与模块名（实时读 `modules/registry.json`）、`mnt` 的挂载动作、`flake` 与 `gc` 的旗标、`rollback` 的世代号与旗标。bash-completion（≥2.12）按 `XDG_DATA_DIRS` 自动懒加载，无需额外配置；`switch`/`status`/`doctor`/`info` 无自有参数，不做补全。
 
 模块选配说明：可选软件层（browsers/dev/media/office/proxy/agents 等）与 NixOS 桌面同粒度、跨 NixOS/WSL/standalone 前端，由 `roam module` 按机器启停，记录在仓库根 `local.<主机键>.json`（gitignored，只记本机）；基座（CLI 列表、桌面基座、NixOS 系统基座）不可选。远端 `git+https` 装机得到入库默认集，装后 `roam module init` 本地化。机制细节（path: 双视图求值、darwin 白名单、CI 矩阵）见 [`docs/modules.md`](docs/modules.md)。
 
