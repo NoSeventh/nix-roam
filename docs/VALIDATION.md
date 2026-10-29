@@ -9,6 +9,30 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-29 mnt 故障诊断（NixOS-WSL x86_64）
+
+宿主：`/etc/os-release` 为 NixOS 26.11，`/etc/NIXOS` 存在，
+`uname -a` 为 x86_64 Microsoft WSL2 内核。本机 `local.wsl.json` 已启用 `mnt`，
+当前系统中存在对应的用户级 mount/automount 单元。
+
+实测：`systemctl --user status/show/cat` 与用户日志确认
+`home-xuqihao-mnt-juno.automount` 为 `failed (Result: resources)`，对应
+`.mount` 为 `inactive (dead)`；`findmnt` 未发现该路径挂载，源码入口
+`bash packages/roam.sh mnt status` 返回 `not mounted`。本机
+`systemd.automount(5)` 明确说明普通用户管理器不支持 automount；源码核对还确认
+CLI 固定使用 `sshfs-remote`，与 NixOS 的路径派生单元名不一致。
+非交互 SSH 检查返回 `Host key verification failed`，
+`ssh-keygen -F lxlogin.ihep.ac.cn` 未找到记录。
+
+改动：在 [`roam.md`](roam.md#mnt-linux-自动挂载故障与排查) 记录证据、
+诊断命令与待修复方向，纠正 README 和命令说明中将用户级懒加载视为可用的表述。
+standalone 用户 automount 的权限及路径命名限制经源码和手册核对，未在该前端实测。
+本条补充并纠正下列 10 月 28 日记录中尚未实测的用户 automount 假设。
+
+验证边界：本次仅诊断和文档修改，完成源一致性、本地链接、失效表述与
+`git diff --check` 检查；未执行 Nix 求值、构建或激活，未修改 SSH 信任记录，
+未修复挂载配置或验证 IHEP 非交互认证及实际 SSHFS 挂载，未验证 macOS。
+
 ## 2026-10-28 NixOS/macOS mnt 懒加载配置
 
 改动：NixOS 的 `sshfs-remote` 从登录自动启动的用户服务改为同路径的

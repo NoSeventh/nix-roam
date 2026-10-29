@@ -168,8 +168,7 @@ roam module list       # 模块注册表目录 + 本机 on/off（--host <键> �
 roam module enable media   # 启用模块（未知名/前端不适用/darwin 白名单外会拒绝；可给多个）
  roam module disable media  # 停用模块（幂等）；改完 roam check 验证、roam switch 生效
 roam mnt status          # 查看 IHEP Juno SSHFS 挂载状态（无需仓库目录）
-roam mnt start           # 有用户 systemd 时仅注册懒加载；否则 standalone Linux/WSL 直接启动
-                         # NixOS/macOS 访问目录时懒加载
+roam mnt start           # 尝试用户 automount，失败则直接后台 SSHFS；Linux 懒加载存在已知缺陷，见下文
                          # macOS 首次启用 mnt 后运行 ~/.config/nix-roam/enable-autofs-mnt
 roam update            # nix flake update + flake.lock 差异；提交与切换仍手动完成。
                        # 可选输入：缺省交互列出（回车=全部），roam update nixpkgs nixvim 只更新指定项，--all 跳过交互
@@ -177,6 +176,10 @@ roam flake             # 查看 flake.lock 锁定的输入版本（名称/短 re
                        # --all 附上游传递输入；纯本地解析，不求值不触网、使用共享清单中的 jq
 roam info              # 只读打印宿主探测结论（NixOS/standalone、架构、用户守卫、目标输出）
 ```
+
+`mnt` 的 Linux 用户级 automount 当前存在权限限制和单元命名问题；启用模块并完成
+切换不代表挂载成功。故障证据、SSH 主机信任检查与待修复项见
+[`docs/roam.md`](docs/roam.md#mnt-linux-自动挂载故障与排查)。
 
 `roam` 自带 bash 补全，随包装进四个安装点：子命令（`roam <TAB>`）、`check` 的目标名与 `--build`、`update` 的 flake 输入名（实时读 `flake.lock`）、`module` 的子动作与模块名（实时读 `modules/registry.json`）、`mnt` 的挂载动作、`flake` 与 `gc` 的旗标、`rollback` 的世代号与旗标。bash-completion（≥2.12）按 `XDG_DATA_DIRS` 自动懒加载，无需额外配置；`switch`/`status`/`doctor`/`info` 无自有参数，不做补全。
 
