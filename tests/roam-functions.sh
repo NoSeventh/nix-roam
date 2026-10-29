@@ -477,6 +477,8 @@ modr() { # 参数 = cmd_module 的参数；种子内容经 MOD_SEED_FILE 传给 
     ROAM_REGISTRY_PATH="$FIX/registry-good.json"
     ROAM_LOCAL_DIR="$MODDIR"
     export ROAM_REGISTRY_PATH ROAM_LOCAL_DIR
+    is_nixos() { return 1; }
+    standalone_target() { printf '%s' x86_64-linux; }
     nix() {
       printf '%s\n' "$*" >>"$MODLOG"
       cat "$MOD_SEED_FILE" 2>/dev/null || true
@@ -625,22 +627,34 @@ done
 : >"$JSONDIR/os-release"
 expect_eq 'os-release：字段缺失时允许回落内核名称' "$(os_pretty_name "$JSONDIR/os-release")" ''
 expect_eq 'os-release：文件缺失时允许回落（Darwin）' "$(os_pretty_name "$JSONDIR/missing")" ''
-# --- mnt: direct backend dispatch outside the checkout and guards ---
+# --- mnt: system automount / standalone SSHFS, without host-dependent probes ---
 # shellcheck disable=SC2016
-printf '#!%s\n[ "${MNT_MOUNTED:-1}" = 1 ]\n' "$BASH" >"$STUBBIN/mountpoint"
+printf '#!%s\nprintf "findmnt:%%s\\n" "$*" >>"$MNT_LOG"\n[ "${MNT_MOUNTED:-1}" = 1 ] || [ -f "$MNT_READY" ]\n' "$BASH" >"$STUBBIN/findmnt"
 # shellcheck disable=SC2016
-printf '#!%s\nprintf "sshfs:%%s\\n" "$*" >>"$MNT_LOG"\n' "$BASH" >"$STUBBIN/sshfs"
+printf '#!%s\nprintf "sshfs:%%s\\n" "$*" >>"$MNT_LOG"\n[ "${MNT_SSHFS_RC:-0}" = 0 ] || exit "$MNT_SSHFS_RC"\ntouch "$MNT_READY"\nsleep 2\n' "$BASH" >"$STUBBIN/sshfs"
 printf '#!%s\nexit 0\n' "$BASH" >"$STUBBIN/flock"
 # shellcheck disable=SC2016
 printf '#!%s\nprintf "fusermount:%%s\\n" "$*" >>"$MNT_LOG"\nexit "${MNT_FUSERMOUNT_RC:-0}"\n' "$BASH" >"$STUBBIN/fusermount3"
-chmod +x "$STUBBIN/mountpoint" "$STUBBIN/sshfs" "$STUBBIN/flock" "$STUBBIN/fusermount3"
+# shellcheck disable=SC2016
+printf '#!%s\nprintf "systemctl:%%s\\n" "$*" >>"$MNT_LOG"\ncase "$*" in\n *show*) printf "%%s\\n" "${MNT_LOAD_STATE:-loaded}" ;;\n *is-failed*) exit "${MNT_FAILED_RC:-1}" ;;\n *is-active*) exit "${MNT_AUTOMOUNT_RC:-1}" ;;\n *start*|*stop*) exit "${MNT_SYSTEMCTL_RC:-0}" ;;\nesac\n' "$BASH" >"$STUBBIN/systemctl"
+# shellcheck disable=SC2016
+printf '#!%s\nprintf "sudo:%%s\\n" "$*" >>"$MNT_LOG"\nexec "$@"\n' "$BASH" >"$STUBBIN/sudo"
+printf '%s\n' "#!$BASH" "printf '%s\\n' 'home-test\\x2duser-mnt-juno'" >"$STUBBIN/systemd-escape"
+chmod +x "$STUBBIN/findmnt" "$STUBBIN/sshfs" "$STUBBIN/flock" "$STUBBIN/fusermount3" \
+  "$STUBBIN/systemctl" "$STUBBIN/sudo" "$STUBBIN/systemd-escape"
 mntr() {
   (
     cd "$STUBBIN" || exit 9
-    export PATH="$STUBBIN:$PATH" XDG_RUNTIME_DIR="$STUBBIN/no-runtime"
+    export PATH="$STUBBIN:$PATH"
+    export XDG_STATE_HOME="$STUBBIN/state-root"
     export ROAM_MNT_MOUNT_POINT="$STUBBIN/mnt"
     export ROAM_MNT_STATE_DIR="$STUBBIN/state" MNT_LOG="$STUBBIN/mnt.log"
-    "$BASH" "$REPO/packages/roam.sh" mnt "$@"
+    export MNT_READY="$STUBBIN/mnt-ready"
+    # shellcheck source=/dev/null
+    . "$REPO/packages/roam.sh"
+    kernel=Linux
+    is_nixos() { [ "${MNT_NIXOS:-0}" = 1 ]; }
+    cmd_mnt "$@"
   )
 }
 out="$(mntr)"; rc=$?
@@ -648,10 +662,35 @@ expect_rc 'mnt: default status outside checkout' 0 "$rc"
 expect_eq 'mnt: status output without log wrapper' "$out" "mounted: $STUBBIN/mnt"
 out="$(export MNT_MOUNTED=1; mntr start)"; rc=$?
 expect_rc 'mnt: start dispatch' 0 "$rc"
-expect_eq 'mnt: start avoids duplicate mount' "$(cat "$STUBBIN/mnt.log" 2>/dev/null)" ''
+if [[ "$(cat "$STUBBIN/mnt.log")" != *sshfs:* ]]; then ok 'mnt: start avoids duplicate mount'; else bad 'mnt: duplicate SSHFS'; fi
 out="$(export MNT_MOUNTED=0; mntr start)"; rc=$?
 expect_rc 'mnt: WSL fallback start' 0 "$rc"
 expect_sub 'mnt: direct sshfs invocation' "$(cat "$STUBBIN/mnt.log")" 'sshfs:'
+expect_sub 'mnt: direct SSHFS never prompts for credentials' "$(cat "$STUBBIN/mnt.log")" 'BatchMode=yes,StrictHostKeyChecking=yes'
+expect_sub 'mnt: mount check excludes autofs without resolving the path' "$(cat "$STUBBIN/mnt.log")" '--nocanonicalize --mountpoint'
+rm -f "$STUBBIN/mnt-ready"
+out="$(export MNT_MOUNTED=0 MNT_SSHFS_RC=7; mntr start 2>&1)"; rc=$?
+expect_rc 'mnt: SSHFS authentication failure is not reported as success' 7 "$rc"
+expect_sub 'mnt: failed SSHFS points to backend log' "$out" 'mnt.log'
+out="$(export MNT_NIXOS=1 MNT_MOUNTED=0 MNT_AUTOMOUNT_RC=0; mntr start)"; rc=$?
+expect_rc 'mnt: NixOS registers system automount' 0 "$rc"
+expect_sub 'mnt: system start uses escaped mount path' "$(cat "$STUBBIN/mnt.log")" 'sudo:systemctl --system start home-test\x2duser-mnt-juno.automount'
+expect_sub 'mnt: autofs-only status is ready, not mounted' "$out" "automount ready: $STUBBIN/mnt (not mounted)"
+out="$(export MNT_NIXOS=1 MNT_MOUNTED=0 MNT_AUTOMOUNT_RC=0 MNT_FAILED_RC=0; mntr status 2>&1)"; rc=$?
+expect_rc 'mnt: failed SSHFS cannot be hidden by active automount' 1 "$rc"
+expect_sub 'mnt: failed mount points to system journal' "$out" 'journalctl -b -u'
+out="$(export MNT_NIXOS=1 MNT_MOUNTED=0 MNT_AUTOMOUNT_RC=1; mntr status)"; rc=$?
+expect_rc 'mnt: inactive system automount is not ready' 1 "$rc"
+out="$(export MNT_NIXOS=1 MNT_LOAD_STATE=not-found; mntr start 2>&1)"; rc=$?
+expect_rc 'mnt: missing NixOS module fails explicitly' 1 "$rc"
+expect_sub 'mnt: missing system unit explains activation' "$out" 'roam switch'
+: >"$STUBBIN/mnt.log"
+out="$(export MNT_NIXOS=1 MNT_SYSTEMCTL_RC=5; mntr start 2>/dev/null)"; rc=$?
+expect_rc 'mnt: system manager failure is preserved' 5 "$rc"
+if [[ "$(cat "$STUBBIN/mnt.log")" != *sshfs:* ]]; then ok 'mnt: NixOS failure never bypasses system manager'; else bad 'mnt: NixOS fell back to SSHFS'; fi
+out="$(export MNT_NIXOS=1; mntr stop)"; rc=$?
+expect_rc 'mnt: system stop succeeds' 0 "$rc"
+expect_sub 'mnt: system stop handles trigger and mount' "$(cat "$STUBBIN/mnt.log")" 'stop home-test\x2duser-mnt-juno.automount home-test\x2duser-mnt-juno.mount'
 out="$(export MNT_MOUNTED=1; mntr stop)"; rc=$?
 expect_rc 'mnt: stop dispatch' 0 "$rc"
 expect_sub 'mnt: direct fusermount invocation' "$(cat "$STUBBIN/mnt.log")" 'fusermount:'
@@ -665,8 +704,8 @@ expect_rc 'mnt: reject unknown action' 1 "$rc"
 out="$(mntr start extra 2>/dev/null)"; rc=$?
 expect_rc 'mnt: reject extra arguments' 1 "$rc"
 mkdir -p "$STUBBIN/no-tools"
-out="$(PATH="$STUBBIN/no-tools" ROAM_MNT_MOUNT_POINT="$STUBBIN/mnt" cmd_mnt status 2>&1)"; rc=$?
-expect_rc 'mnt: missing mountpoint tool fails' 1 "$rc"
+out="$(export kernel=Linux; PATH="$STUBBIN/no-tools" ROAM_MNT_MOUNT_POINT="$STUBBIN/mnt" cmd_mnt status 2>&1)"; rc=$?
+expect_rc 'mnt: missing findmnt tool fails' 1 "$rc"
 expect_sub 'mnt: missing tool explains activation' "$out" 'roam switch'
 
 rm -rf "$JSONDIR"

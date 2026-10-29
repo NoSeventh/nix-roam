@@ -44,58 +44,59 @@ nh home semantics (read against nh 4.4.2 upstream source): nh home builds the `a
 - `roam update [input...|--all]` lists the inputs locked in `flake.lock` (jq) for an interactive pick — Enter/EOF means all (default), numbers and names mix freely — while explicit input names or `--all` skip the prompt and update only the chosen inputs via `nix flake update <input>...`; it prints the `flake.lock` diff but never commits or switches.
 - `roam flake [-a|--all]` reads flake.lock locally with jq, follows its root-to-node mappings, and prints names/revisions/dates/refs/sources. `--all` includes transitive nodes. It does not evaluate or fetch inputs; malformed/unsupported lock structures fail clearly.
 - `roam module init|list|enable|disable [names...|--host K]` (added 2026-10-11) maintains the machine-local module selection `local.<hostKey>.json` — the bash front end of `lib/selection.nix` (mechanism: [`modules.md`](modules.md)). `init` seeds from the current effective selection (one light eval of `config.roam.selectedModules`), so a fresh init changes nothing; `list` prints the registry with per-machine on/off; `enable`/`disable` validate against the registry first (unknown name / front-not-applicable / darwin-non-whitelisted die before any file is touched — mirroring the Nix-side throws), seed from the effective selection when no local file exists, then rewrite the file (idempotent; disable of a not-enabled tier is a no-op note) and print the delta with `roam check <K>`/`roam switch` hints. The registry and selection files are parsed structurally with jq, independent of indentation/key order; `tests/module-registry.sh` checks output fields and file applicability; the selection file is strict JSON (no trailing comma — `fromJSON` rejects it) with a `host` self-check field. hostKey: hostname on NixOS, output name on standalone.
-- `roam mnt [start|stop|status]` is the mnt mount entry and works outside the checkout. No argument means `status`; it returns the mount or automount status without writing logs. `start`/`stop` are logged under `~/.local/state/nix-roam/`. On Linux, `start` attempts `sshfs-remote.automount` when a user bus is available, then falls back to direct background SSHFS if the bus is unavailable or starting the unit fails. The configured user automount cannot run under an unprivileged user manager; see the diagnosis below. The background path sleeps one second without checking that SSHFS mounted successfully, so a successful `start` exit alone is insufficient: check `status` and `mnt.log`. macOS writes an autofs map under `~/.config/nix-roam/auto_sshfs`; after enabling `mnt` and applying it, run `~/.config/nix-roam/enable-autofs-mnt` once to register the map with `/etc/auto_master`, then access to `~/mnt/juno` is lazy. The helper intentionally uses sudo explicitly rather than requesting root during Home Manager activation.
+- `roam mnt [start|stop|status]` is the mnt mount entry and works outside the checkout. No argument means `status`; it reports state without writing logs or triggering Linux automounts. `start`/`stop` are logged under `~/.local/state/nix-roam/`. NixOS uses sudo to start/stop system-level mount units named with `systemd-escape --path`; `start` registers the trigger and clears an earlier mount failure for retry. Standalone Linux starts direct background SSHFS under a lock and checks for an actual mount, preserving early SSHFS failure codes instead of reporting success after a fixed sleep. macOS writes an autofs map under `~/.config/nix-roam/auto_sshfs`; after enabling `mnt` and applying it, run `~/.config/nix-roam/enable-autofs-mnt` once to register the map with `/etc/auto_master`, then access to `~/mnt/juno` is lazy. The helper intentionally uses sudo explicitly rather than requesting root during Home Manager activation.
 - `roam info` prints the host detection read-only.
 
 ## mnt Linux 自动挂载故障与排查
 
-Linux 配置的目标是访问 `~/mnt/juno` 时建立 SSHFS、空闲五分钟后卸载，
-但当前用户级 automount 实现无法实现该目标。实测环境与验证边界见
-[`VALIDATION.md`](VALIDATION.md#2026-10-29-mnt-故障诊断nixos-wsl-x86_64)。
+### 当前实现
 
-### 原因与证据
+[`modules/mnt/nixos.nix`](../modules/mnt/nixos.nix) 定义系统级 mount/automount：
+开机只启动 automount，访问 `~/mnt/juno` 才建立 SSHFS，空闲五分钟后卸载。
+普通用户 manager 无权创建 autofs，不能改回 `systemd.user`。
 
-1. **普通用户 systemd 不支持 automount。**
-   [`modules/mnt/nixos.nix`](../modules/mnt/nixos.nix) 通过
-   `systemd.user.units` 定义 mount/automount。`systemd.automount(5)` 明确限定
-   automount 仅支持系统级管理器及 root 的用户管理器，普通用户即使有正常的
-   user bus、启用了 linger 也不满足条件。本机配置已经激活，但
-   `home-xuqihao-mnt-juno.automount` 为 `failed (Result: resources)`，对应
-   `.mount` 为 `inactive (dead)`；挂载尚未进入 SSH 连接阶段。
-   [`home/mnt-linux.nix`](../home/mnt-linux.nix) 同样使用普通用户 automount，
-   也受此限制；Home Manager 能生成单元不等于 systemd 能运行它。
-2. **CLI 与 NixOS 的单元名称不一致。**
-   [`packages/roam/mnt.sh`](../packages/roam/mnt.sh) 的 `start/stop/status`
-   固定操作 `sshfs-remote.automount` / `.mount`，而 NixOS 生成的是
-   `home-<username>-mnt-juno.automount` / `.mount`，CLI 因而无法正确控制或
-   查询该单元。standalone 的单元也命名为 `sshfs-remote`，不符合
-   mount/automount 文件名必须由 `Where` 路径转义而来的要求。
-3. **SSH 主机信任尚未建立。**
-   本机以 `BatchMode=yes` 检查 IHEP 连接得到 `Host key verification failed`，
-   `ssh-keygen -F lxlogin.ihep.ac.cn` 未找到记录。这是独立于 automount 的后续
-   阻碍；后台 SSHFS 无法交互确认指纹，也尚不能据此断言密钥认证或远端访问正常。
+专用的 `mount.fuse.roam-sshfs` helper 通过 `system.fsPackages` 注册；系统负责
+FUSE 挂载，SSH 子进程通过 `runuser` 切换到配置中的登录用户，读取该用户的 SSH
+配置、私钥和 known_hosts，不使用 root 的 SSH 身份。UID/GID 从运行时账户数据库
+解析；`uid/gid + allow_other + default_permissions + umask=0077` 允许登录用户
+访问 root 建立的挂载，同时保留本地仅所有者可访问的权限。SSH 使用
+`BatchMode=yes`、`StrictHostKeyChecking=yes` 和十秒连接超时；秘密不进入 store。
 
-### 诊断命令与修复方向
+[`packages/roam/mnt.sh`](../packages/roam/mnt.sh) 按挂载路径转义单元名，并操作
+系统级管理器。Linux 状态检查只读取挂载表中的 `fuse.sshfs`，使用
+`findmnt --nocanonicalize` 避免路径解析触发 autofs。状态可区分 `mounted`、
+`automount ready ... (not mounted)`、`not mounted`；若 mount 单元失败则返回非零并
+提示 `journalctl`，不会用仍然 active 的 automount 掩盖 SSH 错误。
 
-以下单元名对应本机登录用户；其他机器应按实际挂载路径转义后的名称替换：
+[`home/mnt-linux.nix`](../home/mnt-linux.nix) 不再生成用户 mount/automount。
+standalone Linux 的交互 Bash 调用 `roam mnt start`，有无 user bus 均走直接 SSHFS；
+锁内等待实际挂载成功，失败返回非零，日志写入 `~/.local/state/nix-roam/mnt.log`。
+宿主须提供可用的 FUSE 设备与非 root 挂载工具。该前端不提供按目录访问触发或
+空闲卸载；原生系统级 automount 由宿主 OS 管理。
+
+### SSH 前置条件与诊断
+
+新机器先运行 `ssh xuqihao@lxlogin.ihep.ac.cn`，核对主机指纹。若非交互认证
+失败，运行 `ssh-copy-id -i ~/.ssh/id_rsa.pub xuqihao@lxlogin.ihep.ac.cn` 完成
+公钥授权（使用其他密钥时替换路径），再检查 BatchMode。仅能输入密码登录还不足以
+支持后台挂载；加密私钥也需要系统挂载进程可用的非交互认证方式。
+
+NixOS 排查命令（`status`/`findmnt` 不触发连接，最后的 `ls` 才访问远端）：
 
 ```bash
-systemctl --user status home-xuqihao-mnt-juno.automount home-xuqihao-mnt-juno.mount
-journalctl --user -b -u home-xuqihao-mnt-juno.automount -u home-xuqihao-mnt-juno.mount
-findmnt --mountpoint "$HOME/mnt/juno"
+unit="$(systemd-escape --path "$HOME/mnt/juno")"
+systemctl --system status "$unit.automount" "$unit.mount"
+journalctl -b -u "$unit.automount" -u "$unit.mount"
+findmnt -rn --nocanonicalize --mountpoint "$HOME/mnt/juno"
 roam mnt status
 ssh-keygen -F lxlogin.ihep.ac.cn
 ssh -o BatchMode=yes -o ConnectTimeout=8 xuqihao@lxlogin.ihep.ac.cn true
+roam mnt start
+ls "$HOME/mnt/juno"
 ```
 
-先手动运行 `ssh xuqihao@lxlogin.ihep.ac.cn`，核对服务器指纹并完成登录，
-再重新检查非交互认证。若保留真正的按需挂载，NixOS 需改为系统级 automount，
-并明确 SSH 所用身份、密钥与 known_hosts、挂载所有权和访问权限；仅把
-`systemd.user` 改成 `systemd` 不足以完成修复。CLI 需同步统一单元名称和管理层级。
-standalone Linux 的系统级 automount 应由原生宿主系统管理；用户侧 SSHFS
-fallback 是直接挂载，不具备按目录访问触发的语义。
-
-这些是待实现的修复方向；本次记录未修复配置，未确认远端成功挂载。
+旧实现的普通用户 automount 权限错误、CLI 名称不一致和 SSH 首次认证问题，以及
+后续修复的实测边界，见 [`VALIDATION.md`](VALIDATION.md)。
 
 ## pre-push：验证推送快照
 

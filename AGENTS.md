@@ -79,6 +79,11 @@ review and commit `flake.lock`, then validate affected targets;
   services/tools. Keep deliberate front differences explicit. Do not introduce
   clang or bare neovim into standalone dev: gcc and nixvim already own the
   conflicting binaries. Keep one Python environment where one is managed.
+- `mnt` uses system-level mount/automount on NixOS; ordinary user systemd cannot
+  run automounts. Derive unit names from the mount path. Its helper runs SSH as
+  the login user and resolves UID/GID at runtime; keys and known_hosts stay in
+  that user's home. Standalone Linux uses direct SSHFS with checked startup.
+  Status must distinguish autofs from SSHFS without touching the mount path.
 - `profiles/nixos-base.nix` owns NixOS-only Node/npm/pnpm, R, and scientific
   Python/PyROOT. Python bindings use the same Python package set; rpy2's wrapper
   sets matching `R_HOME`. Standalone retains uv and project/native runtimes.

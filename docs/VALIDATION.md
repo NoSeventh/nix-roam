@@ -9,6 +9,44 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-29 mnt 系统级按需挂载修复（NixOS-WSL x86_64）
+
+宿主：NixOS 26.11，`/etc/NIXOS` 存在，x86_64 Microsoft WSL2 内核；
+本机 `local.wsl.json` 选择 `mnt`。
+
+改动：NixOS 改用系统级 mount/automount，以专用 `mount.fuse.roam-sshfs`
+helper 解析运行时 UID/GID，并以登录用户运行 SSH，保留用户自己的密钥和
+known_hosts；挂载使用本地仅所有者可访问的权限。`roam mnt` 统一按路径转义单元名，
+用系统管理器 start/stop，区分 autofs 就绪、SSHFS 已挂载和 mount 失败；状态查询
+不解析挂载路径。standalone Linux 删除不可运行的用户 automount，改为直接 SSHFS，
+锁内等待实际挂载并保留启动失败退出码。README、AGENTS 与机制文档同步更新。
+
+验证：Nix 格式与解析、受影响 WSL mount/automount 选项及系统派生求值通过；
+WSL toplevel 构建通过，`roam switch` 经 nh 成功激活。`nix flake check path:./.`
+完整通过，含桌面/WSL 系统配置求值及三项 x86_64 checks；脚本回归覆盖转义单元名、
+系统管理器失败不降级、autofs 不误报挂载、失败 mount 不被 active 触发器掩盖，
+以及直接 SSHFS 的认证失败退出码。`bash tests/run-all.sh` 全部 372 项通过
+（roam 函数 223 项）；测试桩显式固定宿主模式并在沙箱内使用可写状态目录。
+x86_64 standalone 显式导入 mnt Home Manager 模块的 activation package 构建通过，
+未激活该前端。
+
+实机：补齐用户 known_hosts 后，远端最初拒绝现有 RSA 公钥；用户完成公钥授权后，
+`ssh -o BatchMode=yes ... true` 成功，访问 `~/mnt/juno` 触发真实 IHEP SSHFS，
+可列出远端根目录，挂载目录的 UID/GID 为本地 `1000:100`、权限为 `0700`。
+`findmnt --nocanonicalize` 同时显示 autofs 与 `fuse.sshfs`，`roam mnt status`
+正确报告 `mounted`。随后真实挂载在五分钟空闲后卸载（22:25:20 挂载、
+22:30:44 进入 inactive），触发器仍 active，状态查询只报告 `automount ready`。
+已实测已挂载状态下 `roam mnt stop` 完整停止挂载与触发器，再次 `start` 只注册
+触发器、访问目录后重新挂载；系统和用户管理器均无失败单元。
+另外使用临时本地 SSH 服务验证完整的按访问挂载、文件内容、UID/GID、仅所有者权限
+及缩短为空闲两秒的自动卸载；临时服务、运行时单元和文件均已清理。
+
+边界：未构建/激活 NixOS 桌面、ARM 或 Darwin；未在其他原生发行版激活 standalone，
+未重启 WSL 复验开机注册。
+额外的五输出 drvPath 并行求值与 ARM mnt 扩展求值未在超时前完成，不计为通过；
+此前的离线构建因缺少本地依赖而失败，联网重试后上述本机构建及 flake checks 通过。
+SSH 密钥、known_hosts 与远端公钥授权均未进入仓库或 Nix store。
+
 ## 2026-10-29 mnt 故障诊断（NixOS-WSL x86_64）
 
 宿主：`/etc/os-release` 为 NixOS 26.11，`/etc/NIXOS` 存在，
