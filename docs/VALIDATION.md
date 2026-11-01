@@ -9,6 +9,25 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-10-30 共享 Hugging Face Hub CLI（Gentoo WSL x86_64）
+
+宿主：Gentoo Linux 2.18，`/etc/NIXOS` 不存在，x86_64 Microsoft WSL2 内核；
+使用 standalone Home Manager。
+
+改动：`packages/cli-dev.nix` 的共享 AI CLI 列表新增 unstable
+`python3Packages.huggingface-hub`，提供 `hf` 命令；README 说明 CLI 与项目
+Python 库的区别。不新增全局 Python 环境，不修改宿主或项目解释器。
+
+验证：`nix fmt packages/cli-dev.nix`、Nix 解析和 `git diff --check` 通过；
+使用 `path:./.` 完成三个 standalone activation package 与两个 NixOS
+toplevel 的 drvPath 求值。x86_64 Linux standalone activation package
+构建通过，从该产物的 `home-path/bin/hf` 执行 `--help` 与 `version` 成功，
+版本为 1.30.0。
+
+边界：未激活，未测试登录、模型下载或上传；未构建 NixOS、ARM 或 Darwin。
+未更新 flake.lock，未运行与本次包列表改动无关的脚本测试。
+求值期间仍有既有 Cachix 签名信任和上游平台属性弃用警告，未修改其配置。
+
 ## 2026-10-29 mnt 系统级按需挂载修复（NixOS-WSL x86_64）
 
 宿主：NixOS 26.11，`/etc/NIXOS` 存在，x86_64 Microsoft WSL2 内核；

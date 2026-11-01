@@ -276,6 +276,8 @@ GitHub 侧的 `eval` workflow（`.github/workflows/eval.yml`）验证 Git 视图
 
 Linux CLI 清单包含 bubblewrap（`bwrap`），供需要进程隔离的开发工具使用；macOS 不安装。可选层的共用应用列表放在各自的 `packages.nix`，系统服务仍由 NixOS 端声明。
 
+共享 CLI 清单通过 `python3Packages.huggingface-hub` 提供 Hugging Face 的 `hf` 命令（如 `hf download`、`hf auth login`）。该工具使用自己的 Nix Python 依赖，不会让宿主或项目 Python 自动获得 `import huggingface_hub`；项目需要该库时应在自己的环境中声明。
+
 需要 Home Manager 托管配置文件的 CLI 放在 `home/common.nix`；GUI Home Manager 配置只放在 `home/default.nix`，避免给 WSL 和 macOS 引入桌面依赖。
 
 Node.js（含 npm）、pnpm、Python 科学计算环境（含 PyROOT）和 R 仅由 `profiles/nixos-base.nix` 安装，NixOS 桌面与 WSL 使用完全相同的 stable 包。Python 与 PyROOT 来自同一 Python 包集，Python wrapper 为 rpy2 设置匹配的 `R_HOME`。不要用 pip 修改这套只读环境。

@@ -102,6 +102,7 @@ with pkgs; [
   # --- AI 开发辅助 CLI ---
   codegraph
   rtk
+  python3Packages.huggingface-hub
 
   # --- 小众 / 网络 CLI ---
   yt-dlp
