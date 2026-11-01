@@ -6,8 +6,12 @@
 
 - 对 Nix 改动：解析编辑过的文件 → 求值受影响的选项 / 派生 → 构建对应目标。不把「求值通过」当「构建通过」，不把「构建通过」当「激活通过」，也不把当前主机上找到的命令当作另一目标包内容的证据。
 - 「纯重构」用五输出 drvPath 前后对比验证（干净树 vs 干净树）：`nix eval --raw .#<target>.drvPath`。注意 HM 侧 `programs.*` 子选项「显式设置为空值」与「未设置」可能生成不同文本（曾见于 `programs.bash.initExtra`：空串会多出一个换行），布尔注入必须用属性集级 `lib.optionalAttrs` 而非字符串级 `lib.optionalString`。
-- 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
+- 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，836e59f；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
+
+## 2026-11-01 git 历史按主题重写（元数据操作，树零变化）
+
+非代码改动：将 2026-09-17 之前约 9 个月的 307 个零散提交按主题压缩为 12 个时代提交（初始提交保留，之后的 92 个规范提交逐条保留，400 → 105）。执行方式为 `git commit-tree` 保树重建（非补丁重放，无冲突面），验证：分段覆盖与顺序经全量 rev-list 逐一比对；新旧 HEAD `git diff` 为空（文件内容逐字节一致）；保留提交的作者/提交者身份与日期原样保留。文档与 `flake.nix` 中 29 个旧提交引用已按 old→new 映射表改写（`docs/VALIDATION.md`、`docs/modules.md`、`flake.nix`），无未映射的真实引用；`home/default.nix` 等处的十六进制匹配确认为颜色值/数字/分区 UUID，未触碰。旧历史完整保留于本地分支 `backup/pre-rewrite-20261101`。边界：需强推 Gitee（有意识的规则破例）；GitHub 镜像因同步 CI 不强推需一次性手动对齐；其他克隆需 `git fetch && git reset --hard origin/master`；本次未运行任何 Nix 求值/构建（树未变化，无需）。
 
 ## 2026-11-01 新增 android 可选层（Gentoo 2.18 / WSL2 standalone x86_64，本机）
 
@@ -18,7 +22,7 @@
 改动：新增 `android` 可选层（第 12 层）：`modules/android/{packages,nixos,home,sdk}.nix`
 + standalone 前端环境接线 `home/android-linux.nix`。内容为 stable 通道的
 android-tools（adb/fastboot）、openjdk 21、gradle 8.14.4、Android Studio
-2025.3.4.7（unfree，循 ba5973a 惯例不进任何默认集，仅本机显式启用）与
+2025.3.4.7（unfree，循 323e6d0 惯例不进任何默认集，仅本机显式启用）与
 androidenv 预置只读 SDK（platforms 35/36/37.0 + build-tools 35.0.0/36.0.0/
 37.0.0 + platform-tools + cmdline-tools 20.0 + cmake 4.1.2，无模拟器/NDK/
 系统镜像）。`ANDROID_HOME` 指向 store 内 SDK 根（standalone 经
@@ -213,7 +217,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 冒烟追加修复：`roam.selectedModules` 同时有 option default 与入口赋值，readOnly 在优先级过滤前把两者都计作定义，读取元信息失败但 toplevel/activationPackage 构建未强制读取它。移除 option default、保留只读约束；新增 `selection-metadata` check，验证非空赋值可读、二次赋值被拒，并强制读取五个实际输出的元信息。新 check 在修复前如预期失败，修复后通过。
 
-验证：本机脚本测试 338/338；`tests/prepush-snapshots.sh --real-nix` 20/20（临时真 Git + 无外部输入 flake，含非 HEAD 祖先的分叉提交、annotated tag、空格及 URI 特殊字符路径、坏提交被本地修复/local 掩盖的负例、坏工作树不污染好提交、多 ref 失败不中断与去重、缺 SHA、文档/删除/空 stdin）。真实仓库以 HEAD `417ebf1` 的模拟推送协议运行当前钩子，锁定该 SHA 的默认五输出求值通过；当前改动的五输出 `path:` drvPath 求值及元信息读取通过。Nix 格式化/解析、ShellCheck、`git diff --check` 通过；`nix flake check --offline path:./.` 构建三项 x86_64 checks 通过；x86_64 standalone activationPackage 构建通过，构建产物的 `roam module list --host x86_64-linux` 冒烟通过。首次构建遇 NJU 缓存 502 超时，重试仅在命令上选择现有 USTC/TUNA/官方缓存，构建成功；仓库镜像配置未修改。
+验证：本机脚本测试 338/338；`tests/prepush-snapshots.sh --real-nix` 20/20（临时真 Git + 无外部输入 flake，含非 HEAD 祖先的分叉提交、annotated tag、空格及 URI 特殊字符路径、坏提交被本地修复/local 掩盖的负例、坏工作树不污染好提交、多 ref 失败不中断与去重、缺 SHA、文档/删除/空 stdin）。真实仓库以 HEAD `f8668c5` 的模拟推送协议运行当前钩子，锁定该 SHA 的默认五输出求值通过；当前改动的五输出 `path:` drvPath 求值及元信息读取通过。Nix 格式化/解析、ShellCheck、`git diff --check` 通过；`nix flake check --offline path:./.` 构建三项 x86_64 checks 通过；x86_64 standalone activationPackage 构建通过，构建产物的 `roam module list --host x86_64-linux` 冒烟通过。首次构建遇 NJU 缓存 502 超时，重试仅在命令上选择现有 USTC/TUNA/官方缓存，构建成功；仓库镜像配置未修改。
 
 边界：未激活、未真实 push、未重跑装机脚本；NixOS/ARM/macOS 未构建或激活（无 ARM/macOS 硬件，保留既有边界）。本机 local 选配与 flake.lock 未改变；本批验证完成后直接提交，未推送。
 
@@ -289,12 +293,12 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 改动：①linux.sh 新增提权前端 `run_as_root`（have sudo → sudo；无 sudo 且 stdin 是终端 → `su_root`；皆不可用 → 非零返回，fail-loud 留给调用方）与 `su_root`（`su -c` 只收一个命令串，参数经 `printf %q` 逐个消毒拼接；对普通词只产空格/& 反斜杠转义，POSIX sh 兼容，本路径不触发 `$'…'` 形式）。②步骤 1 single 分支重写：`/nix` 缺失 → `run_as_root sh -c 'mkdir -m 0755 /nix && chown <user> /nix'`（有 sudo 的机器结果不变——原先等价操作交给官方安装器内部 sudo；无 sudo 机器交互输 root 密码完成）；`/nix` 存在但不可写 → 同一前端尝试 chown 后复检；两者皆败的手动命令文案补 WSL `wsl -d <发行版> -u root` 进入方式。su 分支要求 `[ -t 0 ]`：`bash <(curl …)` 保留终端 stdin（README 交互性主张），`curl | bash` 无从输密码、直接落手动命令而非挂起。③0.8 模式日志补 su 可用性。④新测试 `tests/bootstrap-helpers.sh`（sed 提取 `run_as_root`/`su_root` 顶格多行函数体加载——linux.sh 不可整体 source，仓库定位段即开始执行；`have` 单行定义提不出来，测试内等价重定义、分派用例按需覆盖）12 例：sudo/su/皆无三分派、sudo 与 su 的 rc 透传、非终端 stdin 拒走 su（`< /dev/null` 钉死宿主 tty 状态——本条即「断言不得隐含宿主假设」的直接应用）、`su -c` 单串经 shell 重解析还原 argv（空格/& 元字符往返）。两个沙箱发现入注：stub 以 `$BASH` 为 shebang（nix build 沙箱无 `/usr/bin/env`，roam-functions 假 nix 同款手法）；新测试文件必须先 `git add` 才进 flake 源副本，否则沙箱内 run-all 找不到它而本地能跑（flake git-tree 过滤只认索引）。⑤run-all 汇总接入（161→173）、flake.nix scriptChecks 注释、AGENTS（单测手段补 sed 提取约束：两函数保持顶格多行）、README（单用户 `/nix` 一句 + `bash <(...)` 交互性主张补 su 依赖）、docs/bootstrap.md 同步。
 
-验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` 三脚本过；shellcheck 0.11.0 零告警（`nix shell nixpkgs#shellcheck` 直跑三个改动脚本）；run-all 173/173（roam-functions 104 + prepush-gate 24 + 补全 22 + 脚手架 6 + repo-references 5 + bootstrap-helpers 12）；`nix build` 直建 `checks.x86_64-linux.shellcheck-scripts` 与 `checks.x86_64-linux.roam-unit-tests` rc=0（沙箱内两关卡，后者含新套件与 $BASH stub）；`git diff --check` 干净；**四输出 drvPath 提交前后逐一相同**（干净树对干净树——flake.nix 仅注释变化的「注释级纯重构」主张再实证；初次对比基于 99d4da6，当时桌面两侧同因尚未放行的 electron-41.10.7 拒评不可比〔该断点随后由 ac987f0 解决〕，rebase 到 ac987f0 后复核四输出仍逐一相同）。
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` 三脚本过；shellcheck 0.11.0 零告警（`nix shell nixpkgs#shellcheck` 直跑三个改动脚本）；run-all 173/173（roam-functions 104 + prepush-gate 24 + 补全 22 + 脚手架 6 + repo-references 5 + bootstrap-helpers 12）；`nix build` 直建 `checks.x86_64-linux.shellcheck-scripts` 与 `checks.x86_64-linux.roam-unit-tests` rc=0（沙箱内两关卡，后者含新套件与 $BASH stub）；`git diff --check` 干净；**四输出 drvPath 提交前后逐一相同**（干净树对干净树——flake.nix 仅注释变化的「注释级纯重构」主张再实证；初次对比基于 c50dbf6，当时桌面两侧同因尚未放行的 electron-41.10.7 拒评不可比〔该断点随后由 67c3535 解决〕，rebase 到 67c3535 后复核四输出仍逐一相同）。
 
-未验证 / 发现：①Gentoo WSL 实机重跑——改动即由该场景触发，su 交互路径在真终端的密码提示、建好 `/nix` 后官方安装器 `--no-daemon` 全程未实测；预期直接重跑 `bash ~/nix-roam/bootstrap/bootstrap.sh` 即可走通（或 curl 一键，复用已有克隆）。②tty+su 正路径无合成端到端（单测以 su_root 直测拼串 + 非终端负路径夹逼覆盖；伪终端方案不引入）。③aarch64 两 check 本机直建被拒（x86_64 无 ARM，既有边界，CI 覆盖）。④本批期间本地曾并行做出一份 electron-41.10.7 允许项修复（41.9.1 两存的劣化版，11266ef），push 时撞上远端更完整的 ac987f0（stable 实例替换 + nixos-base 条目求值复核 + flake check/构建验证），rebase 时丢弃该提交，electron 问题以 ac987f0 为准。
-## 2026-10-02 insecure 清单随 2f90778 flake 更新补齐：electron-41.10.7（flake.nix + profiles/nixos-base.nix 注释 + AGENTS，AlmaLinux 9.8 / WSL2 standalone，本机）
+未验证 / 发现：①Gentoo WSL 实机重跑——改动即由该场景触发，su 交互路径在真终端的密码提示、建好 `/nix` 后官方安装器 `--no-daemon` 全程未实测；预期直接重跑 `bash ~/nix-roam/bootstrap/bootstrap.sh` 即可走通（或 curl 一键，复用已有克隆）。②tty+su 正路径无合成端到端（单测以 su_root 直测拼串 + 非终端负路径夹逼覆盖；伪终端方案不引入）。③aarch64 两 check 本机直建被拒（x86_64 无 ARM，既有边界，CI 覆盖）。④本批期间本地曾并行做出一份 electron-41.10.7 允许项修复（41.9.1 两存的劣化版，11266ef），push 时撞上远端更完整的 67c3535（stable 实例替换 + nixos-base 条目求值复核 + flake check/构建验证），rebase 时丢弃该提交，electron 问题以 67c3535 为准。
+## 2026-10-02 insecure 清单随 0d8a3c4 flake 更新补齐：electron-41.10.7（flake.nix + profiles/nixos-base.nix 注释 + AGENTS，AlmaLinux 9.8 / WSL2 standalone，本机）
 
-背景：上一条 VALIDATION 发现的既有断点——2f90778 update flake 后桌面 toplevel 求值拒评 electron-41.10.7（`nix flake check` 与桌面输出全挂）。用户批准按 AGENTS「Handling EOL / insecure packages」流程放行。
+背景：上一条 VALIDATION 发现的既有断点——0d8a3c4 update flake 后桌面 toplevel 求值拒评 electron-41.10.7（`nix flake check` 与桌面输出全挂）。用户批准按 AGENTS「Handling EOL / insecure packages」流程放行。
 
 改动与过程：①实例归属探针——stable（rev 78e9c78）`electron_41` = 41.10.7、unstable（b4fd65b）`electron_41` = 41.10.6：拒评的 41.10.7 只可能来自 pkgsFor 管辖的 **stable 实例**（桌面闭包经 pkgs-stable 引用 electron_41，与 2026-09-26 引入 41.9.1 同一消费者）→ `flake.nix` 共享清单 electron-41.9.1 **替换**为 electron-41.10.7（旧版本随 stable 前移已无引用者，按 2026-09-17 先例替换不累积）。②nixos-base 侧清理尝试被求值推翻：依据顶点探针（unstable `electron`=43.6.0 / `electron_41`=41.10.6 / `pnpm`=12.3.4）判定 electron-40.10.5、pnpm-10.29.2 已死并移除，桌面求值相继拒评两者（unstable `electron_40` 仍是 40.10.5；GNOME 链仍钉 pnpm 10.29.2），逐条恢复——**顶点属性探针覆盖不了版本化/被钉住的引用面，条目存亡以受影响输出求值为准**（教训已记入两处注释与 AGENTS）。③flake bump 会串行暴露多个拒评（Nix 一次只报一个：先 stable electron，放行后才轮到 unstable electron/pnpm），修到目标通过为止。nixos-base 最终清单与改动前一致，仅注释重写。
 
@@ -310,7 +314,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 验证（本机 AlmaLinux 9.8 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` 全过；shellcheck 0.11.0 零告警（`nix shell nixpkgs#shellcheck` 直跑四个改动脚本）；run-all 161/161（roam-functions 104 + prepush-gate 24 + 补全 22 + 脚手架 6 + repo-references 5）；实机 `bash packages/roam.sh flake` / `flake --all` 输出核对（root 六输入齐全、home-manager 按声明名显示、hermes-agent 无声明 ref 显 `-`、传递表含 nixvim 自带 nixpkgs_2）；`nix build` 直建 `checks.x86_64-linux.shellcheck-scripts` + `checks.x86_64-linux.roam-unit-tests` rc=0（沙箱内两关卡）；`nix build --no-link .#homeConfigurations.x86_64-linux.activationPackage` rc=0（roam.sh 过 writeShellApplication 的 bash -n + shellcheck 门）；`git diff --check` 干净。
 
-未验证 / 发现：①`nix flake check` 整体 rc=1——**既有问题，与本批无关**：stash 对照下干净 HEAD 同样在 `.#nixosConfigurations.nixos…toplevel` 求值处拒绝 electron-41.10.7（2f90778 update flake 后 nixpkgs unstable 的 electron 前移，允许清单未跟：共享侧 flake.nix 放行 electron-41.9.1，NixOS unstable 侧在 profiles/nixos-base.nix）；是否放行新版本属 insecure 审批，未擅自处理，留待决定；故第三层以上述直建两 check 替代整体 check。②aarch64 两 check 本机直建被拒（x86_64 无 ARM/模拟执行——既有边界，CI 覆盖）。③macOS Bash 3.2 实机未跑（`[[ =~ ]]` 区间量词 / `${var:0:7}` / 数组 `+=()` 均 3.1+ 原语，按惯例待第二宿主实证）。④已安装的 `bin/roam` 是旧世代，实机验证走 `bash packages/roam.sh flake` 调试路径；`roam switch` 后才进入正式入口。
+未验证 / 发现：①`nix flake check` 整体 rc=1——**既有问题，与本批无关**：stash 对照下干净 HEAD 同样在 `.#nixosConfigurations.nixos…toplevel` 求值处拒绝 electron-41.10.7（0d8a3c4 update flake 后 nixpkgs unstable 的 electron 前移，允许清单未跟：共享侧 flake.nix 放行 electron-41.9.1，NixOS unstable 侧在 profiles/nixos-base.nix）；是否放行新版本属 insecure 审批，未擅自处理，留待决定；故第三层以上述直建两 check 替代整体 check。②aarch64 两 check 本机直建被拒（x86_64 无 ARM/模拟执行——既有边界，CI 覆盖）。③macOS Bash 3.2 实机未跑（`[[ =~ ]]` 区间量词 / `${var:0:7}` / 数组 `+=()` 均 3.1+ 原语，按惯例待第二宿主实证）。④已安装的 `bin/roam` 是旧世代，实机验证走 `bash packages/roam.sh flake` 调试路径；`roam switch` 后才进入正式入口。
 
 ## 2026-09-29 门控黑名单反转 + SIGPIPE/空行修正 + 清单静态审计（.githooks/pre-push + tests/prepush-gate.sh + AGENTS/docs·roam + flake.nix 注释，Fedora 44 / WSL2 standalone，本机）
 
@@ -318,7 +322,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 改动：①清单反转为黑名单 `EVAL_SKIP_RE`——docs/tests/bootstrap/.github/.githooks 五目录与根 README/AGENTS/LICENSE/.gitignore 为已知非输入，**清单外一律视为求值输入**：未知路径（近失名、新增根文件、目录导入内非 .nix 文件——`./hosts/<h>/` 整目录进 store 的潜伏缺口由此自动覆盖）全部保守拦下；漏扩清单的代价降为多跑一次（安全方向）。②判定改 here-string `grep -qEv <<<"$diff_out"`（无管道，SIGPIPE 面归零）+ 空差异显式 `[ -n ]` 前置——here-string 对空串产生一个空行，`-v` 会把空行当「未命中清单」误判为输入（实现时预判，「空差异放行」既有用例即其覆盖）。③prepush-gate 18→24 例：近失名语义反转（mypackages/x、dotfiles-extra/y、notes.flake.lock.bak 由放行改拦下）、已知非输入全集放行（含 fixtures/flake.lock 精度提升、根四文件、.github）、审计三断言（`EVAL_SKIP_RE` 在位防改名脱钩；全仓 .nix 相对路径引用清单目录 ==1——钉 flake.nix `${./tests}` 的 checks 专用引用，钉数前先独立 grep 确认真值；清单五目录内 .nix ==0）。④AGENTS CI 段、docs/roam.md check 条目、flake.nix scriptChecks 注释同步（flake.nix 仅注释变化）。
 
-验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` / shellcheck 零告警（改动两文件）；run-all 129/129（roam-functions 75 + prepush-gate 24 + 补全 19 + 脚手架 6 + repo-references 5；rc 直取）；真 sha 门控：docs-only（0742967→8f7ac9f）rc=1、含 Nix 增量（b960794→0742967）rc=0；钩子端到端——放行路径（真实钩子 + docs-only 增量）0.014s rc=0、新放行说明正确打印；触发路径（本批 38f1d64→2425258，含 flake.nix/钩子/测试）门控正确触发五输出并行求值 rc=0（68s，暖缓存波动区间内）；`nix flake check` rc=0（改动后内容，沙箱 shellcheck-scripts + roam-unit-tests 双确认）；`git diff --check` 干净；**五输出 drvPath 提交前后逐一相同**（38f1d64 vs 2425258，干净树对干净树——flake.nix 仅注释变化的「注释级纯重构」主张实证；checks 输出因引用 `self.outPath` 而移动，符合预期不在对比范围）。
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` / shellcheck 零告警（改动两文件）；run-all 129/129（roam-functions 75 + prepush-gate 24 + 补全 19 + 脚手架 6 + repo-references 5；rc 直取）；真 sha 门控：docs-only（9226b47→79817c3）rc=1、含 Nix 增量（70fd370→9226b47）rc=0；钩子端到端——放行路径（真实钩子 + docs-only 增量）0.014s rc=0、新放行说明正确打印；触发路径（本批 78420d5→c5afc12，含 flake.nix/钩子/测试）门控正确触发五输出并行求值 rc=0（68s，暖缓存波动区间内）；`nix flake check` rc=0（改动后内容，沙箱 shellcheck-scripts + roam-unit-tests 双确认）；`git diff --check` 干净；**五输出 drvPath 提交前后逐一相同**（78420d5 vs c5afc12，干净树对干净树——flake.nix 仅注释变化的「注释级纯重构」主张实证；checks 输出因引用 `self.outPath` 而移动，符合预期不在对比范围）。
 
 未验证：真实 push 触发钩子（同前，推送仍手动）；macOS Bash 3.2 实机（here-string 自 bash 2.05b 起，3.2 兼容按惯例待第二宿主实证）。
 
@@ -328,7 +332,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 改动：①`cmd_check` 求值并行——各目标相互独立且只读，后台子壳并发求值、mktemp 暂存各自 out/err/rc、`wait` 全部完成后按输入次序汇报（完成次序不定，汇报次序必须稳定可测）、rc 汇总语义不变；`--build` 保持串行（并发 nix build 各自按 max-jobs 展开构建进程，内存/CPU 成倍叠加，只读求值无此成本）；子壳以 if/else 双分支显式写 rc 文件（set -e 下 nix 失败不接住会在落盘前中止子壳）。②pre-push 差异门控：钩子加 BASH_SOURCE 执行守卫（可 source 单测），`gate_needed` 读 pre-push stdin 协议（每行 `<local_ref> <local_sha> <remote_ref> <remote_sha>`）逐 ref 做端点 diff（求值只看推送后最终树，中间提交无关）匹配 `EVAL_INPUT_RE` 闭式清单（`*.nix`、`flake.lock`、`meta.json`、`packages/`、`dotfiles/`——后两者系被 Nix 路径字面量引用进 store 的非 Nix 文件；今后新增此类引用必须同步扩此清单，漏列=误放行）；删除推送（local 全零）放行，新分支（remote 全零）与 diff 失败（sha 缺失）保守跑全量（宁多跑勿漏跑）；全不命中打印说明放行，任一命中 exec 五输出并行求值。③测试：roam-functions 的 cmd_check 断言改次序无关（桩日志排序比对 + 汇报头行次序断言 + 并行预告行——后台子壳竞争写日志），73→75；新增 `tests/prepush-gate.sh` 18 例（git 函数桩 + stdin 协议注入；方向性断言：9 类求值输入命中拦下、近失名/纯文档放行、删除放行且不消费 diff、新分支与 sha 缺失保守拦下、空差异/空 stdin 放行、多 ref 任一命中即拦）；入 run-all → flake checks（shellcheck 关卡 `tests/*.sh` glob 自动覆盖新文件）。④文档同步：roam.sh 头注/usage、docs/roam.md（check 条目 + 测试段补 prepush-gate）、AGENTS.md（CI 段门控描述、目录树两行、双守卫提醒）、README 三处。
 
-验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` 全过；shellcheck 零告警（`nix shell nixpkgs#shellcheck` 直跑全量改动脚本，沙箱侧另经 shellcheck-scripts 关卡）；run-all 123/123（roam-functions 75 + prepush-gate 18 新增 + 补全 19 + 脚手架 6 + repo-references 5）；钩子实机两路径——跳过路径（0742967→8f7ac9f，纯 docs/VALIDATION.md 增量）0.01s rc=0 打印放行说明；检查路径（b960794→0742967，含 packages/ 等）门控放行进入五输出并行求值 rc=0，逐目标输出/警告正确按目标归组、汇报次序=输入次序。计时：串行基线（改动前、暖缓存干净树）115s → 并行冷缓存（改动后、脏树）83s → 并行暖缓存 63s（-45%；余下受最慢单个求值支配——桌面 toplevel，Amdahl 上限；并发期 Nix 报 git-tree 输入锁等待与 eval-cache busy（ignored），均被正确处理）。`nix flake check` rc=0（shellcheck-scripts + roam-unit-tests 沙箱双确认）；activationPackage 构建 rc=0（roam.sh 过 writeShellApplication 门）；`git diff --check` 干净。
+验证（本机 Fedora 44 / WSL2 standalone x86_64，用户 xuqihao）：`bash -n` 全过；shellcheck 零告警（`nix shell nixpkgs#shellcheck` 直跑全量改动脚本，沙箱侧另经 shellcheck-scripts 关卡）；run-all 123/123（roam-functions 75 + prepush-gate 18 新增 + 补全 19 + 脚手架 6 + repo-references 5）；钩子实机两路径——跳过路径（9226b47→79817c3，纯 docs/VALIDATION.md 增量）0.01s rc=0 打印放行说明；检查路径（70fd370→9226b47，含 packages/ 等）门控放行进入五输出并行求值 rc=0，逐目标输出/警告正确按目标归组、汇报次序=输入次序。计时：串行基线（改动前、暖缓存干净树）115s → 并行冷缓存（改动后、脏树）83s → 并行暖缓存 63s（-45%；余下受最慢单个求值支配——桌面 toplevel，Amdahl 上限；并发期 Nix 报 git-tree 输入锁等待与 eval-cache busy（ignored），均被正确处理）。`nix flake check` rc=0（shellcheck-scripts + roam-unit-tests 沙箱双确认）；activationPackage 构建 rc=0（roam.sh 过 writeShellApplication 门）；`git diff --check` 干净。
 
 过程教训两条：①新文件不 `git add -N` 就跑 flake check——git 类 flake 源不含未跟踪文件，沙箱里 run-all 找不到 tests/prepush-gate.sh 而失败，外显 signature 为「roam-unit-tests 失败 + shellcheck-scripts cancelled」（与既有老规矩同因，补记 signature 以便下次直接识别）；②验证命令勿把 `nix flake check` 管道接 `tail`——无 pipefail 时链上 rc 取自 tail，失败会被随后的 echo 假确认（首跑即如此，靠 ❓cancelled 线索识破后修正重跑）。
 
@@ -346,9 +350,9 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 未验证：真实 push 触发钩子（推送仍手动；本机已启用 core.hooksPath，下次推送即实证，异常则记新条）；CI 实跑（同前，Gitee 同步后事后层）；macOS / aarch64 实机（同前）；Gitee 旧名重定向失效场景（外部依赖不可制造——关卡+文档已把暴露面收敛到 4 处 alternation 与历史记录）。
 
-## 2026-09-28 NixOS 侧 roam switch 实机首跑——预检/安装位/断言三项遗留关闭（检出 ≥b9c3cea 的 roam 变更实机激活，NixOS-WSL 26.11 x86_64，主机 wsl；记录自用户实跑输出转记）
+## 2026-09-28 NixOS 侧 roam switch 实机首跑——预检/安装位/断言三项遗留关闭（检出 ≥836e59f 的 roam 变更实机激活，NixOS-WSL 26.11 x86_64，主机 wsl；记录自用户实跑输出转记）
 
-范围：NixOS-WSL 主机对含 hostname 预检（a1401d0）与 gc 折入（200e441）的检出执行 `roam switch`。实跑 rc=0（run_logged 的「完成」仅在 rc=0 打印）：19 个派生构建、12 路径经 NJU 镜像替换、激活与 bootloader 登记完成、全程无 stc exit 4（getty mask 与 linger 在位——闭包可见 `unit-console-getty.service-disabled`）；dix 差异 2110→2110 路径（+12/-12、+4.69 KiB，与 standalone 侧同批切换同幅 = 同一 roam 包内容）；`ShellCheck-0.11.0` 被取入构建环境——writeShellApplication 门在 NixOS 侧真实执行（三个 roam.drv：文本装配 + 检查 + symlinkJoin 外壳）。
+范围：NixOS-WSL 主机对含 hostname 预检（e779fa8）与 gc 折入（8f6a2ee）的检出执行 `roam switch`。实跑 rc=0（run_logged 的「完成」仅在 rc=0 打印）：19 个派生构建、12 路径经 NJU 镜像替换、激活与 bootloader 登记完成、全程无 stc exit 4（getty mask 与 linger 在位——闭包可见 `unit-console-getty.service-disabled`）；dix 差异 2110→2110 路径（+12/-12、+4.69 KiB，与 standalone 侧同批切换同幅 = 同一 roam 包内容）；`ShellCheck-0.11.0` 被取入构建环境——writeShellApplication 门在 NixOS 侧真实执行（三个 roam.drv：文本装配 + 检查 + symlinkJoin 外壳）。
 
 就此关闭的未验证项：①`nixos_preflight` 实机执行（P3 遗留——cmd_switch NixOS 分支必经预检方到 nh，rc=0 即通过）；②NixOS 侧安装位的 roam 变更激活（自 P1 批起多笔「该侧下次 switch 生效」——WSL 侧安装的 roam 自此含守卫分发、gc 折入、预检全部内容）；③hostnameGuard 断言过真实 NixOS toplevel 构建（此前仅 /tmp 负例与求值层证据）。
 
@@ -358,7 +362,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-28 NixOS 侧复验 gc 折入 + gc 用例宿主漂移修复（tests/roam-functions.sh，NixOS-WSL 26.11 / wsl，本机）
 
-背景：gc 折入（200e441）的验证在 Fedora/WSL standalone 完成，上条记录留了「NixOS 分支的 gc（NixOS 自动 --system 的真机行为）——NixOS 侧下次顺手」未验证项；本次在 NixOS-WSL 主机上复验即补此层。
+背景：gc 折入（8f6a2ee）的验证在 Fedora/WSL standalone 完成，上条记录留了「NixOS 分支的 gc（NixOS 自动 --system 的真机行为）——NixOS 侧下次顺手」未验证项；本次在 NixOS-WSL 主机上复验即补此层。
 
 发现：真机复跑 run-all 77 例中 1 例**假失败**——`gc：无 --system 不调 sudo` 隐含假设宿主非 NixOS：`cmd_gc` 经 `is_nixos()`（探测 `/etc/NIXOS`）在 NixOS 上自动 `system_gc=true`，桩 sudo 被真实调用。用例语义随运行宿主漂移，属测试缺陷非 roam 缺陷（roam.sh 侧行为完全符合设计）。
 
@@ -382,7 +386,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-28 双推后自查：四处修正 + 脚手架端到端模拟（AGENTS.md + packages/roam-completion.bash + flake.nix + README.md，Fedora 44 / WSL2 standalone，本机）
 
-自查发现并修正：①AGENTS.md 架构图四安装点之一的 `modules/desktop/programs.nix` 系 2026-09-26 拆档（4342a57）前的残留，实际导入点是 `modules/desktop/core.nix`——P2 搬运未扫到该节，属前史问题非当日引入；②roam-completion.bash 头注释「改动后手动自查」在 fc18a739 建关卡后已失准——当日只改了 roam.nix 的同义注释，漏了补全文件自身头部，改指 shellcheck-scripts 关卡；③shellcheck-scripts 命令行补入 `packages/roam.sh`（writeShellApplication 构建门之外的第二重覆盖，`nix flake check` 单独跑也能拦住）；④README `roam switch` 说明补 NixOS 预检一句。
+自查发现并修正：①AGENTS.md 架构图四安装点之一的 `modules/desktop/programs.nix` 系 2026-09-26 拆档（c012431）前的残留，实际导入点是 `modules/desktop/core.nix`——P2 搬运未扫到该节，属前史问题非当日引入；②roam-completion.bash 头注释「改动后手动自查」在 fc18a739 建关卡后已失准——当日只改了 roam.nix 的同义注释，漏了补全文件自身头部，改指 shellcheck-scripts 关卡；③shellcheck-scripts 命令行补入 `packages/roam.sh`（writeShellApplication 构建门之外的第二重覆盖，`nix flake check` 单独跑也能拦住）；④README `roam switch` 说明补 NixOS 预检一句。
 
 脚手架端到端模拟（补 P3「未验证」里最近的一层）：/tmp 完整副本 + `cp -r hosts/_template hosts/newhost` + sed 替换占位符 + 把 bootstrap/nixos.sh heredoc 打印的样例块 A（hostnameGuard 随 sed 变为 newhost）按用户粘贴路径插入 flake.nix → `.#nixosConfigurations.newhost.config.networking.hostName` 求值 = "newhost"、toplevel drvPath 求值 OK（hostnameGuard 断言通过）——「新主机脚手架 → 粘贴样例 → 求值」整链实证。过程两次踩到已知/新知：Git Flake 纯度要求对新 hosts/ 目录 `git add -N`（VALIDATION 早有记载）；本机 nix-instantiate `--parse`（Determinate Nix 3.22.2）实际做变量解析而非纯语法解析——样例块单独解析须完整绑定 outputs 函数头变量，改为真插 flake 求值，验证反而更强。
 
@@ -420,7 +424,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-28 编辑残留清理 + roam 单测/补全 harness 进仓（packages/roam.{nix,sh} + tests/ + flake.nix + eval.yml，Fedora 44 / WSL2 standalone，本机）
 
-改动：两部分。①残留——roam.sh NixOS 分支的 nh 缺失提示改指 cli-dev 共享列表（原提示仍指向 2026-09-28 已退役的 `programs.nh.enable`，standalone 分支此前已改对）；flake.nix 删除 electron-41.9.1 近逐字重复的注释块（保留带探针验证细节与 nixos-base 指针的一份）；VALIDATION.md 复原 4e7a8af 条目失落的 `##` 标题行（与 git 历史逐字比对确认仅缺该行）。②测试基建——roam.sh 分发段加 `${BASH_SOURCE[0]} = $0` 执行守卫（source 加载不分发、直跑照旧），`system_generation_ids` 的 profile 目录可用 `ROAM_SYSTEM_PROFILES_DIR` 重定向；新增 `tests/`：roam-functions.sh（纯函数单测 29 例——meta_username 好坏样本、standalone_target 架构矩阵（uname 打桩、kernel 捕获期重 source）、nixos_output、load_hm_generations（PATH 注入假 home-manager 喂 fixture，含 rollback 同路径重复世代语义）、system_generation_ids（临时目录 + 噪声过滤）、choose_inputs（fixture flake.lock + stdin 管道，编号/名称/逗号混用/越界拒绝））+ completion-harness.sh（模拟 COMP_WORDS/COMP_CWORD 直调 `_roam` 19 例；世代号宿主相关只断言旗标，update 输入名读真 flake.lock 只做成员断言）+ run-all.sh 汇总 + fixtures/；flake 新增 `checks.{x86_64,aarch64}-linux`（显式两系统，不做 forAllSystems）：`shellcheck-scripts`（补全文件与 tests/*.sh 静态关卡——堵上 writeShellApplication 门外的洞）与 `roam-unit-tests`（`ROAM_TEST_REPO` 指向 store 副本跑 run-all）；CI eval.yml 加第三步 `nix flake check`。AGENTS/README/roam.nix 注释同步。
+改动：两部分。①残留——roam.sh NixOS 分支的 nh 缺失提示改指 cli-dev 共享列表（原提示仍指向 2026-09-28 已退役的 `programs.nh.enable`，standalone 分支此前已改对）；flake.nix 删除 electron-41.9.1 近逐字重复的注释块（保留带探针验证细节与 nixos-base 指针的一份）；VALIDATION.md 复原 eb71cdc 条目失落的 `##` 标题行（与 git 历史逐字比对确认仅缺该行）。②测试基建——roam.sh 分发段加 `${BASH_SOURCE[0]} = $0` 执行守卫（source 加载不分发、直跑照旧），`system_generation_ids` 的 profile 目录可用 `ROAM_SYSTEM_PROFILES_DIR` 重定向；新增 `tests/`：roam-functions.sh（纯函数单测 29 例——meta_username 好坏样本、standalone_target 架构矩阵（uname 打桩、kernel 捕获期重 source）、nixos_output、load_hm_generations（PATH 注入假 home-manager 喂 fixture，含 rollback 同路径重复世代语义）、system_generation_ids（临时目录 + 噪声过滤）、choose_inputs（fixture flake.lock + stdin 管道，编号/名称/逗号混用/越界拒绝））+ completion-harness.sh（模拟 COMP_WORDS/COMP_CWORD 直调 `_roam` 19 例；世代号宿主相关只断言旗标，update 输入名读真 flake.lock 只做成员断言）+ run-all.sh 汇总 + fixtures/；flake 新增 `checks.{x86_64,aarch64}-linux`（显式两系统，不做 forAllSystems）：`shellcheck-scripts`（补全文件与 tests/*.sh 静态关卡——堵上 writeShellApplication 门外的洞）与 `roam-unit-tests`（`ROAM_TEST_REPO` 指向 store 副本跑 run-all）；CI eval.yml 加第三步 `nix flake check`。AGENTS/README/roam.nix 注释同步。
 
 沙箱实测发现两条（已固化进代码注释）：①构建沙箱 PATH 上的 `bash` 是 stdenv 极简构建（无 progcomp，`compgen` 不可用；沙箱外同一锁定 rev 的 bash-interactive 正常）——roam-unit-tests 的 nativeBuildInputs 须带 `bashInteractive`；②沙箱无 `/usr/bin/env`，stub 脚本 shebang 以 `$BASH` 绝对路径生成，固定 `#!/usr/bin/env bash` 在 flake checks 里跑不起来。
 
@@ -430,11 +434,11 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-28 NixOS 侧 roam 四项遗留实测 + 世代号读取纠偏（packages/roam.sh + packages/roam-completion.bash，NixOS-WSL 26.11 x86_64，本机 wsl）
 
-复验范围：前四条「未验证」清单的 NixOS 部分——补全实机效果（559861a）、nh 经 cli-dev 落系统安装位（b779f51）、status/doctor/rollback 的 NixOS 路径（fb20037）、nrs/hms 在新 bashrc 消失（8a989c7）。
+复验范围：前四条「未验证」清单的 NixOS 部分——补全实机效果（c53d33e）、nh 经 cli-dev 落系统安装位（6a19a14）、status/doctor/rollback 的 NixOS 路径（4be19c6）、nrs/hms 在新 bashrc 消失（a7d835a）。
 
-实测纠偏（改动 ba6947f，两处）：① NixOS 侧世代号读取的三个消费点（doctor 计数、`rollback --list`、补全）原走 `nix-env -p /nix/var/nix/profiles/system --list-generations`——非 root 因取不到 profile 锁（`system.lock` Permission denied）**静默列空**（doctor 退化为「无法列出」warn、`--list` 空表、补全只剩旗标）；且补全分支的 sed 锚 `^[0-9]` 对 nix-env 前导空格右对齐的输出**永不匹配**，root 也拿不到号（standalone 走 home-manager 分支故未暴露）。改为 glob `/nix/var/nix/profiles/system-*-link` 直读：profiles 目录与链接全局可读，日期取链接自身 mtime（GNU stat 不跟随，与 nix-env 同源逐字一致），当前世代以 `readlink system` 为准；roam.sh 抽 `system_generation_ids()` 供 doctor/`--list` 共用，补全文件内同款小循环（入口级重复系惯例）。② 补全首版修法 `${cgen##*/system-}` 对无斜杠的 `system-15-link` 永不匹配（模式含字面 `/`）→ 当前世代漏排除，单步复现后改 basename + 整串比较。
+实测纠偏（改动 4cfaf37，两处）：① NixOS 侧世代号读取的三个消费点（doctor 计数、`rollback --list`、补全）原走 `nix-env -p /nix/var/nix/profiles/system --list-generations`——非 root 因取不到 profile 锁（`system.lock` Permission denied）**静默列空**（doctor 退化为「无法列出」warn、`--list` 空表、补全只剩旗标）；且补全分支的 sed 锚 `^[0-9]` 对 nix-env 前导空格右对齐的输出**永不匹配**，root 也拿不到号（standalone 走 home-manager 分支故未暴露）。改为 glob `/nix/var/nix/profiles/system-*-link` 直读：profiles 目录与链接全局可读，日期取链接自身 mtime（GNU stat 不跟随，与 nix-env 同源逐字一致），当前世代以 `readlink system` 为准；roam.sh 抽 `system_generation_ids()` 供 doctor/`--list` 共用，补全文件内同款小循环（入口级重复系惯例）。② 补全首版修法 `${cgen##*/system-}` 对无斜杠的 `system-15-link` 永不匹配（模式含字面 `/`）→ 当前世代漏排除，单步复现后改 basename + 整串比较。
 
-验证（实机，用户 xuqihao）：两文件 `bash -n` + ShellCheck 0.11.0 零告警（补全文件绕过构建门，按其头部注释手工查）；切换前五输出求值全过（`roam check` 缺省 + 四显式目标，CI 第一层）；三次 `roam switch` 真 rc=0——gen 15（pd9ysa7c…，落 559861a；dix roam ×3、+11/-9、+5.85 KiB）、gen 16（szp6g747…，落 ba6947f；+12/-12、+1.91 KiB）、回滚后复切（同路径复用 system-16-link 不新增世代号，与既往记载一致），均走完激活+bootloader 全链、switch-*.log 带头部落盘。安装位实测：补全文件随 system sw 落位（`/run/current-system/sw/share/bash-completion/completions/roam` → symlinkJoin 外壳）；全新干净登录 shell（`env -i … bash --login -i`）内 `_comp_complete_load roam` 懒加载成 `complete -F _roam roam`，13 用例 harness 全过——一级八子命令+help、`ch`/`-` 前缀、check 旗标+五目标+旗标后补目标、update 经 jq 实时读 flake.lock 补六输入名、rollback 旗标+**用户态**世代号 6–15（当前 16 排除）、gc 四旗标与 `--older-than` 取值、switch/status/未知子命令空补全；`nh` 于 `/run/current-system/sw/bin/nh`（经 profiles/cli.nix 接线，`programs.nh.enable` 已删后两代均正常）；`type nrs`/`type hms` 未定义、`ll` 存留、HM 生成 bashrc 零 nrs/hms 残留。status NixOS 分支：漂移（改动未切）→ 一致（切换后）两态均实测；doctor 用户态全绿（927G 余量、11 世代、六镜像 HTTP 200/301/302、漂移一致、systemd 零失败单元；0 失败 0 提醒 rc=0，doctor-*.log 落盘）；`roam rollback --list` 用户态完整表（日期与 nix-env 同源、当前标记）；`roam rollback --yes` 实机 rc=0——`sudo nixos-rebuild switch --rollback` 全链（profile 16→15、激活完成、`/run/booted-system` 不动属预期——下次 WSL 重开按 profile 引导，复切后已指回 gen 16），rollback-*.log 带头部；回滚后 status=漂移（NixOS 分支为两态判定，「已回滚」三态系 standalone 专属——HM activate 重登记世代号的语义在 NixOS 无对应物）。终态：profile=system-16-link、运行=检出、status=一致、零失败单元。
+验证（实机，用户 xuqihao）：两文件 `bash -n` + ShellCheck 0.11.0 零告警（补全文件绕过构建门，按其头部注释手工查）；切换前五输出求值全过（`roam check` 缺省 + 四显式目标，CI 第一层）；三次 `roam switch` 真 rc=0——gen 15（pd9ysa7c…，落 c53d33e；dix roam ×3、+11/-9、+5.85 KiB）、gen 16（szp6g747…，落 4cfaf37；+12/-12、+1.91 KiB）、回滚后复切（同路径复用 system-16-link 不新增世代号，与既往记载一致），均走完激活+bootloader 全链、switch-*.log 带头部落盘。安装位实测：补全文件随 system sw 落位（`/run/current-system/sw/share/bash-completion/completions/roam` → symlinkJoin 外壳）；全新干净登录 shell（`env -i … bash --login -i`）内 `_comp_complete_load roam` 懒加载成 `complete -F _roam roam`，13 用例 harness 全过——一级八子命令+help、`ch`/`-` 前缀、check 旗标+五目标+旗标后补目标、update 经 jq 实时读 flake.lock 补六输入名、rollback 旗标+**用户态**世代号 6–15（当前 16 排除）、gc 四旗标与 `--older-than` 取值、switch/status/未知子命令空补全；`nh` 于 `/run/current-system/sw/bin/nh`（经 profiles/cli.nix 接线，`programs.nh.enable` 已删后两代均正常）；`type nrs`/`type hms` 未定义、`ll` 存留、HM 生成 bashrc 零 nrs/hms 残留。status NixOS 分支：漂移（改动未切）→ 一致（切换后）两态均实测；doctor 用户态全绿（927G 余量、11 世代、六镜像 HTTP 200/301/302、漂移一致、systemd 零失败单元；0 失败 0 提醒 rc=0，doctor-*.log 落盘）；`roam rollback --list` 用户态完整表（日期与 nix-env 同源、当前标记）；`roam rollback --yes` 实机 rc=0——`sudo nixos-rebuild switch --rollback` 全链（profile 16→15、激活完成、`/run/booted-system` 不动属预期——下次 WSL 重开按 profile 引导，复切后已指回 gen 16），rollback-*.log 带头部；回滚后 status=漂移（NixOS 分支为两态判定，「已回滚」三态系 standalone 专属——HM activate 重登记世代号的语义在 NixOS 无对应物）。终态：profile=system-16-link、运行=检出、status=一致、零失败单元。
 
 未验证：WSL 补救提示分支（仅 nh 失败路径触发）；真实键盘 TAB（harness 模拟 COMP_WORDS/COMP_CWORD，与 standalone 侧验证同界）；desktop 输出实机构建/激活（需桌面主机）；darwin/aarch64 实机；CI 在本批提交上的运行；`roam rollback N` 显式世代号路径（与 `--rollback` 同命令族，未另测）。
 
@@ -478,11 +482,11 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-28 roam switch NixOS 分支（nh 路径）实机首跑通过（packages/roam.sh，NixOS-WSL 26.11 x86_64，本机 wsl）
 
-复验：4e7a8af 落地时记「未验证：NixOS 分支（nh 路径与 WSL 补救提示触发）」——当时本机跑在 Fedora WSL standalone；今日本机为 NixOS-WSL 26.11（hostname `wsl` → `.#wsl` 输出），补上该分支实机首跑，并首次实机覆盖 NixOS 侧安装位（`profiles/cli.nix` → systemPackages → `/run/current-system/sw/bin/roam`）。本机存在多个 WSL 发行版，验证环境以本条为准。
+复验：eb71cdc 落地时记「未验证：NixOS 分支（nh 路径与 WSL 补救提示触发）」——当时本机跑在 Fedora WSL standalone；今日本机为 NixOS-WSL 26.11（hostname `wsl` → `.#wsl` 输出），补上该分支实机首跑，并首次实机覆盖 NixOS 侧安装位（`profiles/cli.nix` → systemPackages → `/run/current-system/sw/bin/roam`）。本机存在多个 WSL 发行版，验证环境以本条为准。
 
-验证（检出 3a614b4 干净树，用户 xuqihao 非 root）：前置健康——`systemctl is-system-running` = running、`user@1000.service` active（95ca45b linger 生效）、无 failed 单元；`roam info` 只读探测逐项正确（NixOS 26.11 / WSL=是 / x86_64 / 用户守卫通过 meta.json xuqihao / switch 目标 `nh os switch --diff always .` → `nixosConfigurations.wsl`）；实跑 `roam switch` 真 rc=0（`cmd; echo $?` 直取，不经管道）——nh 构建缓存命中（4s），nvd 差异 2108→2108 路径零变更（工作树与当前世代同源，符合预期），激活 + bootloader 登记，`system` profile 指向本次构建的 as55pfmzz… 世代（`system -> system-11-link`，链接 mtime 与运行时刻一致；同路径重建不新增世代号）；全程无 stc exit 4。
+验证（检出 dd26edb 干净树，用户 xuqihao 非 root）：前置健康——`systemctl is-system-running` = running、`user@1000.service` active（adac1f3 linger 生效）、无 failed 单元；`roam info` 只读探测逐项正确（NixOS 26.11 / WSL=是 / x86_64 / 用户守卫通过 meta.json xuqihao / switch 目标 `nh os switch --diff always .` → `nixosConfigurations.wsl`）；实跑 `roam switch` 真 rc=0（`cmd; echo $?` 直取，不经管道）——nh 构建缓存命中（4s），nvd 差异 2108→2108 路径零变更（工作树与当前世代同源，符合预期），激活 + bootloader 登记，`system` profile 指向本次构建的 as55pfmzz… 世代（`system -> system-11-link`，链接 mtime 与运行时刻一致；同路径重建不新增世代号）；全程无 stc exit 4。
 
-未验证：WSL 补救提示分支（仅 nh 失败时打印，成功路径不经过）；`roam switch` 额外参数透传未另测（命令串与 nrs 逐字一致已在 4e7a8af 记录）。
+未验证：WSL 补救提示分支（仅 nh 失败时打印，成功路径不经过）；`roam switch` 额外参数透传未另测（命令串与 nrs 逐字一致已在 eb71cdc 记录）。
 
 ## 2026-09-28 roam update 支持选择输入（packages/roam.sh，Fedora 44 / WSL2 standalone，本机）
 
@@ -510,7 +514,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 未验证：本机 `hms` 激活（用户步骤）；aarch64-linux / aarch64-darwin 构建（共享同一 HM 模块，无平台分支，jq/curl 两目标皆有）；NixOS 实机上的渲染（jq 走 systemPackages 的 secure_path 内路径，fastfetch 由用户 shell 调用，PATH 无虞）。
 
-修正（同日，b2d3320 后用户反馈「没对齐」）：首版 Location 行的 `keyIcon` 经 hexdump 复核是**空字符串**（`22 22`，写入时图标字符在透传中丢失），`{icon}` 渲染为空 → 标签格比各行窄一列、整行错位。改用占位符 + `printf '\U000f034e'` 注入 `md-map_marker`（U+F034E，UTF-8 `f3 b0 8d 8e`，与现役 U+F0A79 同 MD 区段族）并 hexdump 校验字节后，重建重渲——各行标签格结构逐字节同构（`│ ` + 4 字节图标 + 2 空格 + 22 宽名称 + `│`），对齐恢复。教训入库：**Nix 文件里的 Nerd Font 图标必须 hexdump 验字节**，渲染缺失不可依赖文本透传；bash `printf '\uXXXX'` 只吃 4 位十六进制，5 位码点须用 `\U000xxxxx`。
+修正（同日，1375c92 后用户反馈「没对齐」）：首版 Location 行的 `keyIcon` 经 hexdump 复核是**空字符串**（`22 22`，写入时图标字符在透传中丢失），`{icon}` 渲染为空 → 标签格比各行窄一列、整行错位。改用占位符 + `printf '\U000f034e'` 注入 `md-map_marker`（U+F034E，UTF-8 `f3 b0 8d 8e`，与现役 U+F0A79 同 MD 区段族）并 hexdump 校验字节后，重建重渲——各行标签格结构逐字节同构（`│ ` + 4 字节图标 + 2 空格 + 22 宽名称 + `│`），对齐恢复。教训入库：**Nix 文件里的 Nerd Font 图标必须 hexdump 验字节**，渲染缺失不可依赖文本透传；bash `printf '\uXXXX'` 只吃 4 位十六进制，5 位码点须用 `\U000xxxxx`。
 
 
 
@@ -522,15 +526,15 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-26 gnome-extension-manager 归位 desktop-managers + AGENTS.md texlive 修正（desktop 侧模块 + 文档，Fedora 44 / WSL2 standalone，本机）
 
-改动：① `gnome-extension-manager` 自 `modules/desktop/session.nix` 移至 `modules/desktop/desktop-managers.nix`（GNOME 软件段，与 gnomeExtensions.\* 同居，仍 pkgs-stable 同实例）——该工具管理 GNOME Shell 扩展，lite 档不 import desktop-managers（无 GNOME Shell），留在 session.nix 属闲置；全量桌面包集合不变，lite 实际减此一包。② 修正 d8d1ec3 的 AGENTS.md 遗留 stale 描述：dev.nix bullet 删去 "texlive scheme-full"（实际已在 office.nix），office.nix bullet 补记 texlive 及「lite 含 office 档故仍携带 TeX」。
+改动：① `gnome-extension-manager` 自 `modules/desktop/session.nix` 移至 `modules/desktop/desktop-managers.nix`（GNOME 软件段，与 gnomeExtensions.\* 同居，仍 pkgs-stable 同实例）——该工具管理 GNOME Shell 扩展，lite 档不 import desktop-managers（无 GNOME Shell），留在 session.nix 属闲置；全量桌面包集合不变，lite 实际减此一包。② 修正 3a4a606 的 AGENTS.md 遗留 stale 描述：dev.nix bullet 删去 "texlive scheme-full"（实际已在 office.nix），office.nix bullet 补记 texlive 及「lite 含 office 档故仍携带 TeX」。
 
-验证（本机 eval-only，未构建/激活）：求值本身解析了两个被改模块。编辑前后对比——desktop `environment.systemPackages` 长度 635→635、gnome-extension-manager 计数 1→1（改由 desktop-managers.nix 提供）；nixos toplevel drvPath qn3r7rfw… → vi9gysi2…（如期移动，列表拼接顺序变化，与 4342a57 同性质）；wsl toplevel drvPath nfblrivv9… 逐字节不变（桌面模块不进 WSL 闭包）。lite 无 flake 输出、未直接求值：其 import 列表为 profiles/desktop.nix 的严格子集，全部模块已被本次 desktop 求值覆盖。
+验证（本机 eval-only，未构建/激活）：求值本身解析了两个被改模块。编辑前后对比——desktop `environment.systemPackages` 长度 635→635、gnome-extension-manager 计数 1→1（改由 desktop-managers.nix 提供）；nixos toplevel drvPath qn3r7rfw… → vi9gysi2…（如期移动，列表拼接顺序变化，与 c012431 同性质）；wsl toplevel drvPath nfblrivv9… 逐字节不变（桌面模块不进 WSL 闭包）。lite 无 flake 输出、未直接求值：其 import 列表为 profiles/desktop.nix 的严格子集，全部模块已被本次 desktop 求值覆盖。
 
 未验证：desktop/lite toplevel 构建（CI 亦仅 eval）；desktop 实机激活；lite 闭包实际少一包的磁盘收益（数 MB 级，可忽略）。
 
-## 2026-09-26 AGENTS.md 补记 linger，对齐 95ca45b（docs-only，Fedora 44 / WSL2 standalone，本机）
+## 2026-09-26 AGENTS.md 补记 linger，对齐 adac1f3（docs-only，Fedora 44 / WSL2 standalone，本机）
 
-纯文档：95ca45b 引入 `users.users.<username>.linger = true` 时未同步 AGENTS.md——NixOS-WSL 段的 stc-exit-4 记载补上第二个来源（WSL boot 无登录会话 → user@1000 不自启 → `/run/user/1000/bus` 缺失 → stc 用户单元重载失败）及其根治（声明式 linger）与放置理由（桌面机登录即起用户管理器，故留在 hosts/wsl）。无 Nix 改动，无需重建；`git diff --check` 干净。
+纯文档：adac1f3 引入 `users.users.<username>.linger = true` 时未同步 AGENTS.md——NixOS-WSL 段的 stc-exit-4 记载补上第二个来源（WSL boot 无登录会话 → user@1000 不自启 → `/run/user/1000/bus` 缺失 → stc 用户单元重载失败）及其根治（声明式 linger）与放置理由（桌面机登录即起用户管理器，故留在 hosts/wsl）。无 Nix 改动，无需重建；`git diff --check` 干净。
 
 ## 2026-09-26 wsl 重开复验：进 gen 9、user@1000 自启、冷启动 nrs exit 0（NixOS-WSL 26.11，本机 wsl）
 
@@ -548,7 +552,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 未验证：`wsl --shutdown` 重开后 user@1000 自启 + 实机进 gen 9（Windows 侧动作，机制上 linger 标记由 logind 开机消费，风险低）；linger 常驻的用户级单元内存开销（单用户 WSL，预期可忽略）；desktop 侧不受影响（未改动其链路，求值面 wsl-only）；CI。
 
-## 2026-09-26 wsl 实机复测 ea68434：mask 生效，补 user@1000 前置后 nrs exit 0、gen 8 落地（NixOS-WSL 26.11，本机 wsl）
+## 2026-09-26 wsl 实机复测 298b169：mask 生效，补 user@1000 前置后 nrs exit 0、gen 8 落地（NixOS-WSL 26.11，本机 wsl）
 
 无代码改动；对上一条（补 mask autovt@tty1）的实机复测，承接其「未验证」清单。
 
@@ -558,17 +562,17 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-26 wsl：补 mask autovt@tty1，根治 nrs 不建系统世代（Fedora 44 / WSL2 standalone，本机）
 
-改动：`hosts/wsl/default.nix` 在既有 `getty@tty1.service` mask（9-18，57af69e）之外补 `systemd.units."autovt@tty1.service".enable = false`。承接上条根因链：9-26 事故唯一失败单元 `autovt@tty1.service` 与 `getty@tty1.service` 是同一模板（`getty@.service`，`autovt@.service` 为其别名）的**不同实例名**，mask 互不覆盖——9-18 只 mask 了前者，故未防住。`enable = false` 语义对照所锁 nixpkgs（26.11.20260923.4975466）源码核验：`nixos/lib/systemd-lib.nix` 对 disabled 单元生成 `…-disabled` derivation（内容 `ln -s /dev/null`；选项文档原话即 "prevent specific template instances … from being started"），`generateUnits` 将其装入 /etc/systemd/system——该目录整体生成，`environment.etc` 逐条探针查不到 tty 条目属正常。mask 后单元无法进入 failed 态 → stc 不再 exit 4 → nh（nrs）得以走到「设 profile 建世代」一步。
+改动：`hosts/wsl/default.nix` 在既有 `getty@tty1.service` mask（9-18，34cd626）之外补 `systemd.units."autovt@tty1.service".enable = false`。承接上条根因链：9-26 事故唯一失败单元 `autovt@tty1.service` 与 `getty@tty1.service` 是同一模板（`getty@.service`，`autovt@.service` 为其别名）的**不同实例名**，mask 互不覆盖——9-18 只 mask 了前者，故未防住。`enable = false` 语义对照所锁 nixpkgs（26.11.20260923.4975466）源码核验：`nixos/lib/systemd-lib.nix` 对 disabled 单元生成 `…-disabled` derivation（内容 `ln -s /dev/null`；选项文档原话即 "prevent specific template instances … from being started"），`generateUnits` 将其装入 /etc/systemd/system——该目录整体生成，`environment.etc` 逐条探针查不到 tty 条目属正常。mask 后单元无法进入 failed 态 → stc 不再 exit 4 → nh（nrs）得以走到「设 profile 建世代」一步。
 
 验证（本机 Fedora 44 / WSL2 / standalone x86_64，纯求值）：两单元 `enable` 均为 false，unit derivation 名分别为 `unit-getty-tty1.service-disabled` / `unit-autovt-tty1.service-disabled`（即 /dev/null mask 形态）；wsl toplevel drvPath 9xrn8rvx… → hjp8kpn9…（如期移动，求值通过）；`grep -rn hosts/wsl flake.nix profiles modules home` 证实该文件仅 `.#wsl` 输出可达，standalone x86_64 activationPackage 求值正常（7wqs57fs…，求值路径不经过该文件）。
 
 未验证：wsl 实机激活——须在 wsl 发行版内 `sudo nixos-rebuild switch --flake .#wsl`，同一条命令兼收止血（nixos-rebuild 先设 profile 后 stc，exit 4 不阻碍落世代）与根治（mask 随新世代进系统）；此后 `nrs` 是否恢复建世代、以及跨 `wsl --shutdown` 持久（建议重启前后各跑一次 nrs，核对 `/nix/var/nix/profiles/system` 是否推进）；system-units 目录实机构建产物（本轮以 derivation 名 + 源码推定，未构建）；CI。
 
-## 2026-09-26 wsl 实机激活 11b9c69..d8d1ec3 一批 + 发现 nh 不建系统世代（NixOS-WSL 26.11，本机 wsl）
+## 2026-09-26 wsl 实机激活 11b9c69..3a4a606 一批 + 发现 nh 不建系统世代（NixOS-WSL 26.11，本机 wsl）
 
-无代码改动；对近期一批提交（meta.json 单源、桌面求值修复、应用按档拆分、automation 下沉、desktop-lite——即 git 11b9c69..d8d1ec3，连同此前 c2e40c3 的 flake.lock 前滚）在 wsl 主机的首次实机激活。以 xuqihao 在 ~/nix-roam 运行 `nh os switch --diff always .`（= `nrs` 别名的实际命令；sudo 免密缓存）。
+无代码改动；对近期一批提交（meta.json 单源、桌面求值修复、应用按档拆分、automation 下沉、desktop-lite——即 git 11b9c69..3a4a606，连同此前 be402d2 的 flake.lock 前滚）在 wsl 主机的首次实机激活。以 xuqihao 在 ~/nix-roam 运行 `nh os switch --diff always .`（= `nrs` 别名的实际命令；sudo 免密缓存）。
 
-验证（实机）：构建 11 个派生全走缓存约 47s；nvd 代际 diff 正常（2101→2106 路径、15.9 GiB 持平、+57.8 MiB）；`/run/current-system` 5jr4dsnd…（26.11.20260911.eaad089）→ 1bfraah5…（26.11.20260923.4975466）；`home-manager-xuqihao.service` 重启成功（Result=success / exit 0）——与 9-19、9-24 两次 `user@1000` cgroup 故障不同，本轮用户管理器正常。7d8fdf8 的 WSL 自动维护首次落地：`nix-gc.timer`（OnCalendar=weekly + Persistent=true）、`nix-optimise.timer`（daily + Persistent=true）、`clean-user-generations.timer`（weekly）三新单元启动并排程（周任务次触发 2026-09-28 00:00）。
+验证（实机）：构建 11 个派生全走缓存约 47s；nvd 代际 diff 正常（2101→2106 路径、15.9 GiB 持平、+57.8 MiB）；`/run/current-system` 5jr4dsnd…（26.11.20260911.eaad089）→ 1bfraah5…（26.11.20260923.4975466）；`home-manager-xuqihao.service` 重启成功（Result=success / exit 0）——与 9-19、9-24 两次 `user@1000` cgroup 故障不同，本轮用户管理器正常。752eab6 的 WSL 自动维护首次落地：`nix-gc.timer`（OnCalendar=weekly + Persistent=true）、`nix-optimise.timer`（daily + Persistent=true）、`clean-user-generations.timer`（weekly）三新单元启动并排程（周任务次触发 2026-09-28 00:00）。
 
 发现一（exit 4 成因，第三次但与前两现不同）：stc 返回 4（成功带失败单元），唯一失败单元 `autovt@tty1.service`——disabled 的模板实例在切换中被拉起，agetty `--keep-baud tty1` 即被 SIGHUP 杀（start-limit-hit；本 boot 此前无运行记录），系 WSL 无真实 tty1 的固有现象，与仓库改动无关；另有用户单元重载的 dbus `$DISPLAY` 警告（非图形 WSL 会话固有，HM 系统级激活不受影响）。无需 `wsl --shutdown`。
 
@@ -586,7 +590,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-26 桌面应用清单按档拆分 + automation 下沉 nixos-base（Fedora 44 / WSL2 standalone，本机）
 
-改动（4342a57）：`programs.nix`（274 行）按档拆为 `modules/desktop/{core,browsers,dev,media,office,proxy,gaming}.nix` —— core 只收开源软件（firefox/chromium 留守，chrome/edge/servo 移 browsers；earlyoom/nix-ld 与 cli-dev 挂载随 core），dev 收编辑器/clang/texlive/distrobox 并接管 mysql（用户决策：mysql 是 dev 的），office 收办公 + 中文软件 + wechat overlay（overlay 随档，不 import 即整体不生效），gaming 收 steam 并归位 `hardware.graphics.enable32Bit`（profiles/desktop.nix 只留 enable）；`services.nix` 解散（earlyoom→core、mysql→dev、rustdesk 注释块→core）；`flatpak-linyaps.nix` 拆为 flatpak.nix（商店 + SJTU 镜像）与 desktop-managers.nix（GNOME/Plasma 备用 DE + 扩展 + dconf）。`profiles/desktop.nix` 改为按档 import 全集，hosts/nixos 行为不变；cli-dev/nixos-base/standalone-linux 中指向 programs.nix / flatpak-linyaps 的注释同步更新。
+改动（c012431）：`programs.nix`（274 行）按档拆为 `modules/desktop/{core,browsers,dev,media,office,proxy,gaming}.nix` —— core 只收开源软件（firefox/chromium 留守，chrome/edge/servo 移 browsers；earlyoom/nix-ld 与 cli-dev 挂载随 core），dev 收编辑器/clang/texlive/distrobox 并接管 mysql（用户决策：mysql 是 dev 的），office 收办公 + 中文软件 + wechat overlay（overlay 随档，不 import 即整体不生效），gaming 收 steam 并归位 `hardware.graphics.enable32Bit`（profiles/desktop.nix 只留 enable）；`services.nix` 解散（earlyoom→core、mysql→dev、rustdesk 注释块→core）；`flatpak-linyaps.nix` 拆为 flatpak.nix（商店 + SJTU 镜像）与 desktop-managers.nix（GNOME/Plasma 备用 DE + 扩展 + dconf）。`profiles/desktop.nix` 改为按档 import 全集，hosts/nixos 行为不变；cli-dev/nixos-base/standalone-linux 中指向 programs.nix / flatpak-linyaps 的注释同步更新。
 
 改动（本条目第二提交）：`automation.nix`（nix.gc / nix.optimise / clean-user-generations）下沉 `profiles/nixos-base.nix` —— 用户决策通过；WSL 从此启用自动 GC（每周 `--delete-older-than 2w` + 每日 optimise + 每周用户世代清理，WSL 下次 switch 首次落地），桌面为同值迁移。
 
@@ -596,7 +600,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-26 桌面求值修复：dms-shell 失效选项 + electron-41.9.1 允许条目（Fedora 44 / WSL2 standalone，本机）
 
-起因：c2e40c3「update flake」后 `.#nixos` 求值失败（CI eval 层同罪）。两层问题被 dms-shell 断言错误掩盖，逐层剥开：① `modules/desktop/niri.nix` 的 `programs.dms-shell.{enableDynamicTheming,enableAudioWavelength,enableVPN}` 已被上游移除（matugen/cava 入默认环境、网络后端运行时自检）；② 断言修掉后露出 insecure 拒绝——桌面闭包经 flake.nix `nixpkgsConfig` 管辖的实例引用 electron-41.9.1（EOL）。
+起因：be402d2「update flake」后 `.#nixos` 求值失败（CI eval 层同罪）。两层问题被 dms-shell 断言错误掩盖，逐层剥开：① `modules/desktop/niri.nix` 的 `programs.dms-shell.{enableDynamicTheming,enableAudioWavelength,enableVPN}` 已被上游移除（matugen/cava 入默认环境、网络后端运行时自检）；② 断言修掉后露出 insecure 拒绝——桌面闭包经 flake.nix `nixpkgsConfig` 管辖的实例引用 electron-41.9.1（EOL）。
 
 改动：niri.nix 删三个失效选项（沿 enableSystemMonitoring 先例留注释）；flake.nix `nixpkgsConfig` 增 `permittedInsecurePackages = [ "electron-41.9.1" ]`。`profiles/nixos-base.nix` 经探针验证无需改动——系统 unstable 实例仍只引用 electron-40.10.5（原条目原样保留；本轮曾误将其替换为 41.9.1 导致旧版消费者被拒，已回退）。两处探针：移除 flake.nix 条目 → 桌面求值失败（条目必需）；nixos-base 只留 40.10.5 → 桌面求值通过（无需 41.9.1）。
 
@@ -624,7 +628,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-24 cachix 社区缓存补入缓存列表（Fedora 44 / WSL2 standalone，本机）
 
-起因：`hms` 在本日 `update flake`（c2e40c3，15:28）后失败——`home/nixvim.nix` 启用的 `rainbow-delimiters` 要 `vimPlugins.rainbow-delimiters-nvim` v0.12.0，其源码 FOD 由 `fetchgit` 从 gitlab.com 取；本机网络下 `getent hosts gitlab.com` 只给被污染的 Cloudflare IPv6（2606:4700:90:…），`git ls-remote` 40s 无响应，构建退化为 reset + 两次 300s 超时后失败，级联 `vimplugin → neovim → nixvim → home-manager-path → home-manager-generation`。查因：该插件在 nixpkgs 中 `meta.license = unfree` → `meta.hydraPlatforms = [ ]`，官方 Hydra 不构建，源码与产物都不在 cache.nixos.org（实测该 FOD `/nix/store/cxyk83xx…-rainbow-delimiters.nvim` 在 cache.nixos.org 与 NJU/TUNA/USTC/SJTU 四个镜像全 404，而同一 store 随机取 3 个 `-source` FOD 均为 200；drv 的 `outputHash` 与社区缓存 narinfo 的 `NarHash: sha256:0zy93xwc…` 一致）。旁证：store 中已存在此前 substitute 来的 `2n5q…-vimplugin-rainbow-delimiters.nvim-0.12.0`，说明 flake 更新换掉 neovim/插件派生路径前并不需要现抓——本次是路径变化与上游不可达同时发生。另注：报错开头的 `options.json` 警告是求值期噪音（`nixosOptionsDoc` 把 nixpkgs 源码路径写进 JSON 字符串，string context 丢失），与本故障无关。
+起因：`hms` 在本日 `update flake`（be402d2，15:28）后失败——`home/nixvim.nix` 启用的 `rainbow-delimiters` 要 `vimPlugins.rainbow-delimiters-nvim` v0.12.0，其源码 FOD 由 `fetchgit` 从 gitlab.com 取；本机网络下 `getent hosts gitlab.com` 只给被污染的 Cloudflare IPv6（2606:4700:90:…），`git ls-remote` 40s 无响应，构建退化为 reset + 两次 300s 超时后失败，级联 `vimplugin → neovim → nixvim → home-manager-path → home-manager-generation`。查因：该插件在 nixpkgs 中 `meta.license = unfree` → `meta.hydraPlatforms = [ ]`，官方 Hydra 不构建，源码与产物都不在 cache.nixos.org（实测该 FOD `/nix/store/cxyk83xx…-rainbow-delimiters.nvim` 在 cache.nixos.org 与 NJU/TUNA/USTC/SJTU 四个镜像全 404，而同一 store 随机取 3 个 `-source` FOD 均为 200；drv 的 `outputHash` 与社区缓存 narinfo 的 `NarHash: sha256:0zy93xwc…` 一致）。旁证：store 中已存在此前 substitute 来的 `2n5q…-vimplugin-rainbow-delimiters.nvim-0.12.0`，说明 flake 更新换掉 neovim/插件派生路径前并不需要现抓——本次是路径变化与上游不可达同时发生。另注：报错开头的 `options.json` 警告是求值期噪音（`nixosOptionsDoc` 把 nixpkgs 源码路径写进 JSON 字符串，string context 丢失），与本故障无关。
 
 改动：`home/nix-cn.nix` 的 `substituters` 末位加 `https://nix-community.cachix.org`；`modules/fix-network.nix` 加 `nix.settings.trusted-public-keys = [ <cachix 公钥> ]`；`bootstrap/{linux,darwin,nixos}.sh` 的缓存变量追加该地址、新增 `CACHIX_PUBLIC_KEY`，以 `extra-trusted-public-keys` 写入（multi 写 daemon 的 `/etc/nix/nix.custom.conf`；linux 单用户写用户级 nix.conf 与 `NIX_CONFIG`；nixos.sh 另入 `NIX_CONFIG`）；三个脚本的幂等跳过标记由 NJU 改为 `nix-community.cachix.org`，使旧配置被重写一次而不是跳过；`AGENTS.md`/`README.md` 同步说明与手工补救命令。公钥刻意不进 `home/nix-cn.nix`：那会落到 standalone 用户 nix.conf，而 `trusted-public-keys` 对非受信用户（本机实测 `trusted-users = root`）是受限设置，每次连 daemon 都会打印 `ignoring the client-specified setting`。
 
@@ -678,7 +682,7 @@ Nix 求值输出出现已有的社区缓存签名警告和 `stdenv.isLinux/isDar
 
 ## 2026-09-19 nrs/nh 实机首验 + WSL cgroup 用户管理器故障（NixOS-WSL 26.11，本机 wsl）
 
-无代码改动；对 9d4d8e7（多机兼容性五连改）遗留未验项 `nrs` 的实机验证。本机当时代际：gen 7（2026-09-19 13:35，已含 nh 与新别名，由用户经 sudo nixos-rebuild 激活）。
+无代码改动；对 c5a4ca9（多机兼容性五连改）遗留未验项 `nrs` 的实机验证。本机当时代际：gen 7（2026-09-19 13:35，已含 nh 与新别名，由用户经 sudo nixos-rebuild 激活）。
 
 验证：`bash -ic 'type nrs && nrs'` 实跑——别名解析 ✓、cwd 相对 `.` 解析 ✓、`--hostname` 默认匹配 `.#wsl` ✓、构建 1s 全缓存 ✓、**nvd 代际 diff 输出正确**（2101→2101 路径、15.9 GiB→15.9 GiB、DIFF 0 字节——同树切换的预期值）、nh 对失败的呈现清晰（结构化错误 vs nixos-rebuild 的裸串）。
 

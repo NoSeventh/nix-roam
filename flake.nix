@@ -70,7 +70,7 @@
       # profiles/nixos-base.nix 声明 —— 那是另一实例的刻意差异，不做合并扩权。
       # electron-41.10.7（EOL）：桌面闭包经 pkgs-stable 的 electron_41 引用（2026-10-02 探针：
       # stable electron_41=41.10.7 / unstable=41.10.6，拒评的 41.10.7 只可能来自本 config
-      # 管辖的 stable 实例）。2f90778 update flake 后 stable 前移，自 41.9.1（2026-09-26 引入）
+      # 管辖的 stable 实例）。0d8a3c4 update flake 后 stable 前移，自 41.9.1（2026-09-26 引入）
       # 替换而来——旧版本已无引用者，替换而非累积。
       # electron-40.10.5 + pnpm-10.29.2（2026-10-11）：standalone unstable 实例在启用可选层
       # （agents 层的 cherry-studio 引 electron_40；全开组合另有 unstable 包链引 pnpm-10.29.2
