@@ -25,7 +25,7 @@ local.<主机键>.json               # 机器本地选配（gitignored，roam mo
 | git 视图（裸 `.#` / 锁定 `rev` 的 Git 引用） | CI eval job、pre-push 推送快照、远端 `git+https` 装机、手工 `nix build .#` | 不可见 | 入库默认集 |
 | `path:./.` 视图 | **roam 全链路**（switch/status/doctor/check）、CI module-matrix | 可见 | 本机选配 |
 
-`local.<主机键>.json` 存在时其 `modules` 列表是**权威完整选择**（整体替换默认集，不做增量合并）；不存在时走调用方显式给出的入库默认集（写在 `hosts/<主机名>/default.nix` / standalone 入口的 `default = []`——延续 explicit-imports 精神，默认组合在 git 里可见可审）。`hosts/nixos` 默认 = 11 层全集（= 原 profiles/desktop.nix），`hosts/wsl` 与 standalone 默认 = 空集（= 原组合）。
+`local.<主机键>.json` 存在时其 `modules` 列表是**权威完整选择**（整体替换默认集，不做增量合并）；不存在时走调用方显式给出的入库默认集（写在 `hosts/<主机名>/default.nix` / standalone 入口的 `default = []`——延续 explicit-imports 精神，默认组合在 git 里可见可审）。`hosts/nixos` 默认 = 除 android 外的 11 层全集（= 原 profiles/desktop.nix；android 层因含 unfree 的 Android Studio，循 ba5973a 闭源清理惯例仅在显式 enable 的机器上启用），`hosts/wsl` 与 standalone 默认 = 空集（= 原组合）。
 
 主机键（hostKey）：NixOS = 主机名（hosts/<主机名>/）；standalone = 输出名（`x86_64-linux` / `aarch64-linux` / `aarch64-darwin`）。
 
@@ -52,7 +52,7 @@ darwin 输出读 local 文件，但仅接受注册表 `darwin: true` 的模块�
 - 每模块单开隔离求值：nixos 前端在 `nixos` 主机、home 前端在 `x86_64-linux`（单层的求值死亡不被其它层掩盖）；
 - wsl 主机全开集求值（wsl 上下文：无硬件配置、nixos-wsl 模块在——agents 层的 `services.hermes-agent` 选项依赖 hermes 模块在 wsl 输出同挂，2026-10-11 补）；
 - darwin 白名单负例（白名单外模块必须被 throw）；
-- 全开集 x86_64 activationPackage **构建**（非默认组合的 buildEnv 冲突兜底；闭包 ~25GB，job 内额外磁盘清理）。
+- 全开集 x86_64 activationPackage **构建**（非默认组合的 buildEnv 冲突兜底；闭包 ~25GB，job 内额外磁盘清理；android 层的 SDK/Android Studio 下载另计 +4GB 左右）。
 - 矩阵清单直接解析 registry.json，无静态清单可漂移。
 
 ## 踩坑记录（机制落地时实证）

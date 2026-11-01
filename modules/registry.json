@@ -77,6 +77,13 @@
       "nixos": true,
       "home": false,
       "darwin": false
+    },
+    {
+      "name": "android",
+      "desc": "安卓开发：adb/fastboot + JDK + Gradle + Android Studio（unfree，WSLg/桌面 GUI）+ 预置只读 SDK（ANDROID_HOME 已接线，不含模拟器/NDK）",
+      "nixos": true,
+      "home": true,
+      "darwin": false
     }
   ]
 }

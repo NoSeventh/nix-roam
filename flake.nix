@@ -79,6 +79,9 @@
       # （默认组合 drvPath 不变，同 41.10.7 的 standalone 无引用者论证）。
       nixpkgsConfig = {
         allowUnfree = true;
+        # Android SDK 许可证预接受（androidenv 组装预置 SDK，见 modules/android/sdk.nix）。
+        # 纯 license 旗标、无版本号可漂移：不使用 androidenv 的输出求值不受影响。
+        android_sdk.accept_license = true;
         permittedInsecurePackages = [
           "electron-41.10.7"
           "electron-40.10.5"

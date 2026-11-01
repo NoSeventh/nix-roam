@@ -19,7 +19,8 @@ in
     ./common.nix
     ./nix-cn.nix
     selectionLib.metaModule
-  ] ++ lib.optional (lib.elem "mnt" sel.modules) ./mnt-linux.nix;
+  ] ++ lib.optional (lib.elem "mnt" sel.modules) ./mnt-linux.nix
+  ++ lib.optional (lib.elem "android" sel.modules) ./android-linux.nix;
 
   # 当前有效选择（roam module init / status 读取）
   roam.selectedModules = sel.modules;

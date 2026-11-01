@@ -117,7 +117,8 @@ metadata. Darwin's whitelist is currently empty.
 maintains it. Host key is NixOS hostname or standalone output name. A present
 file is the complete authoritative selection, replacing the tracked default;
 absence uses the explicit default in each host/standalone entry. Defaults are
-all 11 tiers for desktop and empty for WSL/standalone. Git evaluation and remote
+the 11 open-source tiers for desktop (the unfree android tier is opt-in per
+machine) and empty for WSL/standalone. Git evaluation and remote
 `git+https` cannot see ignored files. Roam and CI module-matrix use `path:./.`;
 CI's default eval and pre-push commit snapshots use Git. Local switch/build
 and recovery examples must use `path:./.` to retain selections.

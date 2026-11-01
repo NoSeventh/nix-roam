@@ -9,6 +9,43 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，b9c3cea；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-11-01 新增 android 可选层（Gentoo 2.18 / WSL2 standalone x86_64，本机）
+
+宿主：Gentoo Linux 2.18，`/etc/NIXOS` 不存在，x86_64 Microsoft WSL2 内核；
+使用 standalone Home Manager，本机 `local.x86_64-linux.json` 启用
+`mnt` + `android`。
+
+改动：新增 `android` 可选层（第 12 层）：`modules/android/{packages,nixos,home,sdk}.nix`
++ standalone 前端环境接线 `home/android-linux.nix`。内容为 stable 通道的
+android-tools（adb/fastboot）、openjdk 21、gradle 8.14.4、Android Studio
+2025.3.4.7（unfree，循 ba5973a 惯例不进任何默认集，仅本机显式启用）与
+androidenv 预置只读 SDK（platforms 35/36/37.0 + build-tools 35.0.0/36.0.0/
+37.0.0 + platform-tools + cmdline-tools 20.0 + cmake 4.1.2，无模拟器/NDK/
+系统镜像）。`ANDROID_HOME` 指向 store 内 SDK 根（standalone 经
+`home.sessionVariables`、NixOS 经 `environment.variables`），`sdkmanager`
+直通 PATH，增量组件需 `sdkmanager --sdk_root` 自建用户目录。flake.nix 的
+共享 nixpkgsConfig 预接受 SDK 许可证（`android_sdk.accept_license = true`，
+纯旗标无版本号）。注册表、docs/modules.md 与 AGENTS.md 层数描述同步。
+
+验证：`nix fmt`（7 文件零改动）、`nix-instantiate --parse`、`git diff --check`
+通过；`path:./.` 视图五输出 drvPath 求值通过（nixos/wsl/ARM/darwin 走默认集，
+x86_64 走 mnt+android 选配）；本机 activationPackage 构建通过（约 9 分钟，
+Android Studio 与 SDK 组件多命中二进制缓存），产物内冒烟：adb/fastboot
+35.0.2、java 21.0.12.1、gradle 8.14.4（Launcher JVM 21）、sdkmanager 20.0
+全部可用；SDK 目录含 android-{35,36,37.0} 与三代 build-tools；
+`hm-session-vars.sh` 导出 ANDROID_HOME。`nix flake check path:./.` 通过
+（三项 x86_64 checks：selection-metadata / shellcheck-scripts /
+roam-unit-tests）。预演 CI module-matrix 组合：wsl 全开（12 层）toplevel
+求值、home 前端全开（8 层）activationPackage 求值均通过，临时 local 文件
+已清理复原。
+
+边界：未激活（`roam switch` 由用户执行）；Android Studio GUI 经 WSLg 的
+实际启动、adb 连接真机/模拟器、gradle 真实项目构建未测试；home 前端全开
+组合的**构建**（CI 兜底项，闭包 ~29GB）未在本地执行，留待 CI；aarch64
+构建未执行（android-studio 仅 x86_64-linux 平台，全开 ARM 构建预期失败，
+CI 矩阵未覆盖 ARM 构建）。求值期既有 Cachix 签名警告与 stdenv 弃用警告
+未处理。
+
 ## 2026-10-30 共享 Hugging Face Hub CLI（Gentoo WSL x86_64）
 
 宿主：Gentoo Linux 2.18，`/etc/NIXOS` 不存在，x86_64 Microsoft WSL2 内核；
