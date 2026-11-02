@@ -7,6 +7,7 @@
 {
   imports = [
     ./common.nix
+    ./input-method-defaults.nix
   ];
 
   # 用户信息（username / stateVersion 由 flake 单点定义，经 specialArgs 注入）

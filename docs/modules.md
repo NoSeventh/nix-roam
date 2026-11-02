@@ -15,6 +15,7 @@ local.<主机键>.json               # 机器本地选配（gitignored，roam mo
 ```
 
 - **基座不可选**：`profiles/nixos-base.nix`（系统基座 + 运行时 + GC）、桌面基座（session/niri/locale-zh/core，经 `profiles/desktop.nix`）、`profiles/cli.nix`（WSL 的 CLI 列表）、standalone 的 `common.nix + cli-dev.nix`。`packages/cli-dev.nix` 仍是不拆的四安装点共享 CLI 列表——模块层叠在其上。
+- Standalone Linux 默认仍是 CLI-only。桌面主机可通过 `roam module enable input-method` 选装用户级 Fcitx5 + Rime；具体使用与桌面会话边界见下方「桌面 Linux 输入法」。
 - 注册表是**双消费源**：Nix 侧 `lib/selection.nix` 用 fromJSON，bash 侧 `roam.sh load_registry` 用 jq——两路消费者不依赖 JSON 排版；`tests/module-registry.sh` 核对旗标与文件实态（home=false 却有 home.nix 的"静默不可达"是重点盯防形态）。
 - 文件位置按约定派生（`modules/<名>/{nixos,home}.nix`），注册表只记名字与旗标——**必须用路径字面量插值**构造（`../modules/${名}/home.nix`）：`../. + 字符串` 拼出的绝对路径在纯求值下禁止 import（2026-10-11 /tmp 尖刺实证）。
 
@@ -64,6 +65,45 @@ darwin 输出读 local 文件，但仅接受注册表 `darwin: true` 的模块�
 5. **set -e 管道赋值**：`cur="$(printf … | grep -vxF x)"` 在滤空输出时 rc=1，函数静默中止——`|| true` 兜住；单测桩内须还原 `set -e` 生产语义否则假通过。
 
 ## 共享列表与 JSON 接口
+
+### 桌面 Linux 输入法
+
+NixOS 桌面的输入法属于桌面基座；standalone Linux 则显式启用：
+
+```bash
+roam module enable input-method
+roam switch
+```
+
+这两个命令在目标桌面 Linux 的仓库根运行，不要在只需 CLI 的 WSL/服务器启用。
+ARM standalone 使用同一个层，不依赖求值主机或环境变量来猜测是否有桌面。
+`input-method` 仅注册 home 前端；NixOS 桌面不需要再启用，Darwin 不适用。
+
+两类桌面共享 `home/input-method-defaults.nix`：Fcitx5 的默认组包含美式键盘和
+Rime，`DefaultIM=rime` 且 `ActiveByDefault=True`；Rime 的
+`default.custom.yaml` 载入雾凇推荐设置，只启用 `double_pinyin_flypy`（小鹤双拼），
+避免沿用旧的全拼选择。小鹤双拼是声韵双拼方案，不包含小鹤音形整套码表。
+
+standalone 的 `home/input-method-linux.nix` 用 HM 的 `i18n.inputMethod`
+安装 stable Fcitx5 wrapper（自带 GTK/Qt 桥接和配置工具），Rime 通过
+`rimeDataPkgs = [ rime-ice ]` 获得实际数据目录，而不是仅把词库包放进 PATH。
+`modules/input-method/home.nix` 保持返回包列表的契约，但返回空列表，
+避免另装一份未封装的 Fcitx5。自启动文件写入 XDG Autostart，兼容非 systemd 桌面，
+不再同时启动 HM 的 systemd 服务。
+
+激活后需注销并重新登录，让整个桌面会话加载 HM 环境变量和自启动项；
+Rime 配置更新后在托盘执行「重新部署」。已有同名配置文件时 HM 会报冲突，
+先备份 `~/.config/fcitx5/{config,profile}` 和
+`~/.local/share/fcitx5/rime/default.custom.yaml` 再迁移，不强制覆盖。
+只托管这些文件，Rime 的 `build/`、`*.userdb` 和同步目录仍由用户持有。
+
+宿主桌面仍需正常加载 HM 登录环境并支持 XDG Autostart；手工启动的 compositor
+需自行加载会话环境并启动 Fcitx5。已有 IBus/Fcitx 自启动应先停用，避免重复实例。
+KDE Wayland 的虚拟键盘选择、GNOME 托盘扩展以及宿主原生 GTK/Qt 应用的插件/ABI
+兼容性仍取决于桌面设置，不由 Nix 用户配置强改；此默认采用 GTK/Qt IM 模块，
+不全局强制所有桌面使用 Wayland frontend。Flatpak 等沙箱应用另有宿主集成边界。
+
+### 应用列表与 JSON
 
 可选层的 `packages.nix` 返回两前端共享的应用列表；`home.nix` 转发该函数，
 `nixos.nix` 安装同一列表并声明系统服务及额外工具。dev 的 clang、裸 neovim、

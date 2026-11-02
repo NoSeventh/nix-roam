@@ -207,7 +207,7 @@ nonexistent inputs or reintroduce removed chaotic/master inputs casually.
   and `.githooks/pre-push`'s guard must remain sourceable for tests. Keep Bash
   3.2 compatibility. The package pins its command-library store path; jq and
   other runtime tools come from the install sites, without runtimeInputs.
-- `nix flake check` builds selection-metadata, shellcheck-scripts, and roam-unit-tests; every command
+- `nix flake check` builds input-method-defaults, selection-metadata, shellcheck-scripts, and roam-unit-tests; every command
   library file is statically checked. Test stubs use $BASH shebangs, and completion
   checks require bashInteractive. Run tests/run-all.sh for local script checks.
 - CI evaluates five outputs, builds x86_64 standalone, and runs flake checks.

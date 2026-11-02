@@ -9,6 +9,48 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，836e59f；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-11-02 Linux 桌面默认 Fcitx5 + Rime 小鹤双拼
+
+宿主：Gentoo Linux 2.18，`/etc/NIXOS` 不存在，x86_64 Microsoft WSL2 内核；
+以 standalone Home Manager 模式验证，未激活桌面输入法。
+
+改动：新增仅 home-linux 可选的 `input-method` 层，HM 模块安装 stable
+Fcitx5 wrapper（GTK/Qt 桥接与配置工具）及带雾凇词库的 Rime 插件；
+XDG Autostart 启动该 wrapper，不依赖 systemd 用户服务。
+NixOS 桌面与 standalone opt-in 共享 `home/input-method-defaults.nix`：
+Fcitx5 默认 Rime 且启动为活动状态，Rime 只启用小鹤双拼
+`double_pinyin_flypy`。NixOS 的 Rime 同样通过 `rimeDataPkgs` 接入雾凇，
+不再仅把词库包放在 addons 并假设插件会搜索到它。
+CLI-only 默认、NixOS-WSL、Darwin 不引入此配置。
+新增 `checks.<linux>.input-method-defaults` 覆盖 CLI 隔离、两前端默认项一致、
+环境变量、自启动文件和插件/方案产物。README 与模块使用文档同步。
+
+验证：编辑的 Nix 文件通过 `nix fmt`、解析；五输出 drvPath 求值通过，
+本机 x86_64 保留原有 `mnt` + `android` 选择。使用独立的临时
+`local.input-method-test.json` 和 HM `extendModules.specialArgs.hostKey`
+覆盖真实选配入口，input-method 单开 x86_64 / ARM 求值通过，
+home 前端 9 层全开 x86_64 求值通过，Darwin 明确拒绝该层。
+input-method 单开的 x86_64 activationPackage 实际构建通过；
+NixOS 的 `config.i18n.inputMethod.package` 也构建通过（非整套系统构建）。
+从实际产物确认自启动命令指向 wrapper，含 `librime.so`、
+`double_pinyin_flypy.schema.yaml` 和 `rime_ice_suggestion.yaml`。
+使用相同 librime 的 `rime_deployer --build` 在临时用户目录部署成功，
+生成的小鹤 prism、雾凇词典和默认 `schema_list` 均正确。
+`nix flake check path:./.` 四项 x86_64 检查及 `bash tests/run-all.sh`
+全部通过；ARM 新增 check 的 drvPath 求值通过。临时选配与 Rime 测试目录已清理，
+未修改本机 local 选择或真实用户词库。
+
+提交前复验：当前 `mnt` + `android` standalone activationPackage、
+在此基础上额外导入输入法 HM 模块的 activationPackage、NixOS 输入法包和
+input-method-defaults check 均构建通过；重新运行 `nix fmt`（7 文件零改动）、
+`git diff --check` 与 `nix flake check path:./.` 通过。仍未更改本机选配或激活。
+
+边界：未激活、未实测图形会话或应用中的中文输入；ARM 未构建，
+NixOS 整套系统和 standalone 全开组合未构建。已有同名用户配置须先备份迁移，
+激活后需注销重登及 Rime 重新部署。宿主桌面环境、已有 IBus/Fcitx、
+KDE Wayland 虚拟键盘选择和原生/沙箱应用的 IM 插件兼容性仍需目标桌面验证；
+不自动修改宿主系统配置。既有 Cachix 签名与 stdenv 弃用警告未处理。
+
 ## 2026-11-01 git 历史按主题重写（元数据操作，树零变化）
 
 非代码改动：将 2026-09-17 之前约 9 个月的 307 个零散提交按主题压缩为 12 个时代提交（初始提交保留，之后的 92 个规范提交逐条保留，400 → 105）。执行方式为 `git commit-tree` 保树重建（非补丁重放，无冲突面），验证：分段覆盖与顺序经全量 rev-list 逐一比对；新旧 HEAD `git diff` 为空（文件内容逐字节一致）；保留提交的作者/提交者身份与日期原样保留。文档与 `flake.nix` 中 29 个旧提交引用已按 old→new 映射表改写（`docs/VALIDATION.md`、`docs/modules.md`、`flake.nix`），无未映射的真实引用；`home/default.nix` 等处的十六进制匹配确认为颜色值/数字/分区 UUID，未触碰。旧历史完整保留于本地分支 `backup/pre-rewrite-20261101`。边界：需强推 Gitee（有意识的规则破例）；GitHub 镜像因同步 CI 不强推需一次性手动对齐；其他克隆需 `git fetch && git reset --hard origin/master`；本次未运行任何 Nix 求值/构建（树未变化，无需）。

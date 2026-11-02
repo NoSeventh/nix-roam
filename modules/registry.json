@@ -2,6 +2,13 @@
   "version": 1,
   "modules": [
     {
+      "name": "input-method",
+      "desc": "桌面 Linux 用户级 Fcitx5 + Rime 雾凇拼音（默认小鹤双拼）",
+      "nixos": false,
+      "home": true,
+      "darwin": false
+    },
+    {
       "name": "flatpak",
       "desc": "Flatpak/Linyaps 应用商店 + SJTU 镜像源（系统服务，无用户级实现）",
       "nixos": true,

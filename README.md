@@ -26,6 +26,7 @@
 - 跨平台共享的现代 CLI、Git 工具、C/C++、Rust、Go、uv、Typst 与 AI 辅助工具；Node/npm 和 Python 科学计算环境仅在 NixOS 安装
 - Linux / WSL 上不依赖 root profile 的便携用户环境
 - NixOS 上的 Niri 桌面、GUI 应用、服务与虚拟化配置
+- Linux 桌面默认 Fcitx5 + Rime 小鹤双拼；standalone 通过 `roam module enable input-method` 选装后 `roam switch`，注销重登生效（[使用与边界](docs/modules.md#桌面-linux-输入法)）
 - 面向中国大陆网络的 Nix binary cache 和 npm 镜像配置
 - unstable 与 stable 两套 nixpkgs 通道，按软件稳定性选用
 

@@ -157,6 +157,7 @@
         };
 
       # 仓库自有脚本关卡（nix flake check；CI eval.yml 第三层）：
+      #   input-method-defaults —— 桌面共享默认项、CLI 隔离、Fcitx5 插件与自启动产物
       #   selection-metadata —— 五输出选配元信息可读，且不可被第二次赋值覆盖
       #   shellcheck-scripts —— 补全文件、tests/bootstrap 脚本与 git 钩子等不经
       #                         writeShellApplication 门的脚本静态检查
@@ -168,6 +169,40 @@
       scriptChecks =
         pkgs':
         {
+          input-method-defaults =
+            let
+              baseline = (self.homeConfigurations.${pkgs'.stdenv.hostPlatform.system}.extendModules {
+                specialArgs.hostKey = "__input-method-check";
+              }).config;
+              desktop = self.nixosConfigurations.nixos.config.home-manager.users.${username};
+              configured = (self.homeConfigurations.${pkgs'.stdenv.hostPlatform.system}.extendModules {
+                specialArgs.hostKey = "__input-method-check";
+                modules = [ ./home/input-method-linux.nix ];
+              }).config;
+              rimePatch = c: c.xdg.dataFile."fcitx5/rime/default.custom.yaml".text;
+              fcitxProfile = c: c.xdg.configFile."fcitx5/profile".text;
+            in
+            assert !baseline.i18n.inputMethod.enable;
+            assert !(baseline.xdg.dataFile ? "fcitx5/rime/default.custom.yaml");
+            assert configured.i18n.inputMethod.enable;
+            assert configured.i18n.inputMethod.type == "fcitx5";
+            assert !configured.i18n.inputMethod.fcitx5.systemd.enable;
+            assert configured.home.sessionVariables.GTK_IM_MODULE == "fcitx";
+            assert configured.home.sessionVariables.QT_IM_MODULE == "fcitx";
+            assert configured.home.sessionVariables.XMODIFIERS == "@im=fcitx";
+            assert rimePatch configured == rimePatch desktop;
+            assert fcitxProfile configured == fcitxProfile desktop;
+            assert pkgs'.lib.hasInfix "DefaultIM=rime" (fcitxProfile configured);
+            assert pkgs'.lib.hasInfix "schema: double_pinyin_flypy" (rimePatch configured);
+            assert configured.xdg.configFile."fcitx5/config".text == desktop.xdg.configFile."fcitx5/config".text;
+            pkgs'.runCommand "input-method-defaults" { } ''
+              test -f ${configured.i18n.inputMethod.package}/share/rime-data/double_pinyin_flypy.schema.yaml
+              test -f ${configured.i18n.inputMethod.package}/share/rime-data/rime_ice_suggestion.yaml
+              test -f ${configured.i18n.inputMethod.package}/lib/fcitx5/librime.so
+              test -f ${configured.xdg.configFile."autostart/org.fcitx.Fcitx5.desktop".source}
+              ${configured.i18n.inputMethod.package}/bin/fcitx5 --version
+              touch $out
+            '';
           # 元信息不一定被 activationPackage/toplevel 强制求值，需单独覆盖。
           selection-metadata =
             let

@@ -13,8 +13,9 @@
       fcitx5-nord
       fcitx5-pinyin-zhwiki
       fcitx5-lua
-      fcitx5-rime
-      rime-ice
+      (fcitx5-rime.override {
+        rimeDataPkgs = [ rime-ice ];
+      })
     ];
     fcitx5.waylandFrontend = true;
   };
@@ -26,10 +27,10 @@
     packages = with pkgs-stable; [
       cascadia-code
       noto-fonts
-      noto-fonts-cjk-sans    # 思源黑体
-      noto-fonts-cjk-serif   # 思源宋体
+      noto-fonts-cjk-sans # 思源黑体
+      noto-fonts-cjk-serif # 思源宋体
       noto-fonts-color-emoji
-      source-han-sans        # 思源黑体
+      source-han-sans # 思源黑体
       unifont
       dejavu_fonts
       jetbrains-mono
