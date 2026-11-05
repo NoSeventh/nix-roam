@@ -6,6 +6,7 @@ with pkgs;
   cc-switch
   agent-browser
   codex
+  deepseek-harness
   opencode-desktop
 
   # AI 聊天客户端
