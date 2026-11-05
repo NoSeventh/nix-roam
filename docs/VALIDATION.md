@@ -9,6 +9,14 @@
 - 测试断言不得隐含宿主假设：凡被测路径消费宿主探测（`is_nixos` / `uname` 等），桩内一律钉死其返回值——否则用例语义随运行宿主漂移（2026-09-28 gc 用例在真 NixOS 上假失败一次后立此规矩，836e59f；且新脚本测试应在第二个宿主上跑过一遍才算数）。
 - 对纯文档改动：检查源一致性、本地链接、被删路径的引用与 `git diff --check`，无需重建或激活。
 
+## 2026-11-05 新增 torrent 可选层（qBittorrent-nox + FakeHTTP 上传伪装）
+
+宿主：Gentoo Linux / WSL2 standalone Nix 2.35.2（`/etc/NIXOS` 不存在，x86_64，6.18.40.1 WSL2 内核）；构建目标 `nixosConfigurations.wsl`。
+
+改动：新系统级可选层 `modules/torrent/`（registry 注册 `torrent`，nixos:true / home:false / darwin:false；入库默认集不变，wsl 默认仍为空集，需 `roam module enable torrent` 本地启用）。内容：`services.qbittorrent`（锁定 rev 的 qbittorrent-nox 5.2.3，WebUI 8080 / BT 51413，出站源端口池 51414-51513——`Session\OutgoingPortsMin/Max` 键名在 qBittorrent 5.3 源码实证）；FakeHTTP 0.9.18（锁定 nixpkgs 已收录，无需自打包）systemd 服务 `-f -4 -a -y 50 -h/-e www.baidu.com`，nft 规则复刻上游 `src/ipv4nft.c` 表结构但把队列条件收窄到 qBittorrent 端口（postrouting 匹配源端口池、prerouting 匹配 dport 51413，SYN + `ct packets 2-4` ACK、fwmark 0x8000 旁路、bypass 放行，规则随服务 ExecStartPre/ExecStopPost 启停）；`boot.kernelModules = [ nfnetlink_queue xt_NFQUEUE ]`（WSL 宿主内核 `XT_TARGET_NFQUEUE=m`，模块经 WSL overlay 挂载，Gentoo 与 NixOS-WSL 的 `/lib/modules` 均实证存在）。
+
+验证：干净树 `nix flake check` 全过（含 selection-metadata 门禁）；临时 `local.wsl.json`（验后已删）启用 torrent 后 `nix eval path:./.` 的 selectedModules 与 fakehttp/qbittorrent 两服务 ExecStart 正确解析，并完整构建 `nixosConfigurations.wsl.config.system.build.toplevel`（26.11.20261006.151fa4e）成功。未验证：NixOS-WSL 内实际激活与 `roam module enable/switch` 链路、nft 规则运行时装载（非 root 无法 `nft -c` 预检，语法为服务首启硬校验；规则主体逐字复刻上游生成物）、FakeHTTP 实际伪装与运营商侧效果、IPv6/镜像网络路径、桌面 `nixos` 输出启用本层。
+
 ## 2026-11-02 Linux 桌面默认 Fcitx5 + Rime 小鹤双拼
 
 宿主：Gentoo Linux 2.18，`/etc/NIXOS` 不存在，x86_64 Microsoft WSL2 内核；

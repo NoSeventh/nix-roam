@@ -91,6 +91,13 @@
       "nixos": true,
       "home": true,
       "darwin": false
+    },
+    {
+      "name": "torrent",
+      "desc": "种子盒：qBittorrent-nox WebUI + FakeHTTP NFQUEUE 上传流量伪装成 HTTP（绕过运营商 QoS 限速；系统级专属，无用户级实现）",
+      "nixos": true,
+      "home": false,
+      "darwin": false
     }
   ]
 }
